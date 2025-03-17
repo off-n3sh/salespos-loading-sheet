@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% block title %}Reports{% endblock %}
+{% block content %}
+<div class="container mx-auto">
+    <h2 class="text-3xl font-bold mb-6 text-gray-900 dark:text-white">Financial Reports</h2>
+
+    <!-- Time Filter -->
+    <div class="mb-6">
+        <label for="time-filter" class="text-gray-700 dark:text-gray-300 mr-2">Filter by Time:</label>
+        <select id="time-filter" class="p-2 border rounded dark:bg-gray-800 dark:text-white" onchange="updateFilter()">
+            <option value="day" {% if time_filter == 'day' %}selected{% endif %}>Daily</option>
+            <option value="week" {% if time_filter == 'week' %}selected{% endif %}>Weekly</option>
+            <option value="month" {% if time_filter == 'month' %}selected{% endif %}>Monthly</option>
+            <option value="year" {% if time_filter == 'year' %}selected{% endif %}>Yearly</option>
+        </select>
+    </div>
+
+    <!-- Financial Metrics Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Total Sales</h3>
+            <p class="text-gray-700 dark:text-gray-300">Retail: {{ chart_data.sales_vs_debts.data[0] | round(2) }} KES</p>
+            <p class="text-gray-700 dark:text-gray-300">Wholesale: {{ chart_data.sales_vs_debts.data[1] | round(2) }} KES</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Total Paid</h3>
+            <p class="text-gray-700 dark:text-gray-300">Retail: {{ chart_data.paid_vs_debt.data[0] | round(2) }} KES</p>
+            <p class="text-gray-700 dark:text-gray-300">Wholesale: {{ chart_data.paid_vs_debt.data[1] | round(2) }} KES</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Total Debt</h3>
+            <p class="text-gray-700 dark:text-gray-300">Retail: {{ chart_data.paid_vs_debt.data[2] | round(2) }} KES</p>
+            <p class="text-gray-700 dark:text-gray-300">Wholesale: {{ chart_data.paid_vs_debt.data[3] | round(2) }} KES</p>
+            <p class="text-gray-700 dark:text-gray-300 font-semibold">Overall: {{ total_debt | round(2) }} KES</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Money in Bank</h3>
+            <p class="text-gray-700 dark:text-gray-300">Retail: {{ chart_data.money_in_bank.data[0] | round(2) }} KES</p>
+            <p class="text-gray-700 dark:text-gray-300">Wholesale: {{ chart_data.money_in_bank.data[1] | round(2) }} KES</p>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <!-- Sales vs Debts Chart -->
+        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Sales vs Debts</h3>
+            <canvas id="sales-vs-debts-chart" class="h-64"></canvas>
+        </div>
+        <!-- Paid vs Debt Chart -->
+        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Paid vs Debt</h3>
+            <canvas id="paid-vs-debt-chart" class="h-64"></canvas>
+        </div>
+        <!-- Money in Bank Chart -->
+        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Money in Bank</h3>
+            <canvas id="money-in-bank-chart" class="h-64"></canvas>
+        </div>
+    </div>
+
+    <!-- Order History -->
+    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-6">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Order History</h3>
+        <div class="space-y-2">
+            {% for order in orders %}
+            <div class="text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 py-2">
+                <span class="font-semibold">{{ order.receipt_id }} - {{ order.shop_name }}</span>
+                <span class="ml-2">Booked {{ order.date.strftime('%d/%m/%Y %H:%M') }}</span>
+                <span class="ml-2 {{ 'text-green-600' if order.balance == 0 else 'text-red-600' }}">
+                    {% if order.balance > 0 %}
+                        Open Pending {{ order.balance }}
+                    {% else %}
+                        Closed Paid {{ order.payment }} on {{ order.closed_date.strftime('%d/%m/%Y %H:%M') if order.closed_date else 'N/A' }}
+                    {% endif %}
+                </span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Stock Activity Log -->
+    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-6">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Stock Activity Log</h3>
+        <div class="space-y-2">
+            {% for log in stock_logs %}
+            <div class="text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 py-2">
+                <span>{{ log.timestamp.strftime('%d/%m/%Y %H:%M') }} - </span>
+                <span class="font-semibold">{{ log.product_type }} - {{ log.subtype }}</span>
+                <span class="{{ 'text-green-600' if log.change_type == 'add_stock' else 'text-red-600' }}">: {{ log.change_type }} {{ log.quantity }} @ {{ log.price_per_unit }} ({{ log.quantity * log.price_per_unit }})</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Expenses Log -->
+    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Expenses Log</h3>
+        <div class="space-y-2">
+            {% for expense in expenses %}
+            <div class="text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 py-2">
+                <span>{{ expense.date.strftime('%d/%m/%Y %H:%M') }} - </span>
+                <span class="font-semibold">{{ expense.category }}: {{ expense.description }}</span>
+                <span class="text-purple-600"> - {{ expense.amount }} KES</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<script>
+    // Update time filter
+    function updateFilter() {
+        const timeFilter = document.getElementById('time-filter').value;
+        window.location.href = `{{ url_for('reports') }}?time=${timeFilter}`;
+    }
+
+    // Initialize Charts
+    // Sales vs Debts Chart
+    const salesVsDebtsCtx = document.getElementById('sales-vs-debts-chart').getContext('2d');
+    new Chart(salesVsDebtsCtx, {
+        type: 'bar',
+        data: {
+            labels: {{ chart_data.sales_vs_debts.labels | tojson }},
+            datasets: [{
+                label: 'Amount (KES)',
+                data: {{ chart_data.sales_vs_debts.data | tojson }},
+                backgroundColor: {{ chart_data.sales_vs_debts.colors | tojson }},
+                borderColor: {{ chart_data.sales_vs_debts.colors | tojson }},
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Amount (KES)'
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+
+    // Paid vs Debt Chart
+    const paidVsDebtCtx = document.getElementById('paid-vs-debt-chart').getContext('2d');
+    new Chart(paidVsDebtCtx, {
+        type: 'bar',
+        data: {
+            labels: {{ chart_data.paid_vs_debt.labels | tojson }},
+            datasets: [{
+                label: 'Amount (KES)',
+                data: {{ chart_data.paid_vs_debt.data | tojson }},
+                backgroundColor: {{ chart_data.paid_vs_debt.colors | tojson }},
+                borderColor: {{ chart_data.paid_vs_debt.colors | tojson }},
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Amount (KES)'
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+
+    // Money in Bank Chart
+    const moneyInBankCtx = document.getElementById('money-in-bank-chart').getContext('2d');
+    new Chart(moneyInBankCtx, {
+        type: 'bar',
+        data: {
+            labels: {{ chart_data.money_in_bank.labels | tojson }},
+            datasets: [{
+                label: 'Amount (KES)',
+                data: {{ chart_data.money_in_bank.data | tojson }},
+                backgroundColor: {{ chart_data.money_in_bank.colors | tojson }},
+                borderColor: {{ chart_data.money_in_bank.colors | tojson }},
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Amount (KES)'
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

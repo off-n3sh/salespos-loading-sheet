@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dreamland Enterprises - {% block title %}{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <!-- Add Chart.js for Reports page visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white transition-colors duration-300">
+    <div class="flex h-screen">
+        <!-- Sidebar (Hidden by Default) -->
+        <div id="sidebar" class="w-64 bg-gray-800 dark:bg-gray-900 shadow-lg p-4 flex flex-col h-full transition-all duration-300 transform -translate-x-full">
+            <div class="flex justify-between items-center mb-6">
+                <h1 class="text-xl font-bold text-white">Dreamland Enterprises</h1>
+                <button id="sidebar-close" class="text-white focus:outline-none">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <nav class="flex-1">
+                <a href="{{ url_for('dashboard') }}" class="block py-2 px-4 text-gray-300 hover:bg-orange-500 hover:text-white rounded">Home</a>
+                <a href="{{ url_for('orders') }}" class="block py-2 px-4 text-gray-300 hover:bg-orange-500 hover:text-white rounded">Orders</a>
+                <a href="{{ url_for('receipts') }}" class="block py-2 px-4 text-gray-300 hover:bg-orange-500 hover:text-white rounded">Receipts</a>
+                <a href="{{ url_for('loading_sheets') }}" class="block py-2 px-4 text-gray-300 hover:bg-orange-500 hover:text-white rounded">Loading Sheets</a>
+                <a href="{{ url_for('stock') }}" class="block py-2 px-4 text-gray-300 hover:bg-orange-500 hover:text-white rounded">Stock</a>
+                <a href="{{ url_for('reports') }}" class="block py-2 px-4 text-gray-300 hover:bg-orange-500 hover:text-white rounded">Reports</a>
+            </nav>
+            <button id="theme-toggle" class="mt-4 bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600">Toggle Dark Mode</button>
+        </div>
+        <!-- Main Content -->
+        <div id="main-content" class="flex-1 transition-all duration-300">
+            <header class="bg-blue-900 text-white p-4 flex items-center justify-between">
+                <button id="sidebar-toggle" class="text-white focus:outline-none">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+                    </svg>
+                </button>
+                <h1 class="text-2xl font-semibold">Dreamland Enterprises</h1>
+                <div></div> <!-- Spacer -->
+            </header>
+            <div class="p-6">
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>

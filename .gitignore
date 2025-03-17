@@ -1,0 +1,29 @@
+# Created by venv; see https://docs.python.org/3/library/venv.html
+
+# Ignore Python virtual environments
+venv/
+bin/
+lib/
+lib64/
+pyvenv.cfg/
+include/
+
+# Ignore sensitive files
+salespos-578ff-firebase-adminsdk-fbsvc-e3d51aa7c5.json
+sec.py
+
+# Ignore database and logs
+dreamland.sql
+*.log
+
+# Ignore build artifacts and temporary files
+build.txt
+__pycache__/
+*.pyc
+
+# Ignore other unnecessary files
+writeup
+
+# Ignore editor files
+.DS_Store
+*.swp

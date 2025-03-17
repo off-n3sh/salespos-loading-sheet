@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% block title %}Loading Sheets{% endblock %}
+{% block content %}
+    <div class="p-6 max-w-4xl mx-auto">
+        <!-- Current Loading Sheet -->
+        <div id="current-loading-sheet" class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-8 print:border-0">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Current Loading Sheet</h2>
+                <div class="flex space-x-4">
+                    <button onclick="printCurrentSheet()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none transition">Print</button>
+                    <a href="{{ url_for('download_loading_sheet') }}" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">Download PDF</a>
+                </div>
+            </div>
+
+            <div class="border border-gray-300 dark:border-gray-600 rounded-lg p-5 print:border print:p-6">
+                <!-- Header -->
+                <div class="text-center mb-6 print:mb-8">
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Dreamland Distributors</h3>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">P.O Box 123-00200 Nairobi | Phone: 0725 530632</p>
+                    <p class="text-sm font-medium mt-1"><strong>Date:</strong> {{ current_date.strftime('%d/%m/%Y %H:%M') if current_date else '' }}</p>
+                    {% if created_at %}
+                        <p class="text-sm font-medium mt-1"><strong>Created At:</strong> {{ created_at.strftime('%d/%m/%Y %H:%M') }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Goods Table -->
+                <table class="w-full border-collapse border border-gray-300 dark:border-gray-600 text-sm print:text-base">
+                    <thead>
+                        <tr class="bg-gray-100 dark:bg-gray-700">
+                            <th class="border border-gray-300 dark:border-gray-600 p-3 text-left font-medium">Item</th>
+                            <th class="border border-gray-300 dark:border-gray-600 p-3 text-left font-medium">Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in aggregated_items %}
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                            <td class="border border-gray-300 dark:border-gray-600 p-3">{{ item.name }}</td>
+                            <td class="border border-gray-300 dark:border-gray-600 p-3">
+                                {% if "sugar" in item.name.lower() and "2k" in item.name.lower() %}
+                                    2 pieces x {{ item.quantity }}
+                                {% elif item.quantity > 1 %}
+                                    {{ item.quantity }} pieces
+                                {% else %}
+                                    Single unit
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+                <!-- Footer -->
+                <div class="mt-6 text-center print:mt-8">
+                    <p class="text-sm font-medium text-gray-900 dark:text-white">Total Items: {{ total_items }}</p>
+                    <div class="mt-4 space-y-2">
+                        <p><strong>Driver Signature:</strong> ____________________</p>
+                        <p><strong>Date Loaded:</strong> ____________________</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Loading Sheets -->
+        {% if recent_sheets %}
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+                <h3 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Recent Loading Sheets</h3>
+                <div class="space-y-4">
+                    {% for sheet in recent_sheets %}
+                    <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg shadow transition hover:shadow-md">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <p class="text-gray-900 dark:text-white"><strong>ID:</strong> {{ sheet.id }}</p>
+                                <p class="text-gray-600 dark:text-gray-400 mt-1">Total Items: {{ sheet.total_items }}</p>
+                                <p class="text-gray-600 dark:text-gray-400 mt-1">Created At: {{ sheet.created_at.strftime('%d/%m/%Y %H:%M') }}</p>
+                            </div>
+                            <div class="flex justify-end space-x-2">
+                                <button onclick="printLoadingSheet('{{ sheet.id }}')" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Print</button>
+                                <a href="{{ url_for('download_loading_sheet') }}?sheet_id={{ sheet.id }}" class="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">Download</a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Recent Activity -->
+        {% if recent_activity %}
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mt-8">
+                <h3 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Recent Activity</h3>
+                <div class="space-y-4">
+                    {% for activity in recent_activity %}
+                    <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg shadow">
+                        <p class="text-gray-900 dark:text-white"><strong>ID:</strong> {{ activity.receipt_id }}</p>
+                        <p class="text-gray-600 dark:text-gray-400 mt-1">Salesperson: {{ activity.salesperson_name }}</p>
+                        <p class="text-gray-600 dark:text-gray-400 mt-1">Shop: {{ activity.shop_name }}</p>
+                        <p class="text-gray-600 dark:text-gray-400 mt-1">Date: {{ activity.date.strftime('%d/%m/%Y %H:%M') }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Print Styles -->
+    <style type="text/css" media="print">
+        body {
+            background-color: #ffffff;
+            color: #000000;
+            margin: 0;
+            padding: 0;
+        }
+        /* Hide everything except the print target */
+        body > * {
+            display: none;
+        }
+        #print-target {
+            display: block !important;
+            width: 100%;
+            padding: 1cm;
+            box-sizing: border-box;
+        }
+        #print-target table {
+            width: 100%;
+            font-size: 12pt;
+            border-collapse: collapse;
+        }
+        #print-target th, #print-target td {
+            padding: 8px;
+            border: 1px solid #000000;
+        }
+        #print-target .bg-gray-100, #print-target .bg-gray-700 {
+            background-color: #ffffff !important;
+        }
+        #print-target .border, #print-target .rounded {
+            border: 1px solid #000000 !important;
+            border-radius: 0 !important;
+        }
+        #print-target .flex, #print-target .space-x-4 {
+            display: none !important;
+        }
+    </style>
+
+    <!-- Screen Styles -->
+    <style type="text/css" media="screen">
+        #print-target {
+            display: none;
+        }
+        .shadow-hover:hover {
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+
+    <!-- JavaScript for Printing -->
+    <script>
+        function printCurrentSheet() {
+            const printTarget = document.createElement('div');
+            printTarget.id = 'print-target';
+            printTarget.innerHTML = document.getElementById('current-loading-sheet').innerHTML;
+            document.body.appendChild(printTarget);
+            window.print();
+            printTarget.remove();
+        }
+
+        function printLoadingSheet(sheetId) {
+            fetch(`/loading-sheets?sheet_id=${sheetId}`)  // Fetch the page with sheet_id parameter
+                .then(response => response.text())
+                .then(data => {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(data, 'text/html');
+                    const loadingSheet = doc.querySelector('#current-loading-sheet').innerHTML;
+
+                    const printTarget = document.createElement('div');
+                    printTarget.id = 'print-target';
+                    printTarget.innerHTML = loadingSheet;
+                    document.body.appendChild(printTarget);
+                    window.print();
+                    printTarget.remove();
+                })
+                .catch(error => {
+                    console.error('Error fetching loading sheet:', error);
+                    alert('Failed to load the loading sheet for printing.');
+                });
+        }
+    </script>
+{% endblock %}

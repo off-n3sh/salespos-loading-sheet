@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+{% block content %}
+    <!-- Dashboard Header -->
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Welcome to Dreamland Enterprises</h2>
+        <div class="flex items-center space-x-4">
+            <div id="time-display" class="bg-gray-200 dark:bg-gray-700 px-3 py-1 rounded-lg text-gray-700 dark:text-gray-300 text-sm"></div>
+            <form method="POST" class="flex space-x-2">
+                <input type="text" name="search" value="{{ search | default('') }}" placeholder="Search by salesperson or shop..." class="p-2 border rounded-lg dark:bg-gray-800 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                <button type="submit" class="p-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 focus:outline-none">Search</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Stats Cards (Redesigned Layout) -->
+    <div class="space-y-6 mb-6">
+        <!-- Total Sales Card (Centered, Large, Gradient) -->
+        <div class="w-3/4 mx-auto bg-gradient-to-r from-orange-400 to-orange-500 text-white p-6 rounded-lg shadow-lg hover:scale-105 transition-transform duration-200">
+            <div class="flex items-center space-x-3">
+                <span class="text-2xl">💵</span>
+                <div>
+                    <h3 class="text-lg font-semibold">Total Sales</h3>
+                    <p class="text-3xl font-bold">{{ net_sales | round(2) | default(0) }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Retail and Wholesale Cards (Side by Side, Light Gradient) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Retail Card -->
+            <div class="bg-gradient-to-r from-green-100 to-green-200 dark:from-green-700 dark:to-green-800 p-4 rounded-lg shadow-md">
+                <div class="flex items-center space-x-3">
+                    <span class="text-2xl">🛒</span>
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Retail (Today)</h3>
+                        <p class="text-2xl text-green-600 dark:text-green-400 font-bold">{{ retail_sales | round(2) | default(0) }}</p>
+                    </div>
+                </div>
+            </div>
+            <!-- Wholesale Card -->
+            <div class="bg-gradient-to-r from-blue-100 to-blue-200 dark:from-blue-700 dark:to-blue-800 p-4 rounded-lg shadow-md">
+                <div class="flex items-center space-x-3">
+                    <span class="text-2xl">🚚</span>
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Wholesale (Today)</h3>
+                        <p class="text-2xl text-blue-600 dark:text-blue-400 font-bold">{{ wholesale_sales_today | round(2) | default(0) }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Debt and Expenses Cards (Side by Side, Solid Background) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Debt Card -->
+            <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm">
+                <div class="flex items-center space-x-3">
+                    <span class="text-2xl">⚠️</span>
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Debt</h3>
+                        <p class="text-2xl text-red-500 font-bold">{{ total_debts | round(2) | default(0) }}</p>
+                    </div>
+                </div>
+            </div>
+            <!-- Expenses Card -->
+            <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm">
+                <div class="flex items-center space-x-3">
+                    <span class="text-2xl">🧾</span>
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Expenses</h3>
+                        <p class="text-2xl text-purple-500 font-bold">{{ total_expenses | round(2) | default(0) }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sales History Section -->
+    <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Sales History</h2>
+    <div class="flex space-x-4 mb-6 w-full max-w-4xl items-center">
+        <button id="all-btn" class="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors shadow">All {{ sales_history | length }}</button>
+        <button id="pending-btn" class="flex-1 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors shadow">Pending {{ sales_history | selectattr('balance', '>', 0) | list | length }}</button>
+        <button id="completed-btn" class="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors shadow">Completed {{ sales_history | selectattr('balance', '==', 0) | list | length }}</button>
+        <button id="expenses-btn" class="flex-1 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors shadow">Expenses</button>
+        <select id="time-filter" onchange="updateFilter(this.value)" class="p-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500">
+            <option value="all" {% if time_filter == 'all' %}selected{% endif %}>All Time</option>
+            <option value="day" {% if time_filter == 'day' %}selected{% endif %}>Day</option>
+            <option value="week" {% if time_filter == 'week' %}selected{% endif %}>Week</option>
+            <option value="month" {% if time_filter == 'month' %}selected{% endif %}>Month</option>
+            <option value="year" {% if time_filter == 'year' %}selected{% endif %}>Year</option>
+        </select>
+    </div>
+
+    <!-- Sales History List -->
+    <div id="sales-history" class="space-y-4 max-h-96 overflow-y-auto">
+        {% for sale in sales_history %}
+        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow shadow-hover">
+            <div class="grid grid-cols-1 sm:grid-cols-6 gap-4">
+                <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 rounded-full overflow-hidden">
+                        {% if sale.photoUrl %}
+                            <img src="{{ sale.photoUrl }}" alt="Salesperson Photo" class="w-full h-full object-cover">
+                        {% else %}
+                            <div class="w-full h-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center text-white font-bold">
+                                {{ sale.salesperson_name[0] | default('N') | upper }}
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <p class="font-semibold text-gray-900 dark:text-white">{{ sale.shop_name }}</p>
+                        <p class="text-sm text-gray-700 dark:text-gray-300">{{ sale.salesperson_name | default('N/A') }}</p>
+                    </div>
+                </div>
+                <div>
+                    <p class="font-semibold text-gray-900 dark:text-white">Booked</p>
+                    <p class="text-sm text-gray-700 dark:text-gray-300">{{ sale.date.strftime('%d/%m/%Y %H:%M:%S') }}</p>
+                </div>
+                <div>
+                    <p class="font-semibold text-gray-900 dark:text-white">Closed</p>
+                    <p class="text-sm text-gray-700 dark:text-gray-300">{{ sale.closed_date.strftime('%d/%m/%Y %H:%M:%S') if sale.closed_date else 'Not Closed' }}</p>
+                </div>
+                <div>
+                    <p class="font-semibold text-gray-900 dark:text-white">Type</p>
+                    <p class="text-sm text-gray-700 dark:text-gray-300">{{ sale.order_type }}</p>
+                </div>
+                <div>
+                    <p class="font-semibold text-gray-900 dark:text-white">Total Amount</p>
+                    <p class="text-sm text-gray-700 dark:text-gray-300">{{ sale.payment | round(2) }}/{{ (sale.payment + sale.balance) | round(2) }}</p>
+                </div>
+                <div class="relative">
+                    <p class="font-semibold text-gray-900 dark:text-white">Status</p>
+                    <div class="flex items-center">
+                        <p class="text-sm {% if sale.balance > 0 %}text-red-600{% else %}text-green-600{% endif %}">
+                            {% if sale.balance > 0 %}Pending{% else %}Paid{% endif %}
+                        </p>
+                        <button class="ml-2 text-gray-600 dark:text-gray-300 focus:outline-none" onclick="toggleMenu('menu-{{ sale.receipt_id }}')">
+                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4z"></path></svg>
+                        </button>
+                        <div id="menu-{{ sale.receipt_id }}" class="hidden absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 border rounded-lg shadow-lg z-10">
+                            <a href="{{ url_for('receipt', order_id=sale.receipt_id) }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">View Receipt</a>
+                            {% if sale.order_type != 'retail' %}
+                            <div class="group">
+                                <a href="#" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" onclick="showLoadOptions('{{ sale.receipt_id }}')">Load to Loading Sheet</a>
+                                <div id="load-options-{{ sale.receipt_id }}" class="hidden absolute right-48 mt-[-30px] w-40 bg-white dark:bg-gray-800 border rounded-lg shadow-lg z-20">
+                                    <a href="{{ url_for('load_to_loading_sheet', receipt_id=sale.receipt_id, action='current') }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Add to Current</a>
+                                    <a href="{{ url_for('load_to_loading_sheet', receipt_id=sale.receipt_id, action='new') }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Start New</a>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Expenses List (Hidden by Default) -->
+    <div id="expenses-list" class="space-y-4 hidden">
+        {% for expense in expenses %}
+        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow shadow-hover">
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                <div>
+                    <p class="font-semibold text-gray-900 dark:text-white">Description</p>
+                    <p class="text-sm text-gray-700 dark:text-gray-300">{{ expense.description }}</p>
+                </div>
+                <div>
+                    <p class="font-semibold text-gray-900 dark:text-white">Amount</p>
+                    <p class="text-sm text-gray-700 dark:text-gray-300">{{ expense.amount | round(2) }}</p>
+                </div>
+                <div>
+                    <p class="font-semibold text-gray-900 dark:text-white">Date</p>
+                    <p class="text-sm text-gray-700 dark:text-gray-300">{{ expense.date.strftime('%d/%m/%Y %H:%M:%S') }}</p>
+                </div>
+                <div>
+                    <p class="font-semibold text-gray-900 dark:text-white">Category</p>
+                    <p class="text-sm text-gray-700 dark:text-gray-300">{{ expense.category }}</p>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- JavaScript -->
+    <script>
+        function updateTime() {
+            const nairobiTime = new Date().toLocaleString('en-US', { timeZone: 'Africa/Nairobi', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+            document.getElementById('time-display').textContent = nairobiTime.replace(',', '');
+        }
+        updateTime();
+        setInterval(updateTime, 1000);
+
+        const allBtn = document.getElementById('all-btn');
+        const pendingBtn = document.getElementById('pending-btn');
+        const completedBtn = document.getElementById('completed-btn');
+        const expensesBtn = document.getElementById('expenses-btn');
+        const salesHistory = document.getElementById('sales-history');
+        const expensesList = document.getElementById('expenses-list');
+        let currentFilter = '{{ time_filter }}';
+
+        function updateFilter(time) {
+            currentFilter = time;
+            fetch(`/?time=${time}`).then(res => res.text()).then(html => {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                salesHistory.innerHTML = doc.getElementById('sales-history').innerHTML;
+                expensesList.classList.add('hidden');
+                salesHistory.classList.remove('hidden');
+            });
+        }
+
+        allBtn.addEventListener('click', () => {
+            salesHistory.classList.remove('hidden');
+            expensesList.classList.add('hidden');
+            fetch(`/?time=${currentFilter}`).then(res => res.text()).then(html => {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                salesHistory.innerHTML = doc.getElementById('sales-history').innerHTML;
+            });
+        });
+
+        pendingBtn.addEventListener('click', () => {
+            salesHistory.classList.remove('hidden');
+            expensesList.classList.add('hidden');
+            fetch(`/?time=${currentFilter}`).then(res => res.text()).then(html => {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const allSales = Array.from(doc.querySelectorAll('#sales-history > div'));
+                salesHistory.innerHTML = allSales.filter(sale => sale.querySelector('.text-red-600')).map(sale => sale.outerHTML).join('');
+            });
+        });
+
+        completedBtn.addEventListener('click', () => {
+            salesHistory.classList.remove('hidden');
+            expensesList.classList.add('hidden');
+            fetch(`/?time=${currentFilter}`).then(res => res.text()).then(html => {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const allSales = Array.from(doc.querySelectorAll('#sales-history > div'));
+                salesHistory.innerHTML = allSales.filter(sale => sale.querySelector('.text-green-600')).map(sale => sale.outerHTML).join('');
+            });
+        });
+
+        expensesBtn.addEventListener('click', () => {
+            salesHistory.classList.add('hidden');
+            expensesList.classList.remove('hidden');
+        });
+
+        function toggleMenu(menuId) {
+            const menu = document.getElementById(menuId);
+            menu.classList.toggle('hidden');
+        }
+
+        function showLoadOptions(receiptId) {
+            const options = document.getElementById(`load-options-${receiptId}`);
+            options.classList.toggle('hidden');
+        }
+
+        document.addEventListener('click', (e) => {
+            document.querySelectorAll('[id^="menu-"]').forEach(menu => {
+                if (!menu.contains(e.target) && !e.target.closest('button')) {
+                    menu.classList.add('hidden');
+                }
+            });
+            document.querySelectorAll('[id^="load-options-"]').forEach(option => {
+                if (!option.contains(e.target) && !e.target.closest('a[href="#"]')) {
+                    option.classList.add('hidden');
+                }
+            });
+        });
+    </script>
+{% endblock %}

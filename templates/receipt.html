@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Receipt - {{ order.receipt_id }}{% endblock %}
+{% block content %}
+    <div class="p-4" style="background-color: #FFF0F5; color: #000000;">
+        <div class="max-w-xs mx-auto" style="width: 302px;">
+            <input name="print" type="button" value="Print" id="printButton" onclick="printpage()" class="mb-4 px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-900 focus:outline-none">
+            <table width="302" border="1" cellspacing="0" cellpadding="0" id="bordertable" style="border-collapse: collapse; color: #000000;">
+                <!-- Header -->
+                <tr>
+                    <td align="center" class="p-2">
+                        ------legal receipt start--------<br>
+                        <strong>Dreamland Distributors</strong><br>
+                        P.O Box 123-00200 Nairobi<br>
+                        Phone: 0725 530632<br>
+                        Paybill No: 222111<br>
+                        Account No: 360522<br>
+                        Sales: XX-XX  Store: YY-YY<br>
+                        <strong>Receipt ID: {{ order.receipt_id }}</strong><br> 
+                        Pin No: <br>
+                        <table width="100%" border="0" cellspacing="0" cellpadding="2">
+                            <tr>
+                                <td width="50%" align="left">Cash Sale #</td>
+                                <td width="50%" align="right">Till 123456</td>
+                            </tr>
+                            <tr>
+                                <td width="50%" align="left">Date: {{ order.date.strftime('%d/%m/%Y') }}</td>
+                                <td width="50%" align="right">Time: {{ order.date.strftime('%H:%M:%S') }}</td>
+                            </tr>
+                            <tr>
+                                <td width="50%" align="left">Customer:</td>
+                                <td width="50%" align="right">{{ order.shop_name }}</td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                <!-- Items List -->
+                <tr>
+                    <td class="p-2">
+                        <table width="100%" border="0" cellspacing="0" cellpadding="2">
+                            <tr style="border: 1px solid #000000;">
+                                <td class="font-bold" style="border-right: 1px solid #000000;">Item</td>
+                                <td class="font-bold" style="border-right: 1px solid #000000;">Qty</td>
+                                <td class="font-bold" style="border-right: 1px solid #000000;">Price</td>
+                                <td class="font-bold">Amount</td>
+                            </tr>
+                            {% for item in order.order_items %}
+                            <tr style="border-bottom: 1px dashed #000000;">
+                                <td>{{ item.name }}</td>
+                                <td>{{ item.quantity }}</td>
+                                <td>{{ item.price }}</td>
+                                <td>{{ item.amount }}</td>
+                            </tr>
+                            {% endfor %}
+                            <!-- Subtotal, Tax, Item Quantity -->
+                            <tr>
+                                <td colspan="4" style="padding-top: 12px;"></td>
+                            </tr>
+                            <tr>
+                                <td align="left">Subtotal:</td>
+                                <td colspan="3" align="right">{{ order.order_items | sum(attribute='amount') }}</td>
+                            </tr>
+                            <tr>
+                                <td align="left">Tax (16% VAT):</td>
+                                <td colspan="3" align="right">{{ ((order.order_items | sum(attribute='amount') * 0.16) / 1.16) | round(2) }}</td>
+                            </tr>
+                            <tr>
+                                <td align="left">Item Quantity:</td>
+                                <td colspan="3" align="right">{{ order.total_items }}</td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                <!-- Payment Info -->
+                <tr>
+                    <td align="right" class="p-2">
+                        <table width="100%" border="0" cellspacing="0" cellpadding="2">
+                            <tr>
+                                <td width="3%"></td>
+                                <td width="97%" align="left">
+                                    <br>
+                                    <strong>
+                                        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                                            <tr>
+                                                <td align="left">Paid Amount:</td>
+                                                <td align="right">{{ order.payment }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td align="left">Balance:</td>
+                                                <td align="right">{{ order.balance }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td align="left">Change:</td>
+                                                <td align="right">0</td>
+                                            </tr>
+                                        </table>
+                                    </strong>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td height="70"></td>
+                                <td align="center" valign="bottom">Signature</td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                <!-- Footer -->
+                <tr>
+                    <td align="center" class="p-2 text-sm" style="border-top: 1px solid #000000; padding-top: 20px;">
+                        Prices inclusive of VAT where applicable<br>
+                        You were served by: {{ order.salesperson_name }}<br>
+                        Once goods sold, no return<br>
+                        ------end of legal receipt------
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        function printpage() {
+            document.getElementById('printButton').style.visibility = "hidden";
+            window.print();
+            document.getElementById('printButton').style.visibility = "visible";
+        }
+    </script>
+    <style type="text/css" media="print">
+        #printButton {
+            display: none;
+        }
+        body, html {
+            background-color: #FFF0F5;
+            color: #000000;
+        }
+    </style>
+{% endblock %}

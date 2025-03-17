@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Stock{% endblock %}
+{% block header %}Stock Management{% endblock %}
+{% block content %}
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow shadow-hover">
+            <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Total Stock Value</h3>
+            <p class="text-2xl text-orange-500 font-bold">{{ products | sum(attribute='quantity') * products | sum(attribute='price_per_unit') / products | length if products else 0 }}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow shadow-hover cursor-pointer" onclick="document.getElementById('expenseModal').classList.remove('hidden')">
+            <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Add Expense</h3>
+            <p class="text-2xl text-purple-500 font-bold">Click to Add</p>
+        </div>
+    </div>
+
+    <!-- Add New Product Section -->
+    <div class="mb-6 bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Add New Product</h2>
+        <button id="addProductBtn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Add New Product</button>
+    </div>
+
+    <!-- Add New Product Modal -->
+    <div id="addProductModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center">
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg w-96">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">New Product Details</h2>
+            <form method="POST" action="{{ url_for('stock') }}" class="flex flex-col space-y-4">
+                <input name="product_type" placeholder="Product Type (e.g., Flour)" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" required>
+                <input name="subtype" placeholder="Subtype (e.g., Soko Ugali)" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" required>
+                <input name="price_per_unit" type="number" step="0.01" placeholder="Price per Unit (e.g., 100)" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" required>
+                <input name="quantity" type="number" placeholder="Initial Quantity (e.g., 200)" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" required>
+                <input type="hidden" name="action" value="add_product">
+                <div class="flex space-x-2">
+                    <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Submit</button>
+                    <button type="button" id="closeModalBtn" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Expense Modal -->
+    <div id="expenseModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center">
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg w-96">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Add Expense</h2>
+            <form method="POST" action="{{ url_for('expenses') }}" class="flex flex-col space-y-4">
+                <select name="category" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" required>
+                    <option value="Stock">Stock</option>
+                    <option value="Other">Other</option>
+                    <option value="Fuel">Fuel</option>
+                </select>
+                <input name="description" placeholder="Description (e.g., Fuel for Delivery)" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" required>
+                <input name="amount" type="number" step="0.01" placeholder="Amount (e.g., 500)" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" required>
+                <div class="flex space-x-2">
+                    <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Submit</button>
+                    <button type="button" onclick="document.getElementById('expenseModal').classList.add('hidden')" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Products List with Add Stock -->
+    <div class="mb-6">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Current Stock</h2>
+        <div class="space-y-4">
+            {% for product in products %}
+            <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow flex justify-between items-center">
+                <div>
+                    <h3 class="font-semibold text-gray-900 dark:text-white">{{ product.product_type }} - {{ product.subtype }}</h3>
+                    <p class="text-gray-700 dark:text-gray-300">Stock: <span class="{{ 'text-red-600' if product.get('quantity', 0) <= 5 else 'text-green-600' }}">{{ product.get('quantity', 0) }}</span> / {{ product.get('initial_quantity', 0) }}</p>
+                    <p class="text-gray-700 dark:text-gray-300">Price per Unit: {{ product.get('price_per_unit', 0) }}</p>
+                    <p class="text-gray-700 dark:text-gray-300">Expected Value: {{ (product.get('quantity', 0) * product.get('price_per_unit', 0)) | default(0) }}</p>
+                </div>
+                <form method="POST" action="{{ url_for('stock') }}" class="flex space-x-2">
+                    <input name="quantity" type="number" placeholder="Qty" class="p-1 border rounded-lg dark:bg-gray-700 dark:border-gray-600 w-20 appearance-none" required>
+                    <input type="hidden" name="product_type" value="{{ product.product_type }}">
+                    <input type="hidden" name="subtype" value="{{ product.subtype }}">
+                    <input type="hidden" name="action" value="add_stock">
+                    <button type="submit" class="bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600">Add Stock</button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- JavaScript for Modals -->
+    <script>
+        const productModal = document.getElementById('addProductModal');
+        const openProductBtn = document.getElementById('addProductBtn');
+        const closeProductBtn = document.getElementById('closeModalBtn');
+
+        openProductBtn.addEventListener('click', () => productModal.classList.remove('hidden'));
+        closeProductBtn.addEventListener('click', () => productModal.classList.add('hidden'));
+    </script>
+
+    <!-- CSS to Remove Arrows -->
+    <style>
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+    </style>
+{% endblock %}
