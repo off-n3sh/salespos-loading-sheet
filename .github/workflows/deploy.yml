@@ -25,23 +25,30 @@ jobs:
 
     - name: Configure Docker for Artifact Registry
       run: |
-        echo "Configuring Docker for region ${{ secrets.GCP_REGION }}"
-        gcloud auth configure-docker "${{ secrets.GCP_REGION }}-docker.pkg.dev"
-        # Use quotes to ensure the full string is passed as one argument
+        REGION=$(echo "${{ secrets.GCP_REGION }}" | tr -d '\n\r\t ')
+        echo "Configuring Docker for region $REGION"
+        gcloud auth configure-docker "${REGION}-docker.pkg.dev"
 
     - name: Build Docker image
       run: |
-        docker build -t "${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/loading-sheet-repo/loading-sheet-app:latest" .
+        REGION=$(echo "${{ secrets.GCP_REGION }}" | tr -d '\n\r\t ')
+        PROJECT_ID=$(echo "${{ secrets.GCP_PROJECT_ID }}" | tr -d '\n\r\t ')
+        docker build -t "${REGION}-docker.pkg.dev/${PROJECT_ID}/loading-sheet-repo/loading-sheet-app:latest" .
 
     - name: Push Docker image to Artifact Registry
       run: |
-        docker push "${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/loading-sheet-repo/loading-sheet-app:latest"
+        REGION=$(echo "${{ secrets.GCP_REGION }}" | tr -d '\n\r\t ')
+        PROJECT_ID=$(echo "${{ secrets.GCP_PROJECT_ID }}" | tr -d '\n\r\t ')
+        docker push "${REGION}-docker.pkg.dev/${PROJECT_ID}/loading-sheet-repo/loading-sheet-app:latest"
 
     - name: Deploy to Cloud Run
       run: |
+        REGION=$(echo "${{ secrets.GCP_REGION }}" | tr -d '\n\r\t ')
+        PROJECT_ID=$(echo "${{ secrets.GCP_PROJECT_ID }}" | tr -d '\n\r\t ')
         gcloud run deploy loading-sheet-service \
-          --image "${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/loading-sheet-repo/loading-sheet-app:latest" \
-          --region ${{ secrets.GCP_REGION }} \
+          --image "${REGION}-docker.pkg.dev/${PROJECT_ID}/loading-sheet-repo/loading-sheet-app:latest" \
+          --region "${REGION}" \
           --platform managed \
           --allow-unauthenticated \
-          --min-instances 1
+          --min-instances 1 \
+          --service-account "github-deployer@${PROJECT_ID}.iam.gserviceaccount.com"
