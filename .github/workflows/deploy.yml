@@ -25,20 +25,21 @@ jobs:
 
     - name: Configure Docker for Artifact Registry
       run: |
-        gcloud auth configure-docker europe-west1-docker.pkg.dev
+        gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev
 
     - name: Build Docker image
       run: |
-        docker build -t europe-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/loading-sheet-repo/loading-sheet-app:latest .
+        docker build -t ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/loading-sheet-repo/loading-sheet-app:latest .
+        # Ensure the '.' is explicitly included as the build context
 
     - name: Push Docker image to Artifact Registry
       run: |
-        docker push europe-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/loading-sheet-repo/loading-sheet-app:latest
+        docker push ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/loading-sheet-repo/loading-sheet-app:latest
 
     - name: Deploy to Cloud Run
       run: |
         gcloud run deploy loading-sheet-service \
-          --image europe-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/loading-sheet-repo/loading-sheet-app:latest \
+          --image ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/loading-sheet-repo/loading-sheet-app:latest \
           --region ${{ secrets.GCP_REGION }} \
           --platform managed \
           --allow-unauthenticated \
