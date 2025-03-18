@@ -5,14 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dreamland Enterprises - {% block title %}{% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"> <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-white transition-colors duration-300 font-sans">
     <div class="flex h-screen">
-        <!-- Sidebar -->
-        <div id="sidebar" class="w-64 bg-gradient-to-b from-orange-600 to-gray-800 shadow-lg p-6 flex flex-col h-full transition-all duration-300 transform -translate-x-full md:translate-x-0">
+        <!-- Sidebar with improved visibility in light mode -->
+        <div id="sidebar" class="w-64 bg-gradient-to-b from-orange-600 to-gray-700 shadow-lg p-6 flex flex-col h-full transition-all duration-300 transform -translate-x-full md:translate-x-0">
             <div class="flex justify-between items-center mb-8">
                 <h1 class="text-2xl font-bold text-white">Dreamland</h1>
                 <button id="sidebar-close" class="text-white hover:text-orange-200 focus:outline-none">
@@ -22,28 +22,31 @@
                 </button>
             </div>
             <nav class="flex-1 space-y-4">
-                <a href="{{ url_for('dashboard') }}" class="flex items-center py-2 px-4 text-gray-200 hover:bg-orange-500 hover:text-white rounded-lg transition-all duration-200 hover:shadow-md">
+                <a href="{{ url_for('dashboard') }}" class="flex items-center py-2 px-4 text-white hover:bg-orange-500 hover:text-white rounded-lg transition-all duration-200 hover:shadow-md">
                     <i class="fas fa-tachometer-alt mr-3"></i> Dashboard
                 </a>
-                <a href="{{ url_for('orders') }}" class="flex items-center py-2 px-4 text-gray-200 hover:bg-orange-500 hover:text-white rounded-lg transition-all duration-200 hover:shadow-md">
+                <a href="{{ url_for('orders') }}" class="flex items-center py-2 px-4 text-white hover:bg-orange-500 hover:text-white rounded-lg transition-all duration-200 hover:shadow-md">
                     <i class="fas fa-shopping-cart mr-3"></i> Orders
                 </a>
-                <a href="{{ url_for('receipts') }}" class="flex items-center py-2 px-4 text-gray-200 hover:bg-orange-500 hover:text-white rounded-lg transition-all duration-200 hover:shadow-md">
+                <a href="{{ url_for('receipts') }}" class="flex items-center py-2 px-4 text-white hover:bg-orange-500 hover:text-white rounded-lg transition-all duration-200 hover:shadow-md">
                     <i class="fas fa-receipt mr-3"></i> Receipts
                 </a>
-                <a href="{{ url_for('loading_sheets') }}" class="flex items-center py-2 px-4 text-gray-200 hover:bg-orange-500 hover:text-white rounded-lg transition-all duration-200 hover:shadow-md">
+                <a href="{{ url_for('loading_sheets') }}" class="flex items-center py-2 px-4 text-white hover:bg-orange-500 hover:text-white rounded-lg transition-all duration-200 hover:shadow-md">
                     <i class="fas fa-file-alt mr-3"></i> Loading Sheets
                 </a>
-                <a href="{{ url_for('stock') }}" class="flex items-center py-2 px-4 text-gray-200 hover:bg-orange-500 hover:text-white rounded-lg transition-all duration-200 hover:shadow-md">
+                <a href="{{ url_for('stock') }}" class="flex items-center py-2 px-4 text-white hover:bg-orange-500 hover:text-white rounded-lg transition-all duration-200 hover:shadow-md">
                     <i class="fas fa-warehouse mr-3"></i> Stock
                 </a>
-                <a href="{{ url_for('reports') }}" class="flex items-center py-2 px-4 text-gray-200 hover:bg-orange-500 hover:text-white rounded-lg transition-all duration-200 hover:shadow-md">
+                <a href="{{ url_for('reports') }}" class="flex items-center py-2 px-4 text-white hover:bg-orange-500 hover:text-white rounded-lg transition-all duration-200 hover:shadow-md">
                     <i class="fas fa-chart-bar mr-3"></i> Reports
                 </a>
             </nav>
             <div class="mt-auto space-y-4">
                 <button id="theme-toggle" class="w-full bg-orange-500 text-white py-2 rounded-lg hover:bg-orange-600 transition-all duration-200 flex items-center justify-center hover:shadow-md">
-                    <i class="fas fa-moon mr-2"></i> Dark Mode
+                    <i class="fas fa-moon mr-2 dark:hidden"></i>
+                    <i class="fas fa-sun mr-2 hidden dark:inline"></i>
+                    <span class="dark:hidden">Dark Mode</span>
+                    <span class="hidden dark:inline">Light Mode</span>
                 </button>
                 <button id="logout" class="w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition-all duration-200 flex items-center justify-center hover:shadow-md">
                     <i class="fas fa-sign-out-alt mr-2"></i> Logout
@@ -72,22 +75,73 @@
             </div>
         </div>
     </div>
+
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
     <script>
+        // Check for saved theme preference or default to light
+        if (localStorage.getItem('theme') === 'dark' || 
+            (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.body.classList.add('dark');
+            updateThemeIcon(true);
+        } else {
+            document.body.classList.remove('dark');
+            updateThemeIcon(false);
+        }
+
+        // Function to update theme icon visibility
+        function updateThemeIcon(isDark) {
+            const themeToggle = document.getElementById('theme-toggle');
+            if (isDark) {
+                themeToggle.innerHTML = '<i class="fas fa-sun mr-2"></i> Light Mode';
+            } else {
+                themeToggle.innerHTML = '<i class="fas fa-moon mr-2"></i> Dark Mode';
+            }
+        }
+
         // Sidebar toggle
         document.getElementById('sidebar-toggle').addEventListener('click', () => {
             document.getElementById('sidebar').classList.toggle('-translate-x-full');
-            document.getElementById('main-content').classList.toggle('ml-64');
         });
+        
         document.getElementById('sidebar-close').addEventListener('click', () => {
             document.getElementById('sidebar').classList.add('-translate-x-full');
-            document.getElementById('main-content').classList.remove('ml-64');
         });
 
-        // Dark mode toggle (UI only for now)
+        // Dark mode toggle with local storage
         document.getElementById('theme-toggle').addEventListener('click', () => {
-            document.body.classList.toggle('dark');
+            const isDark = document.body.classList.toggle('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            updateThemeIcon(isDark);
         });
+
+        // Add custom CSS for improved visibility of total sales card in light mode
+        const style = document.createElement('style');
+        style.textContent = `
+            .sales-card {
+                background-color: #ffffff;
+                border: 1px solid #e2e8f0;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            }
+            .dark .sales-card {
+                background-color: #2d3748;
+                border-color: #4a5568;
+            }
+            .sales-card-title {
+                color: #2d3748;
+                font-weight: 600;
+            }
+            .dark .sales-card-title {
+                color: #f7fafc;
+            }
+            .sales-card-value {
+                color: #3182ce;
+                font-weight: 700;
+            }
+            .dark .sales-card-value {
+                color: #63b3ed;
+            }
+        `;
+        document.head.appendChild(style);
     </script>
 </body>
 </html>
