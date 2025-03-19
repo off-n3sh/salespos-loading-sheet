@@ -10,12 +10,20 @@ from io import BytesIO
 import os
 
 app = Flask(__name__)
-app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your_secret_key_here')
+app.secret_key = os.getenv('FLASK_SECRET_KEY')
+if not app.secret_key:
+    raise ValueError("FLASK_SECRET_KEY environment variable must be set")
 
 # Initialize Firebase
-firebase_admin.initialize_app()
-db = firestore.client()
+cred_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+if cred_path:
+    cred = credentials.Certificate(cred_path)
+    firebase_admin.initialize_app(cred)
+else:
+    # Fallback to Application Default Credentials (works on Cloud Run with a service account)
+    firebase_admin.initialize_app()
 
+db = firestore.client()
 # Set Kenyan timezone
 KENYA_TZ = pytz.timezone('Africa/Nairobi')
 
