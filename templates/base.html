@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dreamland Enterprises  - {% block title %}{% endblock %}</title>
+    <title>Dreamland Enterprises - {% block title %}{% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
@@ -12,43 +12,43 @@
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-white transition-colors duration-300 font-sans">
     <div class="flex h-screen">
         <!-- Sidebar with improved visibility in light mode -->
-        <div id="sidebar" class="w-64 bg-gradient-to-b from-orange-600 to-gray-700 shadow-lg p-6 flex flex-col h-full transition-all duration-300 transform -translate-x-full md:translate-x-0">
+        <div id="sidebar" class="w-64 bg-gradient-to-b from-orange-600 to-gray-700 dark:from-orange-700 dark:to-gray-800 shadow-lg p-6 flex flex-col h-full transition-all duration-300 transform -translate-x-full md:translate-x-0">
             <div class="flex justify-between items-center mb-8">
-                <h1 class="text-2xl font-bold text-white">Dreamland</h1>
-                <button id="sidebar-close" class="text-white hover:text-orange-200 focus:outline-none">
+                <h1 class="text-2xl font-bold text-white dark:text-gray-200">Dreamland</h1>
+                <button id="sidebar-close" class="text-white dark:text-gray-200 hover:text-orange-200 dark:hover:text-orange-300 focus:outline-none">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                     </svg>
                 </button>
             </div>
             <nav class="flex-1 space-y-4">
-                <a href="{{ url_for('dashboard') }}" class="flex items-center py-2 px-4 text-white hover:bg-orange-500 hover:text-white rounded-lg transition-all duration-200 hover:shadow-md">
+                <a href="{{ url_for('dashboard') }}" class="flex items-center py-2 px-4 text-white dark:text-gray-200 hover:bg-orange-500 hover:text-white dark:hover:text-white rounded-lg transition-all duration-200 hover:shadow-md">
                     <i class="fas fa-tachometer-alt mr-3"></i> Dashboard
                 </a>
-                <a href="{{ url_for('orders') }}" class="flex items-center py-2 px-4 text-white hover:bg-orange-500 hover:text-white rounded-lg transition-all duration-200 hover:shadow-md">
+                <a href="{{ url_for('orders') }}" class="flex items-center py-2 px-4 text-white dark:text-gray-200 hover:bg-orange-500 hover:text-white dark:hover:text-white rounded-lg transition-all duration-200 hover:shadow-md">
                     <i class="fas fa-shopping-cart mr-3"></i> Orders
                 </a>
-                <a href="{{ url_for('receipts') }}" class="flex items-center py-2 px-4 text-white hover:bg-orange-500 hover:text-white rounded-lg transition-all duration-200 hover:shadow-md">
+                <a href="{{ url_for('receipts') }}" class="flex items-center py-2 px-4 text-white dark:text-gray-200 hover:bg-orange-500 hover:text-white dark:hover:text-white rounded-lg transition-all duration-200 hover:shadow-md">
                     <i class="fas fa-receipt mr-3"></i> Receipts
                 </a>
-                <a href="{{ url_for('loading_sheets') }}" class="flex items-center py-2 px-4 text-white hover:bg-orange-500 hover:text-white rounded-lg transition-all duration-200 hover:shadow-md">
+                <a href="{{ url_for('loading_sheets') }}" class="flex items-center py-2 px-4 text-white dark:text-gray-200 hover:bg-orange-500 hover:text-white dark:hover:text-white rounded-lg transition-all duration-200 hover:shadow-md">
                     <i class="fas fa-file-alt mr-3"></i> Loading Sheets
                 </a>
-                <a href="{{ url_for('stock') }}" class="flex items-center py-2 px-4 text-white hover:bg-orange-500 hover:text-white rounded-lg transition-all duration-200 hover:shadow-md">
+                <a href="{{ url_for('stock') }}" class="flex items-center py-2 px-4 text-white dark:text-gray-200 hover:bg-orange-500 hover:text-white dark:hover:text-white rounded-lg transition-all duration-200 hover:shadow-md">
                     <i class="fas fa-warehouse mr-3"></i> Stock
                 </a>
-                <a href="{{ url_for('reports') }}" class="flex items-center py-2 px-4 text-white hover:bg-orange-500 hover:text-white rounded-lg transition-all duration-200 hover:shadow-md">
+                <a href="{{ url_for('reports') }}" class="flex items-center py-2 px-4 text-white dark:text-gray-200 hover:bg-orange-500 hover:text-white dark:hover:text-white rounded-lg transition-all duration-200 hover:shadow-md">
                     <i class="fas fa-chart-bar mr-3"></i> Reports
                 </a>
             </nav>
             <div class="mt-auto space-y-4">
-                <button id="theme-toggle" class="w-full bg-orange-500 text-white py-2 rounded-lg hover:bg-orange-600 transition-all duration-200 flex items-center justify-center hover:shadow-md">
+                <button id="theme-toggle" class="w-full bg-orange-500 text-white dark:text-gray-200 py-2 rounded-lg hover:bg-orange-600 dark:hover:bg-orange-600 transition-all duration-200 flex items-center justify-center hover:shadow-md">
                     <i class="fas fa-moon mr-2 dark:hidden"></i>
                     <i class="fas fa-sun mr-2 hidden dark:inline"></i>
                     <span class="dark:hidden">Dark Mode</span>
                     <span class="hidden dark:inline">Light Mode</span>
                 </button>
-                <button id="logout" class="w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition-all duration-200 flex items-center justify-center hover:shadow-md">
+                <button id="logout" class="w-full bg-red-500 text-white dark:text-gray-200 py-2 rounded-lg hover:bg-red-600 dark:hover:bg-red-600 transition-all duration-200 flex items-center justify-center hover:shadow-md">
                     <i class="fas fa-sign-out-alt mr-2"></i> Logout
                 </button>
             </div>
@@ -70,7 +70,7 @@
                     </button>
                 </div>
             </header>
-            <div class="p-6">
+            <div class="p-6 bg-gray-100 dark:bg-gray-900 rounded-lg">
                 {% block content %}{% endblock %}
             </div>
         </div>
@@ -127,14 +127,14 @@
                 border-color: #4a5568;
             }
             .sales-card-title {
-                color: #2d3748;
+                color: #1a202c; /* Darker color for better visibility in light mode */
                 font-weight: 600;
             }
             .dark .sales-card-title {
                 color: #f7fafc;
             }
             .sales-card-value {
-                color: #3182ce;
+                color: #2b6cb0; /* Slightly darker blue for better visibility in light mode */
                 font-weight: 700;
             }
             .dark .sales-card-value {
