@@ -7,8 +7,6 @@ WORKDIR /app
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV PORT=8080
-ENV GOOGLE_APPLICATION_CREDENTIALS=/app/salespos-578ff-firebase-adminsdk-fbsvc-e3d51aa7c5.json
-ENV FLASK_SECRET_KEY=5845f7ddf6ceb74f2e99c885af1e500c
 
 # Copy requirements file
 COPY requirements.txt .
