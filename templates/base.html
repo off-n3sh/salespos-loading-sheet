@@ -11,7 +11,7 @@
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-white transition-colors duration-300 font-sans">
     <div class="flex h-screen">
-        <!-- Sidebar -->
+        <!-- Sidebar with improved visibility in light mode -->
         <div id="sidebar" class="w-64 bg-gradient-to-b from-orange-600 to-gray-700 shadow-lg p-6 flex flex-col h-full transition-all duration-300 transform -translate-x-full md:translate-x-0">
             <div class="flex justify-between items-center mb-8">
                 <h1 class="text-2xl font-bold text-white">Dreamland</h1>
@@ -22,22 +22,22 @@
                 </button>
             </div>
             <nav class="flex-1 space-y-4">
-                <a href="{{ url_for('dashboard') }}" class="flex items-center py-2 px-4 text-white hover:bg-orange-500 hover:text-gray-900 rounded-lg transition-all duration-200 hover:shadow-md">
+                <a href="{{ url_for('dashboard') }}" class="flex items-center py-2 px-4 text-white hover:bg-orange-500 hover:text-white rounded-lg transition-all duration-200 hover:shadow-md">
                     <i class="fas fa-tachometer-alt mr-3"></i> Dashboard
                 </a>
-                <a href="{{ url_for('orders') }}" class="flex items-center py-2 px-4 text-white hover:bg-orange-500 hover:text-gray-900 rounded-lg transition-all duration-200 hover:shadow-md">
+                <a href="{{ url_for('orders') }}" class="flex items-center py-2 px-4 text-white hover:bg-orange-500 hover:text-white rounded-lg transition-all duration-200 hover:shadow-md">
                     <i class="fas fa-shopping-cart mr-3"></i> Orders
                 </a>
-                <a href="{{ url_for('receipts') }}" class="flex items-center py-2 px-4 text-white hover:bg-orange-500 hover:text-gray-900 rounded-lg transition-all duration-200 hover:shadow-md">
+                <a href="{{ url_for('receipts') }}" class="flex items-center py-2 px-4 text-white hover:bg-orange-500 hover:text-white rounded-lg transition-all duration-200 hover:shadow-md">
                     <i class="fas fa-receipt mr-3"></i> Receipts
                 </a>
-                <a href="{{ url_for('loading_sheets') }}" class="flex items-center py-2 px-4 text-white hover:bg-orange-500 hover:text-gray-900 rounded-lg transition-all duration-200 hover:shadow-md">
+                <a href="{{ url_for('loading_sheets') }}" class="flex items-center py-2 px-4 text-white hover:bg-orange-500 hover:text-white rounded-lg transition-all duration-200 hover:shadow-md">
                     <i class="fas fa-file-alt mr-3"></i> Loading Sheets
                 </a>
-                <a href="{{ url_for('stock') }}" class="flex items-center py-2 px-4 text-white hover:bg-orange-500 hover:text-gray-900 rounded-lg transition-all duration-200 hover:shadow-md">
+                <a href="{{ url_for('stock') }}" class="flex items-center py-2 px-4 text-white hover:bg-orange-500 hover:text-white rounded-lg transition-all duration-200 hover:shadow-md">
                     <i class="fas fa-warehouse mr-3"></i> Stock
                 </a>
-                <a href="{{ url_for('reports') }}" class="flex items-center py-2 px-4 text-white hover:bg-orange-500 hover:text-gray-900 rounded-lg transition-all duration-200 hover:shadow-md">
+                <a href="{{ url_for('reports') }}" class="flex items-center py-2 px-4 text-white hover:bg-orange-500 hover:text-white rounded-lg transition-all duration-200 hover:shadow-md">
                     <i class="fas fa-chart-bar mr-3"></i> Reports
                 </a>
             </nav>
@@ -70,7 +70,7 @@
                     </button>
                 </div>
             </header>
-            <div class="p-6 bg-gray-100 dark:bg-gray-900 rounded-lg shadow-md">
+            <div class="p-6">
                 {% block content %}{% endblock %}
             </div>
         </div>
@@ -114,31 +114,31 @@
             updateThemeIcon(isDark);
         });
 
-        // Add custom CSS for improved visibility of total sales card in both modes
+        // Add custom CSS for improved visibility of total sales card in light mode
         const style = document.createElement('style');
         style.textContent = `
             .sales-card {
-                background-color: #f7fafc; /* Slightly off-white for light mode */
+                background-color: #ffffff;
                 border: 1px solid #e2e8f0;
                 box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             }
             .dark .sales-card {
-                background-color: #2d3748; /* Original dark mode background */
+                background-color: #2d3748;
                 border-color: #4a5568;
             }
             .sales-card-title {
-                color: #1a202c; /* Darker color for light mode */
+                color: #2d3748;
                 font-weight: 600;
             }
             .dark .sales-card-title {
-                color: #e2e8f0; /* Lighter gray for dark mode */
+                color: #f7fafc;
             }
             .sales-card-value {
-                color: #2b6cb0; /* Darker blue for light mode */
+                color: #3182ce;
                 font-weight: 700;
             }
             .dark .sales-card-value {
-                color: #90cdf4; /* Lighter blue for dark mode */
+                color: #63b3ed;
             }
         `;
         document.head.appendChild(style);
