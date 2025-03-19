@@ -114,21 +114,20 @@ def auth_route():
         return redirect(url_for('dashboard'))
     
     error = None
+    signup_success = False
+    
     if request.method == 'POST':
-        if 'login-email' in request.form:  # Login form submission
+        form_type = request.form.get('form_type')
+        
+        if form_type == 'login':
             email = request.form['email']
             password = request.form['password']
             try:
-                # Verify user exists in Firebase Auth
                 user = auth.get_user_by_email(email)
-                # Since Firebase Admin SDK can't verify passwords, we'll assume mobile app compatibility
-                # For now, check Firestore (temporary, we'll refine with client-side auth later)
                 user_doc = db.collection('web_users').where('email', '==', email).limit(1).get()
                 if not user_doc:
                     error = "User not found. Please sign up."
                 else:
-                    # Placeholder: Normally Firebase Client SDK handles password verification
-                    # We'll simulate for now until we add client-side JS
                     stored_user = user_doc[0].to_dict()
                     if stored_user['password'] == password:  # TEMPORARY, replace with proper auth
                         session['user'] = {
@@ -144,39 +143,32 @@ def auth_route():
             except Exception as e:
                 error = str(e)
         
-        elif 'signup-email' in request.form:  # Signup form submission
+        elif form_type == 'signup':
             first_name = request.form['firstName']
             last_name = request.form['lastName']
             email = request.form['email']
             phone = request.form['phone']
             password = request.form['password']
-            role_preference = request.form['role']  # 'team_member' or 'manager'
+            role_preference = request.form['role']
             try:
-                # Create user in Firebase Auth
                 user = auth.create_user(email=email, password=password)
-                # Store in web_users collection with pending role
                 db.collection('web_users').document(user.uid).set({
                     'firstName': first_name,
                     'lastName': last_name,
                     'email': email,
                     'phone': phone,
-                    'password': password,  # TEMPORARY, remove after client-side auth
+                    'password': password,  # TEMPORARY, remove later
                     'role': 'pending',
                     'rolePreference': role_preference,
                     'createdAt': datetime.now(KENYA_TZ)
                 })
-                session['user'] = {
-                    'uid': user.uid,
-                    'email': email,
-                    'role': 'pending'
-                }
-                return redirect(url_for('dashboard'))
+                signup_success = True  # Trigger login tab
             except auth.EmailAlreadyExistsError:
                 error = "Email already exists. Please log in."
             except Exception as e:
                 error = str(e)
     
-    return render_template('auth.html', error=error)
+    return render_template('auth.html', error=error, signup_success=signup_success)
 
 @app.route('/logout')
 def logout():
