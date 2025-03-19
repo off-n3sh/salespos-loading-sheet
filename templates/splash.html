@@ -15,9 +15,9 @@
         </button>
     </div>
     <script>
-        setTimeout(() => { window.location.href = "{{ url_for('login') }}"; }, 3000);
+        setTimeout(() => { window.location.href = "{{ url_for('auth_route') }}"; }, 3000);
         document.getElementById("get-started").addEventListener("click", () => {
-            window.location.href = "{{ url_for('login') }}";
+            window.location.href = "{{ url_for('auth_route') }}";
         });
     </script>
     <style>

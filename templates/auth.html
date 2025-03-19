@@ -23,7 +23,7 @@
             </div>
 
             <!-- Login Form -->
-            <form id="login-form" method="POST" action="{{ url_for('login') }}" class="space-y-4">
+            <form id="login-form" method="POST" action="{{ url_for('auth_route') }}" class="space-y-4">
                 {% if error %}
                     <p class="text-red-500 text-sm text-center">{{ error }}</p>
                 {% endif %}
@@ -44,8 +44,8 @@
                 <button type="submit" class="w-full bg-orange-500 text-white py-2 rounded-lg hover:bg-orange-600 transition-all duration-200">Login</button>
             </form>
 
-            <!-- Signup Form (Hidden by Default) -->
-            <form id="signup-form" method="POST" action="{{ url_for('signup') }}" class="space-y-4 hidden">
+            <!-- Signup Form -->
+            <form id="signup-form" method="POST" action="{{ url_for('auth_route') }}" class="space-y-4 hidden">
                 {% if error %}
                     <p class="text-red-500 text-sm text-center">{{ error }}</p>
                 {% endif %}
@@ -88,7 +88,6 @@
     </div>
 
     <script>
-        // Tab switching
         const loginTab = document.getElementById("login-tab");
         const signupTab = document.getElementById("signup-tab");
         const loginForm = document.getElementById("login-form");
@@ -115,7 +114,6 @@
             loginTab.click();
         });
 
-        // Password toggle
         function togglePassword(inputId, toggleBtnId) {
             const input = document.getElementById(inputId);
             const toggle = document.getElementById(toggleBtnId);
