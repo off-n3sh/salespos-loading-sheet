@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dreamland Enterprises - Login / Signup</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+    <div class="flex w-full max-w-4xl shadow-lg rounded-lg overflow-hidden">
+        <!-- Left Side: Branding -->
+        <div class="hidden md:block w-1/2 bg-gradient-to-b from-orange-600 to-gray-700 p-8 text-white">
+            <h1 class="text-3xl font-bold mb-4">Welcome to Dreamland Enterprises</h1>
+            <p class="text-lg">Securely manage your sales and orders.</p>
+        </div>
+
+        <!-- Right Side: Form -->
+        <div class="w-full md:w-1/2 bg-white p-8">
+            <div class="flex justify-center mb-6">
+                <button id="login-tab" class="px-4 py-2 text-orange-600 font-semibold border-b-2 border-orange-600">Login</button>
+                <button id="signup-tab" class="px-4 py-2 text-gray-600 font-semibold">Signup</button>
+            </div>
+
+            <!-- Login Form -->
+            <form id="login-form" method="POST" action="{{ url_for('login') }}" class="space-y-4">
+                {% if error %}
+                    <p class="text-red-500 text-sm text-center">{{ error }}</p>
+                {% endif %}
+                <div>
+                    <label for="login-email" class="block text-sm font-medium text-gray-700">Email</label>
+                    <input type="email" id="login-email" name="email" placeholder="nehemiaangana@gmail.com" class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" required>
+                </div>
+                <div>
+                    <label for="login-password" class="block text-sm font-medium text-gray-700">Password</label>
+                    <div class="relative">
+                        <input type="password" id="login-password" name="password" placeholder="••••••••" class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" required>
+                        <button type="button" id="toggle-login-password" class="absolute inset-y-0 right-0 px-3 text-gray-600">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+                <a href="#" class="text-sm text-orange-600 hover:underline">Forgot Password?</a>
+                <button type="submit" class="w-full bg-orange-500 text-white py-2 rounded-lg hover:bg-orange-600 transition-all duration-200">Login</button>
+            </form>
+
+            <!-- Signup Form (Hidden by Default) -->
+            <form id="signup-form" method="POST" action="{{ url_for('signup') }}" class="space-y-4 hidden">
+                {% if error %}
+                    <p class="text-red-500 text-sm text-center">{{ error }}</p>
+                {% endif %}
+                <div>
+                    <label for="signup-firstname" class="block text-sm font-medium text-gray-700">First Name</label>
+                    <input type="text" id="signup-firstname" name="firstName" placeholder="Nehemiah" class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" required>
+                </div>
+                <div>
+                    <label for="signup-lastname" class="block text-sm font-medium text-gray-700">Last Name</label>
+                    <input type="text" id="signup-lastname" name="lastName" placeholder="Angana" class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" required>
+                </div>
+                <div>
+                    <label for="signup-email" class="block text-sm font-medium text-gray-700">Email</label>
+                    <input type="email" id="signup-email" name="email" placeholder="nehemiaangana@gmail.com" class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" required>
+                </div>
+                <div>
+                    <label for="signup-phone" class="block text-sm font-medium text-gray-700">Phone</label>
+                    <input type="tel" id="signup-phone" name="phone" placeholder="+254717160575" class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" required>
+                </div>
+                <div>
+                    <label for="signup-password" class="block text-sm font-medium text-gray-700">Password</label>
+                    <div class="relative">
+                        <input type="password" id="signup-password" name="password" placeholder="Create a password" class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" required>
+                        <button type="button" id="toggle-signup-password" class="absolute inset-y-0 right-0 px-3 text-gray-600">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+                <div>
+                    <label for="signup-role" class="block text-sm font-medium text-gray-700">Role Preference</label>
+                    <select id="signup-role" name="role" class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500">
+                        <option value="team_member">Team Member</option>
+                        <option value="manager">Manager</option>
+                    </select>
+                </div>
+                <button type="submit" class="w-full bg-orange-500 text-white py-2 rounded-lg hover:bg-orange-600 transition-all duration-200">Sign Up</button>
+                <p class="text-sm text-center">Already have an account? <a href="#" id="switch-to-login" class="text-orange-600 hover:underline">Login</a></p>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Tab switching
+        const loginTab = document.getElementById("login-tab");
+        const signupTab = document.getElementById("signup-tab");
+        const loginForm = document.getElementById("login-form");
+        const signupForm = document.getElementById("signup-form");
+
+        loginTab.addEventListener("click", () => {
+            loginTab.classList.add("border-b-2", "border-orange-600", "text-orange-600");
+            signupTab.classList.remove("border-b-2", "border-orange-600", "text-orange-600");
+            signupTab.classList.add("text-gray-600");
+            loginForm.classList.remove("hidden");
+            signupForm.classList.add("hidden");
+        });
+
+        signupTab.addEventListener("click", () => {
+            signupTab.classList.add("border-b-2", "border-orange-600", "text-orange-600");
+            loginTab.classList.remove("border-b-2", "border-orange-600", "text-orange-600");
+            loginTab.classList.add("text-gray-600");
+            signupForm.classList.remove("hidden");
+            loginForm.classList.add("hidden");
+        });
+
+        document.getElementById("switch-to-login").addEventListener("click", (e) => {
+            e.preventDefault();
+            loginTab.click();
+        });
+
+        // Password toggle
+        function togglePassword(inputId, toggleBtnId) {
+            const input = document.getElementById(inputId);
+            const toggle = document.getElementById(toggleBtnId);
+            toggle.addEventListener("click", () => {
+                const type = input.type === "password" ? "text" : "password";
+                input.type = type;
+                toggle.querySelector("i").classList.toggle("fa-eye");
+                toggle.querySelector("i").classList.toggle("fa-eye-slash");
+            });
+        }
+
+        togglePassword("login-password", "toggle-login-password");
+        togglePassword("signup-password", "toggle-signup-password");
+    </script>
+</body>
+</html>

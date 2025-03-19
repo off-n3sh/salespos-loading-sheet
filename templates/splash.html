@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dreamland Enterprises - Welcome</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gradient-to-br from-orange-600 to-gray-700 flex items-center justify-center min-h-screen">
+    <div class="text-center text-white animate-fade-in">
+        <h1 class="text-5xl font-bold mb-4">Dreamland Enterprises</h1>
+        <p class="text-xl mb-6">The Best Wholesaler Prices, Delivered to You</p>
+        <button id="get-started" class="bg-teal-500 text-white py-3 px-6 rounded-lg hover:bg-teal-600 transition-all duration-200 shadow-lg">
+            Get Started
+        </button>
+    </div>
+    <script>
+        setTimeout(() => { window.location.href = "{{ url_for('login') }}"; }, 3000);
+        document.getElementById("get-started").addEventListener("click", () => {
+            window.location.href = "{{ url_for('login') }}";
+        });
+    </script>
+    <style>
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        .animate-fade-in { animation: fadeIn 1.5s ease-in-out; }
+    </style>
+</body>
+</html>
