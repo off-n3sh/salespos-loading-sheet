@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, Response, session, jsonify
 import firebase_admin
-from firebase_admin import credentials, firestore
+from firebase_admin import credentials, firestore, auth
 from datetime import datetime, timedelta
 import json
 import pytz
@@ -8,6 +8,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from io import BytesIO
 import os
+from functools import wraps
 
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY')
@@ -67,6 +68,7 @@ def process_items(items_value):
             return 0
     return 0
 
+
 def get_next_receipt_id():
     """Generate the next receipt ID using a counter in Firestore."""
     counter_ref = db.collection('metadata').document('receipt_counter')
@@ -90,8 +92,100 @@ def log_stock_change(product_type, subtype, change_type, quantity, price_per_uni
         'timestamp': datetime.now(KENYA_TZ)
     })
 
+# Login required decorator
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user' not in session:
+            return redirect(url_for('auth'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# New Routes
+@app.route('/')
+def splash():
+    if 'user' in session:
+        return redirect(url_for('dashboard'))
+    return render_template('splash.html')
+
+@app.route('/auth', methods=['GET', 'POST'])
+def auth_route():
+    if 'user' in session:
+        return redirect(url_for('dashboard'))
+    
+    error = None
+    if request.method == 'POST':
+        if 'login-email' in request.form:  # Login form submission
+            email = request.form['email']
+            password = request.form['password']
+            try:
+                # Verify user exists in Firebase Auth
+                user = auth.get_user_by_email(email)
+                # Since Firebase Admin SDK can't verify passwords, we'll assume mobile app compatibility
+                # For now, check Firestore (temporary, we'll refine with client-side auth later)
+                user_doc = db.collection('web_users').where('email', '==', email).limit(1).get()
+                if not user_doc:
+                    error = "User not found. Please sign up."
+                else:
+                    # Placeholder: Normally Firebase Client SDK handles password verification
+                    # We'll simulate for now until we add client-side JS
+                    stored_user = user_doc[0].to_dict()
+                    if stored_user['password'] == password:  # TEMPORARY, replace with proper auth
+                        session['user'] = {
+                            'uid': user.uid,
+                            'email': email,
+                            'role': stored_user.get('role', 'pending')
+                        }
+                        return redirect(url_for('dashboard'))
+                    else:
+                        error = "Invalid password"
+            except auth.UserNotFoundError:
+                error = "User not found. Please sign up."
+            except Exception as e:
+                error = str(e)
+        
+        elif 'signup-email' in request.form:  # Signup form submission
+            first_name = request.form['firstName']
+            last_name = request.form['lastName']
+            email = request.form['email']
+            phone = request.form['phone']
+            password = request.form['password']
+            role_preference = request.form['role']  # 'team_member' or 'manager'
+            try:
+                # Create user in Firebase Auth
+                user = auth.create_user(email=email, password=password)
+                # Store in web_users collection with pending role
+                db.collection('web_users').document(user.uid).set({
+                    'firstName': first_name,
+                    'lastName': last_name,
+                    'email': email,
+                    'phone': phone,
+                    'password': password,  # TEMPORARY, remove after client-side auth
+                    'role': 'pending',
+                    'rolePreference': role_preference,
+                    'createdAt': datetime.now(KENYA_TZ)
+                })
+                session['user'] = {
+                    'uid': user.uid,
+                    'email': email,
+                    'role': 'pending'
+                }
+                return redirect(url_for('dashboard'))
+            except auth.EmailAlreadyExistsError:
+                error = "Email already exists. Please log in."
+            except Exception as e:
+                error = str(e)
+    
+    return render_template('auth.html', error=error)
+
+@app.route('/logout')
+def logout():
+    session.pop('user', None)
+    return redirect(url_for('splash'))
+
 # Routes
-@app.route('/', methods=['GET', 'POST'])
+@app.route('/dashboard', methods=['GET', 'POST'])
+@login_required
 def dashboard():
     """Render the dashboard with stats cards and sales history."""
     search_query = request.form.get('search', '') if request.method == 'POST' else request.args.get('search', '')
@@ -189,6 +283,7 @@ def dashboard():
                           time_filter=time_filter)
 
 @app.route('/orders', methods=['GET', 'POST'])
+@login_required
 def orders():
     """Handle order creation and display the orders page."""
     if request.method == 'POST':
@@ -281,6 +376,7 @@ def orders():
     return render_template('orders.html', orders=orders, recent_activity=recent_activity, stock_items=stock_items)
 
 @app.route('/stock', methods=['GET', 'POST'])
+@login_required
 def stock():
     """Handle stock management (add, restock, update price) and display stock page."""
     if request.method == 'POST':
@@ -371,6 +467,7 @@ def stock():
     return render_template('stock.html', stock_items=stock_items, recent_activity=recent_activity)
 
 @app.route('/receipts')
+@login_required
 def receipts():
     """Display all receipts."""
     orders = [doc.to_dict() for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).get()]
@@ -380,6 +477,7 @@ def receipts():
     return render_template('receipts.html', orders=orders, recent_activity=recent_activity)
 
 @app.route('/receipt/<order_id>')
+@login_required
 def receipt(order_id):
     """Display a specific receipt."""
     orders_ref = db.collection('orders').where('receipt_id', '==', order_id).limit(1).stream()
@@ -423,6 +521,7 @@ def receipt(order_id):
     return render_template('receipt.html', order=order, recent_activity=recent_activity)
 
 @app.route('/retail', methods=['GET', 'POST'])
+@login_required
 def retail():
     """Handle retail sales and display the retail page."""
     if request.method == 'POST':
@@ -445,6 +544,7 @@ def retail():
     return render_template('retail.html', retail_sales=retail_sales, recent_activity=recent_activity)
 
 @app.route('/reports')
+@login_required
 def reports():
     """Generate and display sales reports with charts."""
     time_filter = request.args.get('time', 'month')
@@ -529,6 +629,7 @@ def reports():
                           chart_data=chart_data, time_filter=time_filter, total_debt=total_debt)
 
 @app.route('/mark_paid/<order_id>', methods=['POST'])
+@login_required
 def mark_paid(order_id):
     """Mark an order as paid and update the balance."""
     orders_ref = db.collection('orders').where('receipt_id', '==', order_id).limit(1).stream()
@@ -571,6 +672,7 @@ def mark_paid(order_id):
         return f"Error updating order: {str(e)}", 500
 
 @app.route('/return_stock/<order_id>', methods=['POST'])
+@login_required
 def return_stock(order_id):
     """Log stock returns for an order and update the order with new item quantities and balance."""
     orders_ref = db.collection('orders').where('receipt_id', '==', order_id).limit(1).stream()
@@ -670,6 +772,7 @@ def return_stock(order_id):
         return f"Error processing stock returns: {str(e)}", 500
     
 @app.route('/expenses', methods=['GET', 'POST'])
+@login_required
 def expenses():
     """Add a new expense and redirect to the dashboard."""
     if request.method == 'POST':
@@ -686,6 +789,7 @@ def expenses():
     return redirect(url_for('dashboard'))
 
 @app.route('/load_to_loading_sheet/<receipt_id>/<action>')
+@login_required
 def load_to_loading_sheet(receipt_id, action):
     order_ref = db.collection('orders').where('receipt_id', '==', receipt_id).limit(1).stream()
     order_doc = next(order_ref, None)
@@ -741,6 +845,7 @@ def load_to_loading_sheet(receipt_id, action):
     return redirect(url_for('loading_sheets'))
 
 @app.route('/loading-sheets')
+@login_required
 def loading_sheets():
     """Display the loading sheets page."""
     current_loading_sheet = session.get('current_loading_sheet', None)
@@ -770,6 +875,7 @@ def loading_sheets():
                           created_at=created_at, recent_sheets=recent_sheets, recent_activity=recent_activity)
 
 @app.route('/download-loading-sheet')
+@login_required
 def download_loading_sheet():
     current_loading_sheet = session.get('current_loading_sheet', None)
     if not current_loading_sheet or not current_loading_sheet.get('items'):
@@ -828,6 +934,7 @@ def download_loading_sheet():
     )
     
 @app.route('/get_loading_sheet/<sheet_id>')
+@login_required
 def get_loading_sheet(sheet_id):
     sheet_ref = db.collection('loading_sheets').document(sheet_id).get()
     if not sheet_ref.exists:
