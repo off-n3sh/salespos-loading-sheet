@@ -107,6 +107,18 @@ def splash():
     if 'user' in session:
         return redirect(url_for('dashboard'))
     return render_template('splash.html')
+    
+@app.route('/health')
+def health_check():
+    """Health check endpoint for deployment verification."""
+    try:
+        test_ref = db.collection('metadata').document('receipt_counter').get()
+        if test_ref.exists or not test_ref.exists:
+            return jsonify({"status": "healthy"}), 200
+        else:
+            return jsonify({"status": "unhealthy", "error": "Firestore query failed"}), 500
+    except Exception as e:
+        return jsonify({"status": "unhealthy", "error": str(e)}), 500
 
 @app.route('/auth', methods=['GET', 'POST'])
 def auth_route():
