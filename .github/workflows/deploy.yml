@@ -40,17 +40,6 @@ jobs:
           PROJECT_ID=$(echo "${{ secrets.GCP_PROJECT_ID }}" | tr -d '\n\r\t ')
           docker push "${REGION}-docker.pkg.dev/${PROJECT_ID}/loading-sheet-repo/loading-sheet-app:latest"
 
-      - name: Get current revision (before deployment)
-        id: get-current-revision
-        run: |
-          REGION=$(echo "${{ secrets.GCP_REGION }}" | tr -d '\n\r\t ')
-          CURRENT_REVISION=$(gcloud run services describe loading-sheet-service \
-            --region "${REGION}" \
-            --platform managed \
-            --format 'value(status.traffic[0].revisionName)' || echo "")
-          echo "Current revision: $CURRENT_REVISION"
-          echo "CURRENT_REVISION=$CURRENT_REVISION" >> $GITHUB_ENV
-
       - name: Deploy to Cloud Run without shifting traffic
         id: deploy
         run: |
@@ -64,43 +53,8 @@ jobs:
             --min-instances 1 \
             --service-account "github-deployer@${PROJECT_ID}.iam.gserviceaccount.com" \
             --no-traffic
-          # Get the revision-specific URL
-          NEW_REVISION=$(gcloud run services describe loading-sheet-service \
-            --region "${REGION}" \
-            --platform managed \
-            --format 'value(status.latestCreatedRevisionName)')
-          REVISION_URL=$(gcloud run revisions describe "$NEW_REVISION" \
-            --region "${REGION}" \
-            --format 'value(status.url)')
-          echo "REVISION_URL=$REVISION_URL" >> $GITHUB_ENV
 
-      - name: Wait for revision to stabilize
-        run: |
-          sleep 10  # Give Cloud Run time to start the new revision
-
-      - name: Health check for new revision
-        id: health-check
-        run: |
-          echo "Checking health of new revision at ${{ env.REVISION_URL }}/health"
-          for i in {1..10}; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ env.REVISION_URL }}/health" || echo "000")
-            RESPONSE=$(curl -s "${{ env.REVISION_URL }}/health" || echo "Curl failed")
-            echo "Attempt $i: Status=$STATUS, Response=$RESPONSE"
-            if [ "$STATUS" -eq 200 ]; then
-              echo "Health check passed with status $STATUS"
-              echo "HEALTH_CHECK_PASSED=true" >> $GITHUB_ENV
-              break
-            fi
-            echo "Health check attempt $i failed with status $STATUS, retrying in 5 seconds..."
-            sleep 5
-          done
-          if [ "${{ env.HEALTH_CHECK_PASSED }}" != "true" ]; then
-            echo "Health check failed after 10 attempts"
-            echo "HEALTH_CHECK_PASSED=false" >> $GITHUB_ENV
-          fi
-
-      - name: Shift traffic to latest revision if health check passes
-        if: env.HEALTH_CHECK_PASSED == 'true'
+      - name: Shift traffic to latest revision
         run: |
           REGION=$(echo "${{ secrets.GCP_REGION }}" | tr -d '\n\r\t ')
           gcloud run services update-traffic loading-sheet-service \
@@ -108,15 +62,3 @@ jobs:
             --region "${REGION}" \
             --platform managed
           echo "Traffic shifted to the latest revision"
-
-      - name: Roll back traffic to previous revision if health check fails
-        if: env.HEALTH_CHECK_PASSED == 'false' && env.CURRENT_REVISION != ''
-        run: |
-          REGION=$(echo "${{ secrets.GCP_REGION }}" | tr -d '\n\r\t ')
-          PREVIOUS_REVISION="${{ env.CURRENT_REVISION }}"
-          echo "Rolling back to previous revision: $PREVIOUS_REVISION"
-          gcloud run services update-traffic loading-sheet-service \
-            --to-revisions "${PREVIOUS_REVISION}=100" \
-            --region "${REGION}" \
-            --platform managed
-          echo "Traffic rolled back to $PREVIOUS_REVISION due to health check failure"
