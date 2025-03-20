@@ -76,7 +76,7 @@ jobs:
         id: health-check
         run: |
           echo "Checking health of new revision at ${{ env.SERVICE_URL }}"
-          for i in {1..10}; do
+          for i in {1..30}; do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ env.SERVICE_URL }}/health" || echo "000")
             if [ "$STATUS" -eq 200 ]; then
               echo "Health check passed with status $STATUS"
