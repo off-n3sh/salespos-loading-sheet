@@ -26,7 +26,6 @@ jobs:
       - name: Configure Docker for Artifact Registry
         run: |
           REGION=$(echo "${{ secrets.GCP_REGION }}" | tr -d '\n\r\t ')
-          echo "Configuring Docker for region $REGION"
           gcloud auth configure-docker "${REGION}-docker.pkg.dev"
 
       - name: Build Docker image
@@ -48,7 +47,7 @@ jobs:
           CURRENT_REVISION=$(gcloud run services describe loading-sheet-service \
             --region "${REGION}" \
             --platform managed \
-            --format 'value(status.traffic[0].revisionName)')
+            --format 'value(status.traffic[0].revisionName)' || echo "")
           echo "Current revision: $CURRENT_REVISION"
           echo "CURRENT_REVISION=$CURRENT_REVISION" >> $GITHUB_ENV
 
@@ -65,19 +64,28 @@ jobs:
             --min-instances 1 \
             --service-account "github-deployer@${PROJECT_ID}.iam.gserviceaccount.com" \
             --no-traffic
-          # Get the URL of the deployed service
-          SERVICE_URL=$(gcloud run services describe loading-sheet-service \
+          # Get the revision-specific URL
+          NEW_REVISION=$(gcloud run services describe loading-sheet-service \
             --region "${REGION}" \
             --platform managed \
+            --format 'value(status.latestCreatedRevisionName)')
+          REVISION_URL=$(gcloud run revisions describe "$NEW_REVISION" \
+            --region "${REGION}" \
             --format 'value(status.url)')
-          echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_ENV
+          echo "REVISION_URL=$REVISION_URL" >> $GITHUB_ENV
+
+      - name: Wait for revision to stabilize
+        run: |
+          sleep 10  # Give Cloud Run time to start the new revision
 
       - name: Health check for new revision
         id: health-check
         run: |
-          echo "Checking health of new revision at ${{ env.SERVICE_URL }}"
-          for i in {1..30}; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ env.SERVICE_URL }}/health" || echo "000")
+          echo "Checking health of new revision at ${{ env.REVISION_URL }}/health"
+          for i in {1..10}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ env.REVISION_URL }}/health" || echo "000")
+            RESPONSE=$(curl -s "${{ env.REVISION_URL }}/health" || echo "Curl failed")
+            echo "Attempt $i: Status=$STATUS, Response=$RESPONSE"
             if [ "$STATUS" -eq 200 ]; then
               echo "Health check passed with status $STATUS"
               echo "HEALTH_CHECK_PASSED=true" >> $GITHUB_ENV
@@ -102,7 +110,7 @@ jobs:
           echo "Traffic shifted to the latest revision"
 
       - name: Roll back traffic to previous revision if health check fails
-        if: env.HEALTH_CHECK_PASSED == 'false'
+        if: env.HEALTH_CHECK_PASSED == 'false' && env.CURRENT_REVISION != ''
         run: |
           REGION=$(echo "${{ secrets.GCP_REGION }}" | tr -d '\n\r\t ')
           PREVIOUS_REVISION="${{ env.CURRENT_REVISION }}"
