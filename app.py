@@ -110,11 +110,8 @@ def splash():
     
 @app.route('/health')
 def health_check():
-    """Simple health check endpoint verifying the app is running and splash route is operational."""
-    try:
-        return jsonify({"status": "healthy", "message": "Splash route operational"}), 200
-    except Exception as e:
-        return jsonify({"status": "unhealthy", "error": str(e)}), 500
+    """Minimal health check endpoint to confirm the app is running."""
+    return jsonify({"status": "healthy", "message": "App is alive"}), 200
 
 @app.route('/auth', methods=['GET', 'POST'])
 def auth_route():
