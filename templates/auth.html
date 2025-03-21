@@ -8,14 +8,12 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body class="bg-gray-900 min-h-screen flex items-center justify-center">
-    <!-- Background elements -->
     <div class="fixed inset-0 overflow-hidden z-0">
         <div class="absolute inset-0 bg-gradient-to-br from-orange-600 to-gray-900 opacity-80"></div>
         <div id="particles-js" class="absolute inset-0"></div>
     </div>
 
     <div class="flex w-full max-w-4xl shadow-2xl rounded-lg overflow-hidden z-10 relative backdrop-blur-sm bg-white/10">
-        <!-- Left Side: Branding -->
         <div class="hidden md:flex md:flex-col md:justify-between w-1/2 bg-gradient-to-br from-gray-900/70 to-orange-900/50 p-8 text-white backdrop-blur-sm">
             <div class="animate-fade-in space-y-6">
                 <div class="flex items-center space-x-3">
@@ -24,243 +22,89 @@
                     </div>
                     <h1 class="text-3xl font-bold">Dreamland</h1>
                 </div>
-                
                 <h2 class="text-2xl font-bold mt-6">Welcome to Your Wholesale Solution</h2>
                 <p class="text-lg opacity-80">Transform your business with premium products at unbeatable prices.</p>
-                
                 <div class="grid grid-cols-2 gap-4 mt-6">
-                    <div class="flex items-center space-x-2">
-                        <div class="h-8 w-8 rounded-full bg-teal-500/20 flex items-center justify-center">
-                            <i class="fas fa-check text-teal-400"></i>
-                        </div>
-                        <span>Bulk Discounts</span>
-                    </div>
-                    <div class="flex items-center space-x-2">
-                        <div class="h-8 w-8 rounded-full bg-teal-500/20 flex items-center justify-center">
-                            <i class="fas fa-check text-teal-400"></i>
-                        </div>
-                        <span>Secure Orders</span>
-                    </div>
-                    <div class="flex items-center space-x-2">
-                        <div class="h-8 w-8 rounded-full bg-teal-500/20 flex items-center justify-center">
-                            <i class="fas fa-check text-teal-400"></i>
-                        </div>
-                        <span>Fast Delivery.</span>
-                    </div>
-                    <div class="flex items-center space-x-2">
-                        <div class="h-8 w-8 rounded-full bg-teal-500/20 flex items-center justify-center">
-                            <i class="fas fa-check text-teal-400"></i>
-                        </div>
-                        <span>24/7 Support</span>
-                    </div>
+                    <div class="flex items-center space-x-2"><div class="h-8 w-8 rounded-full bg-teal-500/20 flex items-center justify-center"><i class="fas fa-check text-teal-400"></i></div><span>Bulk Discounts</span></div>
+                    <div class="flex items-center space-x-2"><div class="h-8 w-8 rounded-full bg-teal-500/20 flex items-center justify-center"><i class="fas fa-check text-teal-400"></i></div><span>Secure Orders</span></div>
+                    <div class="flex items-center space-x-2"><div class="h-8 w-8 rounded-full bg-teal-500/20 flex items-center justify-center"><i class="fas fa-check text-teal-400"></i></div><span>Fast Delivery.</span></div>
+                    <div class="flex items-center space-x-2"><div class="h-8 w-8 rounded-full bg-teal-500/20 flex items-center justify-center"><i class="fas fa-check text-teal-400"></i></div><span>24/7 Support</span></div>
                 </div>
             </div>
-            
             <div class="animate-fade-in-delay">
                 <div class="flex items-center space-x-4 mt-8">
-                    <div class="h-10 w-10 bg-gray-300 rounded-full overflow-hidden flex items-center justify-center">
-                        <i class="fas fa-user text-gray-600"></i>
-                    </div>
-                    <div>
-                        <p class="font-medium">"Dreamland transformed our supply chain efficiency by 60%."</p>
-                        <p class="text-sm opacity-70">— Mama Kamau, Finance Manager</p>
-                    </div>
+                    <div class="h-10 w-10 bg-gray-300 rounded-full overflow-hidden flex items-center justify-center"><i class="fas fa-user text-gray-600"></i></div>
+                    <div><p class="font-medium">"Dreamland transformed our supply chain efficiency by 60%."</p><p class="text-sm opacity-70">— Mama Kamau, Finance Manager</p></div>
                 </div>
             </div>
         </div>
 
-        <!-- Right Side: Form -->
         <div class="w-full md:w-1/2 bg-white p-8 shadow-xl">
             <div class="text-center mb-6">
                 <div class="inline-flex rounded-lg p-1 bg-gray-100">
-                    <button id="login-tab" class="px-6 py-2 rounded-lg bg-orange-500 text-white font-semibold transition-all duration-300 shadow-md">Login</button>
+                    <button id="login-tab" class="px-6 py-2 rounded-lg bg-gray-800 text-white font-semibold transition-all duration-300 shadow-md">Login</button>
                     <button id="signup-tab" class="px-6 py-2 text-gray-600 font-semibold transition-all duration-300 hover:bg-gray-200 rounded-lg">Signup</button>
                 </div>
             </div>
 
-            <!-- Login Form -->
             <form id="login-form" method="POST" action="{{ url_for('auth_route') }}" class="space-y-4 animate-fade-in">
-                {% if error %}
-                    <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded animate-shake">
-                        <p class="text-sm">{{ error }}</p>
-                    </div>
-                {% endif %}
-                {% if signup_success %}
-                    <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-3 rounded animate-slide-in">
-                        <p class="text-sm">Signup successful! Please log in.</p>
-                    </div>
-                {% endif %}
-                <div class="form-group">
-                    <label for="login-email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                    <div class="relative">
-                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
-                            <i class="fas fa-envelope"></i>
-                        </span>
-                        <input type="email" id="login-email" name="email" class="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white" required>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <div class="flex justify-between items-center mb-1">
-                        <label for="login-password" class="block text-sm font-medium text-gray-700">Password</label>
-                        <a href="#" class="text-xs text-orange-600 hover:text-orange-700 hover:underline">Forgot Password?</a>
-                    </div>
-                    <div class="relative">
-                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
-                            <i class="fas fa-lock"></i>
-                        </span>
-                        <input type="password" id="login-password" name="password" class="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white" required>
-                        <button type="button" id="toggle-login-password" class="absolute inset-y-0 right-0 px-3 text-gray-600">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                    </div>
-                </div>
-                <button type="submit" name="form_type" value="login" class="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-3 rounded-lg hover:from-orange-600 hover:to-orange-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center space-x-2">
-                    <span>Login</span>
-                    <i class="fas fa-arrow-right text-sm"></i>
-                </button>
+                {% if error %}<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded animate-shake"><p class="text-sm">{{ error }}</p></div>{% endif %}
+                {% if signup_success %}<div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-3 rounded animate-slide-in"><p class="text-sm">Signup successful! Please log in.</p></div>{% endif %}
+                <div class="form-group"><label for="login-email" class="block text-sm font-medium text-gray-700 mb-1">Email</label><div class="relative"><span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500"><i class="fas fa-envelope"></i></span><input type="email" id="login-email" name="email" class="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white" required></div></div>
+                <div class="form-group"><div class="flex justify-between items-center mb-1"><label for="login-password" class="block text-sm font-medium text-gray-700">Password</label><a href="#" class="text-xs text-orange-600 hover:text-orange-700 hover:underline">Forgot Password?</a></div><div class="relative"><span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500"><i class="fas fa-lock"></i></span><input type="password" id="login-password" name="password" class="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white" required><button type="button" id="toggle-login-password" class="absolute inset-y-0 right-0 px-3 text-gray-600"><i class="fas fa-eye"></i></button></div></div>
+                <button type="submit" name="form_type" value="login" class="w-full bg-gray-800 text-white py-3 rounded-lg hover:bg-gray-900 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center space-x-2"><span>Login</span><i class="fas fa-arrow-right text-sm"></i></button>
             </form>
 
-            <!-- Signup Form -->
             <form id="signup-form" method="POST" action="{{ url_for('auth_route') }}" class="space-y-4 hidden animate-fade-in">
-                {% if error %}
-                    <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded animate-shake">
-                        <p class="text-sm">{{ error }}</p>
-                    </div>
-                {% endif %}
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="form-group">
-                        <label for="signup-firstname" class="block text-sm font-medium text-gray-700 mb-1">First Name</label>
-                        <div class="relative">
-                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
-                                <i class="fas fa-user"></i>
-                            </span>
-                            <input type="text" id="signup-firstname" name="firstName" class="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white" required>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="signup-lastname" class="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
-                        <input type="text" id="signup-lastname" name="lastName" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white" required>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="signup-email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                    <div class="relative">
-                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
-                            <i class="fas fa-envelope"></i>
-                        </span>
-                        <input type="email" id="signup-email" name="email" class="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white" required>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="signup-phone" class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                    <div class="relative">
-                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
-                            <i class="fas fa-phone"></i>
-                        </span>
-                        <input type="tel" id="signup-phone" name="phone" class="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white" required>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="signup-password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                    <div class="relative">
-                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
-                            <i class="fas fa-lock"></i>
-                        </span>
-                        <input type="password" id="signup-password" name="password" class="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white" required>
-                        <button type="button" id="toggle-signup-password" class="absolute inset-y-0 right-0 px-3 text-gray-600">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="signup-role" class="block text-sm font-medium text-gray-700 mb-1">Role Preference</label>
-                    <div class="relative">
-                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
-                            <i class="fas fa-briefcase"></i>
-                        </span>
-                        <select id="signup-role" name="role" class="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white appearance-none">
-                            <option value="team_member">Team Member</option>
-                            <option value="manager">Manager</option>
-                        </select>
-                        <span class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 pointer-events-none">
-                            <i class="fas fa-chevron-down"></i>
-                        </span>
-                    </div>
-                </div>
-                <button type="submit" name="form_type" value="signup" class="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-3 rounded-lg hover:from-orange-600 hover:to-orange-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center space-x-2">
-                    <span>Create Account</span>
-                    <i class="fas fa-user-plus text-sm"></i>
-                </button>
+                {% if error %}<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded animate-shake"><p class="text-sm">{{ error }}</p></div>{% endif %}
+                <div class="grid grid-cols-2 gap-4"><div class="form-group"><label for="signup-firstname" class="block text-sm font-medium text-gray-700 mb-1">First Name</label><div class="relative"><span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500"><i class="fas fa-user"></i></span><input type="text" id="signup-firstname" name="firstName" class="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white" required></div></div><div class="form-group"><label for="signup-lastname" class="block text-sm font-medium text-gray-700 mb-1">Last Name</label><input type="text" id="signup-lastname" name="lastName" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white" required></div></div>
+                <div class="form-group"><label for="signup-email" class="block text-sm font-medium text-gray-700 mb-1">Email</label><div class="relative"><span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500"><i class="fas fa-envelope"></i></span><input type="email" id="signup-email" name="email" class="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white" required></div></div>
+                <div class="form-group"><label for="signup-phone" class="block text-sm font-medium text-gray-700 mb-1">Phone</label><div class="relative"><span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500"><i class="fas fa-phone"></i></span><input type="tel" id="signup-phone" name="phone" class="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white" required></div></div>
+                <div class="form-group"><label for="signup-password" class="block text-sm font-medium text-gray-700 mb-1">Password</label><div class="relative"><span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500"><i class="fas fa-lock"></i></span><input type="password" id="signup-password" name="password" class="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white" required><button type="button" id="toggle-signup-password" class="absolute inset-y-0 right-0 px-3 text-gray-600"><i class="fas fa-eye"></i></button></div></div>
+                <div class="form-group"><label for="signup-role" class="block text-sm font-medium text-gray-700 mb-1">Role Preference</label><div class="relative"><span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500"><i class="fas fa-briefcase"></i></span><select id="signup-role" name="role" class="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white appearance-none"><option value="team_member">Team Member</option><option value="manager">Manager</option></select><span class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 pointer-events-none"><i class="fas fa-chevron-down"></i></span></div></div>
+                <button type="submit" name="form_type" value="signup" class="w-full bg-gray-800 text-white py-3 rounded-lg hover:bg-gray-900 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center space-x-2"><span>Create Account</span><i class="fas fa-user-plus text-sm"></i></button>
                 <p class="text-sm text-center mt-4">Already have an account? <a href="#" id="switch-to-login" class="text-orange-600 hover:text-orange-700 font-medium hover:underline">Login</a></p>
             </form>
         </div>
     </div>
 
-    <!-- Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/particles.js/2.0.0/particles.min.js"></script>
     <script>
-        // Initialize particle background with more vibrant particles
         particlesJS("particles-js", {
             particles: {
-                number: { value: 80, density: { enable: true, value_area: 800 } },
-                color: { value: ["#ffffff", "#ffcc80", "#ffb74d"] },
-                opacity: { value: 0.5, random: true, anim: { enable: true, speed: 1, opacity_min: 0.1, sync: false } },
+                number: { value: 60, density: { enable: true, value_area: 800 } },
+                color: { value: "#ffffff" },
+                opacity: { value: 0.3, random: true },
                 size: { value: 3, random: true },
-                line_linked: {
-                    enable: true,
-                    distance: 150,
-                    color: "#ffffff",
-                    opacity: 0.4,
-                    width: 1
-                },
-                move: {
-                    enable: true,
-                    speed: 2,
-                    direction: "none",
-                    random: true,
-                    straight: false,
-                    out_mode: "out",
-                    bounce: false
-                }
-            },
-            interactivity: {
-                detect_on: "canvas",
-                events: {
-                    onhover: { enable: true, mode: "repulse" },
-                    onclick: { enable: true, mode: "push" }
-                },
-                modes: {
-                    repulse: { distance: 100, duration: 0.4 },
-                    push: { particles_nb: 4 }
-                }
+                line_linked: { enable: true, distance: 150, color: "#ffffff", opacity: 0.2, width: 1 },
+                move: { enable: true, speed: 1.5, direction: "none", random: true, out_mode: "out" }
             }
         });
 
-        // Tab switching logic
         const loginTab = document.getElementById("login-tab");
         const signupTab = document.getElementById("signup-tab");
         const loginForm = document.getElementById("login-form");
         const signupForm = document.getElementById("signup-form");
 
         {% if signup_success %}
-            loginTab.classList.add("bg-orange-500", "text-white");
-            signupTab.classList.remove("bg-orange-500", "text-white");
+            loginTab.classList.add("bg-gray-800", "text-white");
+            signupTab.classList.remove("bg-gray-800", "text-white");
             signupTab.classList.add("text-gray-600");
             loginForm.classList.remove("hidden");
             signupForm.classList.add("hidden");
         {% endif %}
 
         loginTab.addEventListener("click", () => {
-            loginTab.classList.add("bg-orange-500", "text-white", "shadow-md");
-            signupTab.classList.remove("bg-orange-500", "text-white", "shadow-md");
+            loginTab.classList.add("bg-gray-800", "text-white", "shadow-md");
+            signupTab.classList.remove("bg-gray-800", "text-white", "shadow-md");
             signupTab.classList.add("text-gray-600");
             loginForm.classList.remove("hidden");
             signupForm.classList.add("hidden");
         });
 
         signupTab.addEventListener("click", () => {
-            signupTab.classList.add("bg-orange-500", "text-white", "shadow-md");
-            loginTab.classList.remove("bg-orange-500", "text-white", "shadow-md");
+            signupTab.classList.add("bg-gray-800", "text-white", "shadow-md");
+            loginTab.classList.remove("bg-gray-800", "text-white", "shadow-md");
             loginTab.classList.add("text-gray-600");
             signupForm.classList.remove("hidden");
             loginForm.classList.add("hidden");
@@ -271,7 +115,6 @@
             loginTab.click();
         });
 
-        // Password toggle functionality
         function togglePassword(inputId, toggleBtnId) {
             const input = document.getElementById(inputId);
             const toggle = document.getElementById(toggleBtnId);
@@ -288,41 +131,13 @@
     </script>
     
     <style>
-        /* Custom animations */
-        @keyframes fadeIn { 
-            from { opacity: 0; } 
-            to { opacity: 1; } 
-        }
-        
-        @keyframes shakeAnimation { 
-            0%, 100% { transform: translateX(0); } 
-            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); } 
-            20%, 40%, 60%, 80% { transform: translateX(5px); } 
-        }
-        
-        @keyframes slideIn { 
-            from { opacity: 0; transform: translateY(-20px); } 
-            to { opacity: 1; transform: translateY(0); } 
-        }
-        
-        .animate-fade-in { 
-            opacity: 0;
-            animation: fadeIn 0.8s ease-in-out forwards;
-        }
-        
-        .animate-fade-in-delay { 
-            opacity: 0;
-            animation: fadeIn 0.8s ease-in-out forwards;
-            animation-delay: 0.5s;
-        }
-        
-        .animate-shake {
-            animation: shakeAnimation 0.6s ease-in-out;
-        }
-        
-        .animate-slide-in {
-            animation: slideIn 0.5s ease-out;
-        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes shakeAnimation { 0%, 100% { transform: translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); } 20%, 40%, 60%, 80% { transform: translateX(5px); } }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { opacity: 0; animation: fadeIn 0.8s ease-in-out forwards; }
+        .animate-fade-in-delay { opacity: 0; animation: fadeIn 0.8s ease-in-out forwards; animation-delay: 0.5s; }
+        .animate-shake { animation: shakeAnimation 0.6s ease-in-out; }
+        .animate-slide-in { animation: slideIn 0.5s ease-out; }
     </style>
 </body>
 </html>
