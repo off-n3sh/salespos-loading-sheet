@@ -52,7 +52,7 @@
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">New Retail Order</h3>
             <form id="retail-form" method="POST" action="{{ url_for('orders') }}" class="space-y-4">
                 <input type="hidden" name="order_type" value="retail">
-                <input name="salesperson_name" placeholder="Served By" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 w-full" required>
+                <input type="hidden" name="salesperson_name" value="{{ session['user']['firstName'] }} {{ session['user']['lastName'] }}">
                 <div id="retail-items-container" class="space-y-2">
                     <div class="grid grid-cols-6 gap-2 item-row-header text-sm font-semibold">
                         <span class="text-left pl-2">Item</span>
@@ -62,20 +62,7 @@
                         <span class="text-center">Total</span>
                         <span class="text-center">Remove</span>
                     </div>
-                    <div class="grid grid-cols-6 gap-2 item-row">
-                        <select name="items[]" class="col-span-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-select w-full">
-                            <option value="">Search or select a product</option>
-                            {% for item in stock_items %}
-                            <option value="product|{{ item.stock_name }}|quantity|0|price|{{ item.selling_price }}|stock|{{ item.stock_quantity }}">{{ item.stock_name }}</option>
-                            {% endfor %}
-                        </select>
-                        <input name="items[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="1">
-                        <input type="number" class="price-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-                        <input type="number" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-                        <input type="number" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-                        <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 hidden">X</button>
-                        <button type="button" class="add-item bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 col-span-6">Add Item</button>
-                    </div>
+                    <button type="button" class="add-item bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 w-full">Add Item</button>
                 </div>
                 <button type="button" id="add-retail-manual" class="bg-purple-500 text-white px-2 py-1 rounded hover:bg-purple-600">Add Manual Item</button>
                 <div class="grid grid-cols-2 gap-2">
@@ -84,7 +71,7 @@
                 </div>
                 <input name="amount_paid" type="number" placeholder="Amount Paid (optional)" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 w-full" min="0" step="0.01">
                 <div class="flex space-x-2">
-                    <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 flex-1">Submit</button>
+                    <button type="submit" class="btn btn-primary bg-green-500 hover:bg-green-600 flex-1 submit-btn">Submit</button>
                     <button type="button" id="close-retail-modal" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 flex-1">Cancel</button>
                 </div>
             </form>
@@ -97,8 +84,8 @@
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">New Wholesale Order</h3>
             <form id="wholesale-form" method="POST" action="{{ url_for('orders') }}" class="space-y-4">
                 <input type="hidden" name="order_type" value="wholesale">
+                <input type="hidden" name="salesperson_name" value="{{ session['user']['firstName'] }} {{ session['user']['lastName'] }}">
                 <input name="shop_name" placeholder="Shop Name" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 w-full" required>
-                <input name="salesperson_name" placeholder="Salesperson Name" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 w-full" required>
                 <div id="wholesale-items-container" class="space-y-2">
                     <div class="grid grid-cols-6 gap-2 item-row-header text-sm font-semibold">
                         <span class="text-left pl-2">Item</span>
@@ -108,20 +95,7 @@
                         <span class="text-center">Total</span>
                         <span class="text-center">Remove</span>
                     </div>
-                    <div class="grid grid-cols-6 gap-2 item-row">
-                        <select name="items[]" class="col-span-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-select w-full">
-                            <option value="">Search or select a product</option>
-                            {% for item in stock_items %}
-                            <option value="product|{{ item.stock_name }}|quantity|0|price|{{ item.selling_price }}|stock|{{ item.stock_quantity }}">{{ item.stock_name }}</option>
-                            {% endfor %}
-                        </select>
-                        <input name="items[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="1">
-                        <input type="number" class="price-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-                        <input type="number" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-                        <input type="number" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-                        <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 hidden">X</button>
-                        <button type="button" class="add-item bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 col-span-6">Add Item</button>
-                    </div>
+                    <button type="button" class="add-item bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 w-full">Add Item</button>
                 </div>
                 <button type="button" id="add-wholesale-manual" class="bg-purple-500 text-white px-2 py-1 rounded hover:bg-purple-600">Add Manual Item</button>
                 <div class="grid grid-cols-2 gap-2">
@@ -130,7 +104,7 @@
                 </div>
                 <input name="amount_paid" type="number" placeholder="Amount Paid (optional)" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 w-full" min="0" step="0.01">
                 <div class="flex space-x-2">
-                    <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 flex-1">Submit</button>
+                    <button type="submit" class="btn btn-primary bg-green-500 hover:bg-green-600 flex-1 submit-btn">Submit</button>
                     <button type="button" id="close-wholesale-modal" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 flex-1">Cancel</button>
                 </div>
             </form>
@@ -165,7 +139,7 @@
                     <p id="full-amount-text" class="text-sm text-gray-700 dark:text-gray-300"></p>
                 </div>
                 <div class="flex space-x-2">
-                    <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 flex-1">Confirm</button>
+                    <button type="submit" class="btn btn-primary bg-green-500 hover:bg-green-600 flex-1 submit-btn">Confirm</button>
                     <button type="button" id="close-paid-modal" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 flex-1">Cancel</button>
                 </div>
             </form>
@@ -179,12 +153,10 @@
             <form id="return-stock-form" method="POST" action="" class="space-y-4">
                 <div>
                     <label class="font-semibold text-gray-900 dark:text-white">Select Items to Return</label>
-                    <div id="return-stock-items-container" class="space-y-3 mt-2">
-                        <!-- Items will be dynamically populated here -->
-                    </div>
+                    <div id="return-stock-items-container" class="space-y-3 mt-2"></div>
                 </div>
                 <div class="flex space-x-2">
-                    <button type="submit" class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 flex-1">Submit Returns</button>
+                    <button type="submit" class="btn btn-primary bg-yellow-500 hover:bg-yellow-600 flex-1">Submit</button>
                     <button type="button" id="close-return-modal" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 flex-1">Cancel</button>
                 </div>
             </form>
@@ -220,20 +192,37 @@
 
         let currentContainer;
 
+        function resetModal(container) {
+            const header = container.querySelector('.item-row-header');
+            const initialAddBtn = container.querySelector('.add-item');
+            container.innerHTML = '';
+            container.appendChild(header);
+            container.appendChild(initialAddBtn);
+            updateSubtotal();
+        }
+
         openRetail.addEventListener('click', () => {
+            resetModal(retailContainer);
             retailModal.classList.remove('hidden');
             currentContainer = retailContainer;
-            updateSubtotal();
+            attachAddItemListeners(retailContainer);
         });
 
         openWholesale.addEventListener('click', () => {
+            resetModal(wholesaleContainer);
             wholesaleModal.classList.remove('hidden');
             currentContainer = wholesaleContainer;
-            updateSubtotal();
+            attachAddItemListeners(wholesaleContainer);
         });
 
-        closeRetail.addEventListener('click', () => retailModal.classList.add('hidden'));
-        closeWholesale.addEventListener('click', () => wholesaleModal.classList.add('hidden'));
+        closeRetail.addEventListener('click', () => {
+            resetModal(retailContainer);
+            retailModal.classList.add('hidden');
+        });
+        closeWholesale.addEventListener('click', () => {
+            resetModal(wholesaleContainer);
+            wholesaleModal.classList.add('hidden');
+        });
         closeManual.addEventListener('click', () => manualModal.classList.add('hidden'));
         closePaid.addEventListener('click', () => paidModal.classList.add('hidden'));
         closeReturn.addEventListener('click', () => returnModal.classList.add('hidden'));
@@ -247,6 +236,12 @@
             manualModal.classList.remove('hidden');
             currentContainer = wholesaleContainer;
         });
+
+        function attachAddItemListeners(container) {
+            container.querySelectorAll('.add-item').forEach(btn => {
+                btn.addEventListener('click', () => addItem(container));
+            });
+        }
 
         function addItem(container) {
             const div = document.createElement('div');
@@ -263,16 +258,15 @@
                 <input type="number" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
                 <input type="number" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
                 <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
-                <button type="button" class="add-item bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 col-span-6">Add Item</button>
             `;
-            container.appendChild(div);
+            const addBtn = container.querySelector('.add-item');
+            container.insertBefore(div, addBtn);
             const choices = new Choices(div.querySelector('.product-select'), {
                 searchEnabled: true,
                 searchChoices: true,
                 itemSelectText: '',
                 placeholderValue: 'Search or select a product'
             });
-            div.querySelector('.add-item').addEventListener('click', () => addItem(container));
             div.querySelector('.remove-item').addEventListener('click', () => {
                 div.remove();
                 updateSubtotal();
@@ -280,16 +274,6 @@
             attachPriceListener(div);
             updateSubtotal();
         }
-
-        document.querySelectorAll('.add-item').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const container = btn.closest('.space-y-2');
-                addItem(container);
-                btn.classList.add('hidden'); // Hide "Add Item" on the original row after adding a new one
-                const firstRemove = container.querySelector('.item-row:not(:first-child) .remove-item');
-                if (firstRemove) firstRemove.classList.remove('hidden');
-            });
-        });
 
         addManualToOrder.addEventListener('click', () => {
             const name = document.getElementById('manual-item-name').value;
@@ -307,7 +291,8 @@
                     <input type="number" value="${price * qty}" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
                     <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
                 `;
-                currentContainer.appendChild(div);
+                const addBtn = currentContainer.querySelector('.add-item');
+                currentContainer.insertBefore(div, addBtn);
                 div.querySelector('.remove-item').addEventListener('click', () => {
                     div.remove();
                     updateSubtotal();
@@ -331,9 +316,14 @@
 
             form.onsubmit = function(e) {
                 e.preventDefault();
+                const submitBtn = form.querySelector('.submit-btn');
+                submitBtn.classList.add('processing');
+                submitBtn.disabled = true;
                 const amountPaid = parseFloat(document.getElementById('paid-amount').value) || 0;
                 if (amountPaid < 0 || amountPaid > parseFloat(balance)) {
                     alert('Please enter a valid amount (0 or greater, up to the balance).');
+                    submitBtn.classList.remove('processing');
+                    submitBtn.disabled = false;
                     return;
                 }
 
@@ -348,9 +338,15 @@
                         window.location.href = '/orders';
                     } else {
                         response.text().then(text => alert('Error processing payment: ' + text));
+                        submitBtn.classList.remove('processing');
+                        submitBtn.disabled = false;
                     }
                 })
-                .catch(error => alert('An error occurred while processing the payment'));
+                .catch(error => {
+                    alert('An error occurred while processing the payment');
+                    submitBtn.classList.remove('processing');
+                    submitBtn.disabled = false;
+                });
             };
         }
 
@@ -391,6 +387,9 @@
 
             form.onsubmit = function(e) {
                 e.preventDefault();
+                const submitBtn = form.querySelector('.submit-btn');
+                submitBtn.classList.add('processing');
+                submitBtn.disabled = true;
                 const formData = new FormData(this);
                 let hasReturns = false;
                 items.forEach(item => {
@@ -399,6 +398,8 @@
                         hasReturns = true;
                         if (qty > item.quantity) {
                             alert(`Cannot return more than ${item.quantity} units of ${item.name}.`);
+                            submitBtn.classList.remove('processing');
+                            submitBtn.disabled = false;
                             e.stopPropagation();
                             return;
                         }
@@ -407,6 +408,8 @@
 
                 if (!hasReturns) {
                     alert('Please specify at least one item to return.');
+                    submitBtn.classList.remove('processing');
+                    submitBtn.disabled = false;
                     return;
                 }
 
@@ -421,9 +424,15 @@
                         window.location.href = '/orders';
                     } else {
                         alert('Error logging stock returns');
+                        submitBtn.classList.remove('processing');
+                        submitBtn.disabled = false;
                     }
                 })
-                .catch(error => alert('An error occurred while logging the stock returns'));
+                .catch(error => {
+                    alert('An error occurred while logging the stock returns');
+                    submitBtn.classList.remove('processing');
+                    submitBtn.disabled = false;
+                });
             };
         }
 
@@ -504,7 +513,6 @@
         });
 
         document.querySelectorAll('.space-y-2').forEach(container => {
-            updateSubtotal();
             container.querySelectorAll('.qty-input').forEach(input => {
                 input.addEventListener('input', () => updatePriceAndTotal(input.closest('.item-row')));
             });
@@ -512,6 +520,9 @@
 
         document.getElementById('retail-form').addEventListener('submit', function(e) {
             e.preventDefault();
+            const submitBtn = this.querySelector('.submit-btn');
+            submitBtn.classList.add('processing');
+            submitBtn.disabled = true;
             const formData = new FormData(this);
             fetch(this.action, {
                 method: 'POST',
@@ -523,13 +534,22 @@
                     window.location.reload();
                 } else {
                     alert('Error submitting retail order. Please check the data and try again.');
+                    submitBtn.classList.remove('processing');
+                    submitBtn.disabled = false;
                 }
             })
-            .catch(error => alert('An error occurred while submitting the retail order.'));
+            .catch(error => {
+                alert('An error occurred while submitting the retail order.');
+                submitBtn.classList.remove('processing');
+                submitBtn.disabled = false;
+            });
         });
 
         document.getElementById('wholesale-form').addEventListener('submit', function(e) {
             e.preventDefault();
+            const submitBtn = this.querySelector('.submit-btn');
+            submitBtn.classList.add('processing');
+            submitBtn.disabled = true;
             const formData = new FormData(this);
             fetch(this.action, {
                 method: 'POST',
@@ -541,9 +561,15 @@
                     window.location.reload();
                 } else {
                     alert('Error submitting wholesale order. Please check the data and try again.');
+                    submitBtn.classList.remove('processing');
+                    submitBtn.disabled = false;
                 }
             })
-            .catch(error => alert('An error occurred while submitting the wholesale order.'));
+            .catch(error => {
+                alert('An error occurred while submitting the wholesale order.');
+                submitBtn.classList.remove('processing');
+                submitBtn.disabled = false;
+            });
         });
 
         document.querySelectorAll('.mark-paid-btn').forEach(btn => {
@@ -562,7 +588,6 @@
             });
         });
 
-        // Filter Orders
         const today = new Date().toISOString().split('T')[0];
         const weekStart = new Date();
         weekStart.setDate(weekStart.getDate() - weekStart.getDay());
@@ -587,7 +612,6 @@
                     order.classList.toggle('hidden', !show);
                 });
 
-                // Sort to show unpaid orders first
                 const ordersList = document.getElementById('orders-list');
                 const sortedOrders = Array.from(orders).sort((a, b) => {
                     const balanceA = parseFloat(a.getAttribute('data-balance'));
@@ -598,7 +622,6 @@
             });
         });
 
-        // Trigger "All" filter on load
         document.querySelector('[data-filter="all"]').click();
     </script>
 
@@ -721,6 +744,34 @@
             outline: none;
             ring: 2px;
             ring-color: #f59e0b;
+        }
+        .submit-btn.processing {
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        .submit-btn.processing::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            animation: ripple 0.6s linear;
+        }
+        @keyframes ripple {
+            to {
+                width: 300%;
+                height: 300%;
+                opacity: 0;
+            }
+        }
+        .submit-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
         }
     </style>
 {% endblock %}
