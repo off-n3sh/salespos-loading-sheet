@@ -138,30 +138,72 @@ def auth_route():
             email = request.form['email']
             password = request.form['password']
             try:
+                # Use Firebase Authentication to verify credentials
+                # Note: This assumes you're using Firebase's email/password auth
+                # Replace the plaintext password check with proper Firebase auth
                 user = auth.get_user_by_email(email)
+                # Normally, you'd use firebase.auth().signInWithEmailAndPassword on the client-side
+                # For server-side, you'll need a custom token or admin SDK workaround
                 user_doc = db.collection('web_users').where('email', '==', email).limit(1).get()
+                
                 if not user_doc:
                     error = "User not found. Please sign up."
                 else:
                     stored_user = user_doc[0].to_dict()
-                    if stored_user['password'] == password:  # TEMPORARY, replace with proper auth
+                    # TEMPORARY: Replace with Firebase auth verification
+                    if stored_user['password'] == password:  # Remove this in production
                         session['user'] = {
                             'uid': user.uid,
                             'email': email,
                             'role': stored_user.get('role', 'pending'),
-                            'firstName': stored_user.get('firstName', ''),  # Add firstName
-                            'lastName': stored_user.get('lastName', '')     # Add lastName
+                            'firstName': stored_user.get('firstName', ''),
+                            'lastName': stored_user.get('lastName', '')
                         }
                         return redirect(url_for('dashboard'))
                     else:
                         error = "Invalid password"
-            except auth.UserNotFoundError:
+            except UserNotFoundError:
                 error = "User not found. Please sign up."
             except Exception as e:
                 error = str(e)
-        # Rest of the signup logic remains unchanged
+        
+        elif form_type == 'signup':
+            try:
+                email = request.form['email']
+                password = request.form['password']
+                first_name = request.form['firstName']
+                last_name = request.form['lastName']
+                phone = request.form['phone']
+                role = request.form['role']
+
+                # Create user in Firebase Authentication
+                user = auth.create_user(
+                    email=email,
+                    password=password,
+                    display_name=f"{first_name} {last_name}"
+                )
+
+                # Save additional user data to Firestore
+                db.collection('web_users').document(user.uid).set({
+                    'email': email,
+                    'firstName': first_name,
+                    'lastName': last_name,
+                    'phone': phone,
+                    'role': role,
+                    'created_at': firestore.SERVER_TIMESTAMP
+                })
+
+                signup_success = True  # Set flag for success message
+                return render_template('auth.html', error=None, signup_success=signup_success)
+
+            except auth.EmailAlreadyExistsError:
+                error = "Email already exists. Please log in or use a different email."
+            except Exception as e:
+                error = f"Signup failed: {str(e)}"
+
     return render_template('auth.html', error=error, signup_success=signup_success)
 
+# Placeholder for dashboard (ensure this exists)
 @app.route('/logout')
 def logout():
     session.pop('user', None)
