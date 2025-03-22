@@ -2,15 +2,17 @@
 {% block title %}Home{% endblock %}
 {% block content %}
     <!-- Dashboard Header -->
-    <div class="mb-6">
-        <h2 class="text-2xl font-semibold text-gray-900 dark:text-white mb-2">Dashboard Overview</h2>
-        <div class="flex justify-between items-center">
-            <p class="text-lg text-gray-700 dark:text-gray-300">Welcome back, {{ user.firstName | default('User') }}! Here's what's happening with your business today.</p>
+    <div class="mb-8">
+        <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-3">Dashboard Overview</h2>
+        <div class="flex justify-between items-center bg-gray-50 dark:bg-gray-800 p-4 rounded-lg shadow-sm">
+            <p class="text-lg font-medium text-gray-700 dark:text-gray-200">
+                Welcome back, {{ user.firstName | default('User') }}! Here's what's happening with your business today.
+            </p>
             <div class="flex items-center space-x-4">
                 <div id="time-display" class="bg-gray-200 dark:bg-gray-700 px-3 py-1 rounded-lg text-gray-700 dark:text-gray-300 text-sm"></div>
                 <form method="POST" class="flex space-x-2">
-                    <input type="text" name="search" value="{{ search | default('') }}" placeholder="Search by salesperson or shop..." class="p-2 border rounded-lg dark:bg-gray-800 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500">
-                    <button type="submit" class="p-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 focus:outline-none">Search</button>
+                    <input type="text" name="search" value="{{ search | default('') }}" placeholder="Search by salesperson or shop..." class="p-2 border rounded-lg dark:bg-gray-800 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <button type="submit" class="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none">Search</button>
                 </form>
             </div>
         </div>
@@ -19,9 +21,10 @@
     <!-- Stats Cards (Redesigned Layout) -->
     <div class="space-y-8 mb-8">
         <!-- Total Sales Card (Centered, Prominent) -->
-        <div class="w-full max-w-2xl mx-auto bg-gradient-to-r from-orange-500 to-orange-600 dark:from-orange-600 dark:to-orange-700 text-white p-8 rounded-xl shadow-lg border border-orange-200 dark:border-orange-800 hover:scale-105 transition-transform duration-200">
-            <div class="flex items-center space-x-4">
-                <span class="text-3xl">💵</span>
+        <div class="relative w-full max-w-2xl mx-auto bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-700 dark:to-blue-800 text-white p-8 rounded-xl shadow-lg border border-blue-300 dark:border-blue-900 hover:scale-105 transition-transform duration-300">
+            <div class="absolute top-0 left-0 w-full h-full bg-white opacity-10 rounded-xl pointer-events-none"></div>
+            <div class="flex items-center space-x-4 relative z-10">
+                <span class="text-4xl">💰</span>
                 <div>
                     <h3 class="text-xl font-semibold">Total Sales</h3>
                     <p class="text-4xl font-bold">{{ net_sales | round(2) | default(0) }}</p>
@@ -32,7 +35,8 @@
         <!-- Retail and Wholesale Cards (Side by Side) -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
             <!-- Retail Card -->
-            <div class="bg-gradient-to-r from-green-50 to-green-100 dark:from-green-700 dark:to-green-800 p-6 rounded-lg shadow-md border border-green-200 dark:border-green-600 hover:shadow-lg transition-shadow duration-200">
+            <div class="relative bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-shadow duration-300 overflow-hidden">
+                <div class="absolute top-0 left-0 w-2 h-full bg-green-500 dark:bg-green-600"></div>
                 <div class="flex items-center space-x-4">
                     <span class="text-2xl">🛒</span>
                     <div>
@@ -42,7 +46,8 @@
                 </div>
             </div>
             <!-- Wholesale Card -->
-            <div class="bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-700 dark:to-blue-800 p-6 rounded-lg shadow-md border border-blue-200 dark:border-blue-600 hover:shadow-lg transition-shadow duration-200">
+            <div class="relative bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-shadow duration-300 overflow-hidden">
+                <div class="absolute top-0 left-0 w-2 h-full bg-blue-500 dark:bg-blue-600"></div>
                 <div class="flex items-center space-x-4">
                     <span class="text-2xl">🚚</span>
                     <div>
@@ -56,7 +61,8 @@
         <!-- Debt and Expenses Cards (Side by Side) -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
             <!-- Debt Card -->
-            <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow duration-200">
+            <div class="relative bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-shadow duration-300 overflow-hidden">
+                <div class="absolute top-0 left-0 w-2 h-full bg-red-500 dark:bg-red-600"></div>
                 <div class="flex items-center space-x-4">
                     <span class="text-2xl">⚠️</span>
                     <div>
@@ -66,7 +72,8 @@
                 </div>
             </div>
             <!-- Expenses Card -->
-            <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow duration-200">
+            <div class="relative bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-shadow duration-300 overflow-hidden">
+                <div class="absolute top-0 left-0 w-2 h-full bg-purple-500 dark:bg-purple-600"></div>
                 <div class="flex items-center space-x-4">
                     <span class="text-2xl">🧾</span>
                     <div>
@@ -81,18 +88,24 @@
     <!-- Sales History Section -->
     <div class="card">
         <h2 class="card-header">Sales History</h2>
-        <div class="sales-history-btn-group">
+        <div class="sales-history-btn-group relative">
             <button id="all-btn" class="btn btn-primary" style="background-color: #2b6cb0;">All <span class="ml-2">{{ sales_history | length }}</span></button>
             <button id="pending-btn" class="btn btn-primary" style="background-color: #f59e0b;">Pending <span class="ml-2">{{ sales_history | selectattr('balance', '>', 0) | list | length }}</span></button>
             <button id="completed-btn" class="btn btn-primary" style="background-color: #10b981;">Completed <span class="ml-2">{{ sales_history | selectattr('balance', '==', 0) | list | length }}</span></button>
             <button id="expenses-btn" class="btn btn-primary" style="background-color: #8b5cf6;">Expenses</button>
-            <select id="time-filter" onchange="updateFilter(this.value)" class="p-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500">
+            <select id="time-filter" class="p-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="all" {% if time_filter == 'all' %}selected{% endif %}>All Time</option>
-                <option value="day" {% if time_filter == 'day' %}selected{% endif %}>Day</option>
-                <option value="week" {% if time_filter == 'week' %}selected{% endif %}>Week</option>
-                <option value="month" {% if time_filter == 'month' %}selected{% endif %}>Month</option>
-                <option value="year" {% if time_filter == 'year' %}selected{% endif %}>Year</option>
+                <option value="day" {% if time_filter == 'day' %}selected{% endif %}>Daily</option>
+                <option value="week" {% if time_filter == 'week' %}selected{% endif %}>Weekly</option>
+                <option value="month" {% if time_filter == 'month' %}selected{% endif %}>Monthly</option>
+                <option value="year" {% if time_filter == 'year' %}selected{% endif %}>Yearly</option>
             </select>
+            <div id="loading-spinner" class="hidden absolute right-0 top-1/2 transform -translate-y-1/2 mr-4">
+                <svg class="animate-spin h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </div>
         </div>
 
         <!-- Sales History Table -->
@@ -109,9 +122,9 @@
                         <th></th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="sales-history-body">
                     {% for sale in sales_history %}
-                    <tr>
+                    <tr data-date="{{ sale.date.strftime('%Y-%m-%d') }}">
                         <td>
                             <div class="w-8 h-8 rounded-full overflow-hidden">
                                 {% if sale.photoUrl %}
@@ -196,10 +209,66 @@
         const completedBtn = document.getElementById('completed-btn');
         const expensesBtn = document.getElementById('expenses-btn');
         const salesHistory = document.getElementById('sales-history');
+        const salesHistoryBody = document.getElementById('sales-history-body');
         const expensesList = document.getElementById('expenses-list');
+        const timeFilter = document.getElementById('time-filter');
+        const loadingSpinner = document.getElementById('loading-spinner');
         let currentFilter = '{{ time_filter }}';
 
+        function showLoading() {
+            loadingSpinner.classList.remove('hidden');
+        }
+
+        function hideLoading() {
+            loadingSpinner.classList.add('hidden');
+        }
+
+        function groupSalesByPeriod(sales, period) {
+            const grouped = {};
+            sales.forEach(sale => {
+                const date = new Date(sale.dataset.date);
+                let key;
+                if (period === 'week') {
+                    const year = date.getFullYear();
+                    const month = date.getMonth();
+                    const day = date.getDate();
+                    const firstDayOfYear = new Date(year, 0, 1);
+                    const daysSinceYearStart = Math.floor((date - firstDayOfYear) / (1000 * 60 * 60 * 24));
+                    const weekNumber = Math.ceil((daysSinceYearStart + firstDayOfYear.getDay() + 1) / 7);
+                    key = `Week ${weekNumber} ${year}`;
+                } else if (period === 'month') {
+                    const year = date.getFullYear();
+                    const month = date.toLocaleString('default', { month: 'long' });
+                    key = `${month} ${year}`;
+                } else if (period === 'day') {
+                    key = date.toISOString().split('T')[0];
+                } else if (period === 'year') {
+                    key = date.getFullYear().toString();
+                } else {
+                    key = 'All';
+                }
+                if (!grouped[key]) {
+                    grouped[key] = [];
+                }
+                grouped[key].push(sale);
+            });
+            return grouped;
+        }
+
+        function renderGroupedSales(groupedSales) {
+            salesHistoryBody.innerHTML = '';
+            Object.keys(groupedSales).sort().forEach(group => {
+                const groupHeader = document.createElement('tr');
+                groupHeader.innerHTML = `<td colspan="7" class="bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white font-semibold p-2">${group}</td>`;
+                salesHistoryBody.appendChild(groupHeader);
+                groupedSales[group].forEach(sale => {
+                    salesHistoryBody.appendChild(sale);
+                });
+            });
+        }
+
         function updateFilter(time) {
+            showLoading();
             currentFilter = time;
             fetch(`/?time=${time}`).then(res => res.text()).then(html => {
                 const parser = new DOMParser();
@@ -207,44 +276,79 @@
                 salesHistory.innerHTML = doc.getElementById('sales-history').innerHTML;
                 expensesList.classList.add('hidden');
                 salesHistory.classList.remove('hidden');
+                const salesRows = Array.from(salesHistoryBody.querySelectorAll('tr[data-date]'));
+                const groupedSales = groupSalesByPeriod(salesRows, time);
+                renderGroupedSales(groupedSales);
+                hideLoading();
+            }).catch(err => {
+                console.error('Filter error:', err);
+                hideLoading();
             });
         }
 
         allBtn.addEventListener('click', () => {
+            showLoading();
             salesHistory.classList.remove('hidden');
             expensesList.classList.add('hidden');
             fetch(`/?time=${currentFilter}`).then(res => res.text()).then(html => {
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');
                 salesHistory.innerHTML = doc.getElementById('sales-history').innerHTML;
+                const salesRows = Array.from(salesHistoryBody.querySelectorAll('tr[data-date]'));
+                const groupedSales = groupSalesByPeriod(salesRows, currentFilter);
+                renderGroupedSales(groupedSales);
+                hideLoading();
+            }).catch(err => {
+                console.error('All button error:', err);
+                hideLoading();
             });
         });
 
         pendingBtn.addEventListener('click', () => {
+            showLoading();
             salesHistory.classList.remove('hidden');
             expensesList.classList.add('hidden');
             fetch(`/?time=${currentFilter}`).then(res => res.text()).then(html => {
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');
-                const allSales = Array.from(doc.querySelectorAll('#sales-history table tbody tr'));
-                salesHistory.querySelector('tbody').innerHTML = allSales.filter(sale => sale.querySelector('.text-red-600')).map(sale => sale.outerHTML).join('');
+                const allSales = Array.from(doc.querySelectorAll('#sales-history table tbody tr[data-date]'));
+                const filteredSales = allSales.filter(sale => sale.querySelector('.text-red-600'));
+                const groupedSales = groupSalesByPeriod(filteredSales, currentFilter);
+                renderGroupedSales(groupedSales);
+                hideLoading();
+            }).catch(err => {
+                console.error('Pending button error:', err);
+                hideLoading();
             });
         });
 
         completedBtn.addEventListener('click', () => {
+            showLoading();
             salesHistory.classList.remove('hidden');
             expensesList.classList.add('hidden');
             fetch(`/?time=${currentFilter}`).then(res => res.text()).then(html => {
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');
-                const allSales = Array.from(doc.querySelectorAll('#sales-history table tbody tr'));
-                salesHistory.querySelector('tbody').innerHTML = allSales.filter(sale => sale.querySelector('.text-green-600')).map(sale => sale.outerHTML).join('');
+                const allSales = Array.from(doc.querySelectorAll('#sales-history table tbody tr[data-date]'));
+                const filteredSales = allSales.filter(sale => sale.querySelector('.text-green-600'));
+                const groupedSales = groupSalesByPeriod(filteredSales, currentFilter);
+                renderGroupedSales(groupedSales);
+                hideLoading();
+            }).catch(err => {
+                console.error('Completed button error:', err);
+                hideLoading();
             });
         });
 
         expensesBtn.addEventListener('click', () => {
+            showLoading();
             salesHistory.classList.add('hidden');
             expensesList.classList.remove('hidden');
+            setTimeout(() => hideLoading(), 500); // Simulate loading for expenses
+        });
+
+        timeFilter.addEventListener('change', (e) => {
+            updateFilter(e.target.value);
         });
 
         function toggleMenu(menuId) {
