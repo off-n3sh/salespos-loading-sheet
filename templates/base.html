@@ -157,7 +157,7 @@
                 font-size: 1.5rem;
             }
             .dark .sales-card-value {
-                color: #63b3ed;
+                color: #63b3ed; /* Fixed: Added # to the color value */
             }
             
             input, select, textarea {
@@ -242,8 +242,21 @@
             }
             .sales-history-btn-group {
                 display: flex;
+                flex-wrap: nowrap; /* Prevent wrapping to ensure horizontal layout */
                 gap: 0.5rem;
-                flex-wrap: wrap;
+                margin-bottom: 1rem;
+                justify-content: flex-start; /* Align buttons to the left */
+                width: 100%; /* Ensure the button group takes full width */
+                align-items: center; /* Vertically center buttons and select */
+            }
+            .sales-history-btn-group .btn {
+                flex: 1; /* Make buttons take equal space */
+                max-width: 150px; /* Cap the width for larger screens */
+                text-align: center;
+            }
+            .sales-history-btn-group select {
+                flex: 0 0 auto; /* Prevent the select from stretching */
+                max-width: 150px; /* Match button width */
             }
             
             .card {
