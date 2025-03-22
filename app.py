@@ -107,7 +107,7 @@ def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user' not in session:
-            return redirect(url_for('auth'))
+            return redirect(url_for('auth_route'))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -303,10 +303,21 @@ def dashboard():
     sales_history = filtered_orders
     recent_activity = orders[:3]
 
-    return render_template('dashboard.html', net_sales=net_sales, applications=applications, retail_sales=retail_sales, 
-                          wholesale_sales_today=wholesale_sales_today, total_debts=total_debts, total_expenses=total_expenses, 
-                          sales_history=sales_history, expenses=expenses, search=search_query, recent_activity=recent_activity, 
-                          time_filter=time_filter)
+    return render_template(
+        'dashboard.html',
+        user=session['user'],  # Pass the logged-in user object
+        net_sales=net_sales,
+        applications=applications,
+        retail_sales=retail_sales,
+        wholesale_sales_today=wholesale_sales_today,
+        total_debts=total_debts,
+        total_expenses=total_expenses,
+        sales_history=sales_history,
+        expenses=expenses,
+        search=search_query,
+        recent_activity=recent_activity,
+        time_filter=time_filter
+    )
 
 @app.route('/orders', methods=['GET', 'POST'])
 @login_required
