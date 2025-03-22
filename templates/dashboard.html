@@ -2,72 +2,75 @@
 {% block title %}Home{% endblock %}
 {% block content %}
     <!-- Dashboard Header -->
-    <div class="flex justify-between items-center mb-6">
-        <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Welcome to Dreamland Enterprises</h2>
-        <div class="flex items-center space-x-4">
-            <div id="time-display" class="bg-gray-200 dark:bg-gray-700 px-3 py-1 rounded-lg text-gray-700 dark:text-gray-300 text-sm"></div>
-            <form method="POST" class="flex space-x-2">
-                <input type="text" name="search" value="{{ search | default('') }}" placeholder="Search by salesperson or shop..." class="p-2 border rounded-lg dark:bg-gray-800 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500">
-                <button type="submit" class="p-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 focus:outline-none">Search</button>
-            </form>
+    <div class="mb-6">
+        <h2 class="text-2xl font-semibold text-gray-900 dark:text-white mb-2">Dashboard Overview</h2>
+        <div class="flex justify-between items-center">
+            <p class="text-lg text-gray-700 dark:text-gray-300">Welcome back, {{ user.firstName | default('User') }}! Here's what's happening with your business today.</p>
+            <div class="flex items-center space-x-4">
+                <div id="time-display" class="bg-gray-200 dark:bg-gray-700 px-3 py-1 rounded-lg text-gray-700 dark:text-gray-300 text-sm"></div>
+                <form method="POST" class="flex space-x-2">
+                    <input type="text" name="search" value="{{ search | default('') }}" placeholder="Search by salesperson or shop..." class="p-2 border rounded-lg dark:bg-gray-800 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                    <button type="submit" class="p-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 focus:outline-none">Search</button>
+                </form>
+            </div>
         </div>
     </div>
 
     <!-- Stats Cards (Redesigned Layout) -->
-    <div class="space-y-6 mb-6">
-        <!-- Total Sales Card (Centered, Large, Gradient) -->
-        <div class="w-3/4 mx-auto bg-gradient-to-r from-orange-400 to-orange-500 text-white p-6 rounded-lg shadow-lg hover:scale-105 transition-transform duration-200">
-            <div class="flex items-center space-x-3">
-                <span class="text-2xl">💵</span>
+    <div class="space-y-8 mb-8">
+        <!-- Total Sales Card (Centered, Prominent) -->
+        <div class="w-full max-w-2xl mx-auto bg-gradient-to-r from-orange-500 to-orange-600 dark:from-orange-600 dark:to-orange-700 text-white p-8 rounded-xl shadow-lg border border-orange-200 dark:border-orange-800 hover:scale-105 transition-transform duration-200">
+            <div class="flex items-center space-x-4">
+                <span class="text-3xl">💵</span>
                 <div>
-                    <h3 class="text-lg font-semibold">Total Sales</h3>
-                    <p class="text-3xl font-bold">{{ net_sales | round(2) | default(0) }}</p>
+                    <h3 class="text-xl font-semibold">Total Sales</h3>
+                    <p class="text-4xl font-bold">{{ net_sales | round(2) | default(0) }}</p>
                 </div>
             </div>
         </div>
 
-        <!-- Retail and Wholesale Cards (Side by Side, Light Gradient) -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Retail and Wholesale Cards (Side by Side) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
             <!-- Retail Card -->
-            <div class="bg-gradient-to-r from-green-100 to-green-200 dark:from-green-700 dark:to-green-800 p-4 rounded-lg shadow-md">
-                <div class="flex items-center space-x-3">
+            <div class="bg-gradient-to-r from-green-50 to-green-100 dark:from-green-700 dark:to-green-800 p-6 rounded-lg shadow-md border border-green-200 dark:border-green-600 hover:shadow-lg transition-shadow duration-200">
+                <div class="flex items-center space-x-4">
                     <span class="text-2xl">🛒</span>
                     <div>
-                        <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Retail (Today)</h3>
+                        <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200">Retail (Today)</h3>
                         <p class="text-2xl text-green-600 dark:text-green-400 font-bold">{{ retail_sales | round(2) | default(0) }}</p>
                     </div>
                 </div>
             </div>
             <!-- Wholesale Card -->
-            <div class="bg-gradient-to-r from-blue-100 to-blue-200 dark:from-blue-700 dark:to-blue-800 p-4 rounded-lg shadow-md">
-                <div class="flex items-center space-x-3">
+            <div class="bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-700 dark:to-blue-800 p-6 rounded-lg shadow-md border border-blue-200 dark:border-blue-600 hover:shadow-lg transition-shadow duration-200">
+                <div class="flex items-center space-x-4">
                     <span class="text-2xl">🚚</span>
                     <div>
-                        <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Wholesale (Today)</h3>
+                        <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200">Wholesale (Today)</h3>
                         <p class="text-2xl text-blue-600 dark:text-blue-400 font-bold">{{ wholesale_sales_today | round(2) | default(0) }}</p>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Debt and Expenses Cards (Side by Side, Solid Background) -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Debt and Expenses Cards (Side by Side) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
             <!-- Debt Card -->
-            <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm">
-                <div class="flex items-center space-x-3">
+            <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow duration-200">
+                <div class="flex items-center space-x-4">
                     <span class="text-2xl">⚠️</span>
                     <div>
-                        <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Debt</h3>
+                        <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200">Debt</h3>
                         <p class="text-2xl text-red-500 font-bold">{{ total_debts | round(2) | default(0) }}</p>
                     </div>
                 </div>
             </div>
             <!-- Expenses Card -->
-            <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm">
-                <div class="flex items-center space-x-3">
+            <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow duration-200">
+                <div class="flex items-center space-x-4">
                     <span class="text-2xl">🧾</span>
                     <div>
-                        <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Expenses</h3>
+                        <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200">Expenses</h3>
                         <p class="text-2xl text-purple-500 font-bold">{{ total_expenses | round(2) | default(0) }}</p>
                     </div>
                 </div>
