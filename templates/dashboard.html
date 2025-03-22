@@ -2,163 +2,229 @@
 {% block title %}Home{% endblock %}
 {% block content %}
     <!-- Dashboard Header -->
-    <div class="mb-8">
-        <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-3">Dashboard Overview</h2>
-        <div class="flex justify-between items-center bg-gray-50 dark:bg-gray-800 p-4 rounded-lg shadow-sm">
-            <p class="text-lg font-medium text-gray-700 dark:text-gray-200">
-                Welcome back, {{ user.firstName | default('User') }}! Here's what's happening with your business today.
-            </p>
-            <div class="flex items-center space-x-4">
-                <div id="time-display" class="bg-gray-200 dark:bg-gray-700 px-3 py-1 rounded-lg text-gray-700 dark:text-gray-300 text-sm"></div>
-                <form method="POST" class="flex space-x-2">
-                    <input type="text" name="search" value="{{ search | default('') }}" placeholder="Search by salesperson or shop..." class="p-2 border rounded-lg dark:bg-gray-800 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <button type="submit" class="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none">Search</button>
+    <div class="mb-6">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
+            <div>
+                <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Dashboard Overview</h2>
+                <p class="text-gray-600 dark:text-gray-300 mt-1">
+                    Welcome back, {{ user.firstName | default('User') }}!
+                </p>
+            </div>
+            <div class="mt-4 md:mt-0 flex flex-col sm:flex-row items-center space-y-3 sm:space-y-0 sm:space-x-4">
+                <div id="time-display" class="bg-blue-50 dark:bg-gray-700 px-4 py-2 rounded-lg text-blue-600 dark:text-blue-300 font-medium"></div>
+                <form method="POST" class="flex w-full sm:w-auto">
+                    <input type="text" name="search" value="{{ search | default('') }}" placeholder="Search..." class="p-2 border rounded-l-lg w-full dark:bg-gray-800 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <button type="submit" class="p-2 bg-blue-600 text-white rounded-r-lg hover:bg-blue-700 focus:outline-none">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </button>
                 </form>
             </div>
         </div>
     </div>
 
-    <!-- Stats Cards (Redesigned Layout) -->
-    <div class="space-y-8 mb-8">
-        <!-- Total Sales Card (Centered, Prominent) -->
-        <div class="relative w-full max-w-2xl mx-auto bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-700 dark:to-blue-800 text-white p-8 rounded-xl shadow-lg border border-blue-300 dark:border-blue-900 hover:scale-105 transition-transform duration-300">
-            <div class="absolute top-0 left-0 w-full h-full bg-white opacity-10 rounded-xl pointer-events-none"></div>
-            <div class="flex items-center space-x-4 relative z-10">
-                <span class="text-4xl">💰</span>
-                <div>
-                    <h3 class="text-xl font-semibold">Total Sales</h3>
-                    <p class="text-4xl font-bold">{{ net_sales | round(2) | default(0) }}</p>
+    <!-- Main Stats Section -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <!-- Main Stats Column -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Total Sales Card (Spotlight) -->
+            <div class="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-6 rounded-xl shadow-lg relative overflow-hidden group transition-all duration-300 hover:shadow-xl transform hover:-translate-y-1">
+                <div class="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-10 -mt-10"></div>
+                <div class="flex items-center justify-between relative z-10">
+                    <div>
+                        <h3 class="text-lg font-medium text-blue-100">Total Sales</h3>
+                        <p class="text-4xl font-bold mt-2">{{ net_sales | round(2) | default(0) }}</p>
+                        <p class="text-blue-100 mt-2 text-sm">Today's business performance</p>
+                    </div>
+                    <div class="bg-white bg-opacity-20 p-4 rounded-full">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Retail & Wholesale Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <!-- Retail Card -->
+                <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 transition-shadow duration-300 hover:shadow-lg">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="text-gray-500 dark:text-gray-400 text-sm font-medium">Retail Sales</h3>
+                            <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ retail_sales | round(2) | default(0) }}</p>
+                        </div>
+                        <div class="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="mt-4 text-xs text-gray-500 dark:text-gray-400">
+                        Today's walk-in customers
+                    </div>
+                </div>
+                
+                <!-- Wholesale Card -->
+                <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 transition-shadow duration-300 hover:shadow-lg">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="text-gray-500 dark:text-gray-400 text-sm font-medium">Wholesale Sales</h3>
+                            <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ wholesale_sales_today | round(2) | default(0) }}</p>
+                        </div>
+                        <div class="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="mt-4 text-xs text-gray-500 dark:text-gray-400">
+                        Today's business clients
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Retail and Wholesale Cards (Side by Side) -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-            <!-- Retail Card -->
-            <div class="relative bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-shadow duration-300 overflow-hidden">
-                <div class="absolute top-0 left-0 w-2 h-full bg-green-500 dark:bg-green-600"></div>
-                <div class="flex items-center space-x-4">
-                    <span class="text-2xl">🛒</span>
-                    <div>
-                        <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200">Retail (Today)</h3>
-                        <p class="text-2xl text-green-600 dark:text-green-400 font-bold">{{ retail_sales | round(2) | default(0) }}</p>
-                    </div>
-                </div>
-            </div>
-            <!-- Wholesale Card -->
-            <div class="relative bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-shadow duration-300 overflow-hidden">
-                <div class="absolute top-0 left-0 w-2 h-full bg-blue-500 dark:bg-blue-600"></div>
-                <div class="flex items-center space-x-4">
-                    <span class="text-2xl">🚚</span>
-                    <div>
-                        <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200">Wholesale (Today)</h3>
-                        <p class="text-2xl text-blue-600 dark:text-blue-400 font-bold">{{ wholesale_sales_today | round(2) | default(0) }}</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Debt and Expenses Cards (Side by Side) -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+        <!-- Side Stats Column -->
+        <div class="lg:col-span-1 space-y-6">
             <!-- Debt Card -->
-            <div class="relative bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-shadow duration-300 overflow-hidden">
-                <div class="absolute top-0 left-0 w-2 h-full bg-red-500 dark:bg-red-600"></div>
-                <div class="flex items-center space-x-4">
-                    <span class="text-2xl">⚠️</span>
-                    <div>
-                        <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200">Debt</h3>
-                        <p class="text-2xl text-red-500 font-bold">{{ total_debts | round(2) | default(0) }}</p>
+            <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border-l-4 border-red-500 border-t border-r border-b border-gray-200 dark:border-gray-700 transition-shadow duration-300 hover:shadow-lg">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-gray-500 dark:text-gray-400 text-sm font-medium">Outstanding Debt</h3>
+                    <div class="p-2 bg-red-100 dark:bg-red-900 rounded-lg">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
                     </div>
                 </div>
+                <p class="text-2xl font-bold text-red-600 dark:text-red-400 mt-3">{{ total_debts | round(2) | default(0) }}</p>
+                <div class="mt-4 text-xs text-gray-500 dark:text-gray-400">
+                    Total pending collections
+                </div>
             </div>
+
             <!-- Expenses Card -->
-            <div class="relative bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-shadow duration-300 overflow-hidden">
-                <div class="absolute top-0 left-0 w-2 h-full bg-purple-500 dark:bg-purple-600"></div>
-                <div class="flex items-center space-x-4">
-                    <span class="text-2xl">🧾</span>
-                    <div>
-                        <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200">Expenses</h3>
-                        <p class="text-2xl text-purple-500 font-bold">{{ total_expenses | round(2) | default(0) }}</p>
+            <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border-l-4 border-purple-500 border-t border-r border-b border-gray-200 dark:border-gray-700 transition-shadow duration-300 hover:shadow-lg">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-gray-500 dark:text-gray-400 text-sm font-medium">Total Expenses</h3>
+                    <div class="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
                     </div>
+                </div>
+                <p class="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-3">{{ total_expenses | round(2) | default(0) }}</p>
+                <div class="mt-4 text-xs text-gray-500 dark:text-gray-400">
+                    Business costs and expenses
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Sales History Section -->
-    <div class="card">
-        <h2 class="card-header">Sales History</h2>
-        <div class="sales-history-btn-group relative">
-            <button id="all-btn" class="btn btn-primary" style="background-color: #2b6cb0;">All <span class="ml-2">{{ sales_history | length }}</span></button>
-            <button id="pending-btn" class="btn btn-primary" style="background-color: #f59e0b;">Pending <span class="ml-2">{{ sales_history | selectattr('balance', '>', 0) | list | length }}</span></button>
-            <button id="completed-btn" class="btn btn-primary" style="background-color: #10b981;">Completed <span class="ml-2">{{ sales_history | selectattr('balance', '==', 0) | list | length }}</span></button>
-            <button id="expenses-btn" class="btn btn-primary" style="background-color: #8b5cf6;">Expenses</button>
-            <select id="time-filter" class="p-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="all" {% if time_filter == 'all' %}selected{% endif %}>All Time</option>
-                <option value="day" {% if time_filter == 'day' %}selected{% endif %}>Daily</option>
-                <option value="week" {% if time_filter == 'week' %}selected{% endif %}>Weekly</option>
-                <option value="month" {% if time_filter == 'month' %}selected{% endif %}>Monthly</option>
-                <option value="year" {% if time_filter == 'year' %}selected{% endif %}>Yearly</option>
-            </select>
-            <div id="loading-spinner" class="hidden absolute right-0 top-1/2 transform -translate-y-1/2 mr-4">
-                <svg class="animate-spin h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden mb-8">
+        <div class="p-5 border-b border-gray-200 dark:border-gray-700">
+            <h2 class="text-xl font-bold text-gray-900 dark:text-white">Sales History</h2>
+        </div>
+        
+        <!-- Filter Controls -->
+        <div class="p-4 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex flex-wrap gap-3 items-center">
+            <div class="flex space-x-2">
+                <button id="all-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
+                    All <span class="ml-2 bg-white bg-opacity-20 px-2 py-0.5 rounded-full text-xs">{{ sales_history | length }}</span>
+                </button>
+                <button id="pending-btn" class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-md text-sm font-medium flex items-center transition-colors">
+                    Pending <span class="ml-2 bg-white bg-opacity-20 px-2 py-0.5 rounded-full text-xs">{{ sales_history | selectattr('balance', '>', 0) | list | length }}</span>
+                </button>
+                <button id="completed-btn" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
+                    Completed <span class="ml-2 bg-white bg-opacity-20 px-2 py-0.5 rounded-full text-xs">{{ sales_history | selectattr('balance', '==', 0) | list | length }}</span>
+                </button>
+                <button id="expenses-btn" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
+                    Expenses
+                </button>
+            </div>
+            
+            <div class="ml-auto flex items-center space-x-3">
+                <label for="time-filter" class="text-sm font-medium text-gray-700 dark:text-gray-300">Time Period:</label>
+                <select id="time-filter" class="py-2 px-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                    <option value="all" {% if time_filter == 'all' %}selected{% endif %}>All Time</option>
+                    <option value="day" {% if time_filter == 'day' %}selected{% endif %}>Daily</option>
+                    <option value="week" {% if time_filter == 'week' %}selected{% endif %}>Weekly</option>
+                    <option value="month" {% if time_filter == 'month' %}selected{% endif %}>Monthly</option>
+                    <option value="year" {% if time_filter == 'year' %}selected{% endif %}>Yearly</option>
+                </select>
+                <div id="loading-spinner" class="hidden">
+                    <svg class="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </div>
             </div>
         </div>
 
         <!-- Sales History Table -->
-        <div id="sales-history">
-            <table>
-                <thead>
+        <div id="sales-history" class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50 dark:bg-gray-900">
                     <tr>
-                        <th></th>
-                        <th>Booked</th>
-                        <th>Closed</th>
-                        <th>Type</th>
-                        <th>Total Amount</th>
-                        <th>Status</th>
-                        <th></th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"></th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Booked</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Closed</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Type</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Amount</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"></th>
                     </tr>
                 </thead>
-                <tbody id="sales-history-body">
+                <tbody id="sales-history-body" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     {% for sale in sales_history %}
-                    <tr data-date="{{ sale.date.strftime('%Y-%m-%d') }}">
-                        <td>
-                            <div class="w-8 h-8 rounded-full overflow-hidden">
+                    <tr data-date="{{ sale.date.strftime('%Y-%m-%d') }}" class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="w-10 h-10 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
                                 {% if sale.photoUrl %}
                                     <img src="{{ sale.photoUrl }}" alt="Salesperson Photo" class="w-full h-full object-cover">
                                 {% else %}
-                                    <div class="w-full h-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center text-white font-bold">
+                                    <div class="text-white font-bold text-lg">
                                         {{ sale.salesperson_name[0] | default('N') | upper }}
                                     </div>
                                 {% endif %}
                             </div>
                         </td>
-                        <td>
-                            <div class="font-semibold text-gray-900 dark:text-white">{{ sale.shop_name }}</div>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="font-medium text-gray-900 dark:text-white">{{ sale.shop_name }}</div>
                             <div class="text-sm text-gray-500 dark:text-gray-400">{{ sale.salesperson_name | default('N/A') }}</div>
                             <div class="text-sm text-gray-500 dark:text-gray-400">{{ sale.date.strftime('%d/%m/%Y %H:%M:%S') }}</div>
                         </td>
-                        <td>{{ sale.closed_date.strftime('%d/%m/%Y %H:%M:%S') if sale.closed_date else 'Not Closed' }}</td>
-                        <td>{{ sale.order_type }}</td>
-                        <td>{{ sale.payment | round(2) }}/{{ (sale.payment + sale.balance) | round(2) }}</td>
-                        <td class="{% if sale.balance > 0 %}text-red-600{% else %}text-green-600{% endif %}">
-                            {% if sale.balance > 0 %}Pending{% else %}Paid{% endif %}
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
+                            {{ sale.closed_date.strftime('%d/%m/%Y %H:%M:%S') if sale.closed_date else 'Not Closed' }}
                         </td>
-                        <td class="relative">
-                            <button class="text-gray-600 dark:text-gray-300 focus:outline-none" onclick="toggleMenu('menu-{{ sale.receipt_id }}')">
-                                <i class="fas fa-ellipsis-v"></i>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
+                            <span class="px-2 py-1 rounded-full text-xs font-medium {% if sale.order_type == 'retail' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% else %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200{% endif %}">
+                                {{ sale.order_type }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                            {{ sale.payment | round(2) }}/{{ (sale.payment + sale.balance) | round(2) }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 py-1 rounded-full text-xs font-medium {% if sale.balance > 0 %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200{% else %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% endif %}">
+                                {% if sale.balance > 0 %}Pending{% else %}Paid{% endif %}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
+                            <button class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none" onclick="toggleMenu('menu-{{ sale.receipt_id }}')">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                                </svg>
                             </button>
                             <div id="menu-{{ sale.receipt_id }}" class="hidden absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 border rounded-lg shadow-lg z-10">
-                                <a href="{{ url_for('receipt', order_id=sale.receipt_id) }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">View Receipt</a>
+                                <a href="{{ url_for('receipt', order_id=sale.receipt_id) }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-t-lg">View Receipt</a>
                                 {% if sale.order_type != 'retail' %}
-                                <div class="group">
-                                    <a href="#" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" onclick="showLoadOptions('{{ sale.receipt_id }}')">Load to Loading Sheet</a>
-                                    <div id="load-options-{{ sale.receipt_id }}" class="hidden absolute right-48 mt-[-30px] w-40 bg-white dark:bg-gray-800 border rounded-lg shadow-lg z-20">
-                                        <a href="{{ url_for('load_to_loading_sheet', receipt_id=sale.receipt_id, action='current') }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Add to Current</a>
-                                        <a href="{{ url_for('load_to_loading_sheet', receipt_id=sale.receipt_id, action='new') }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Start New</a>
+                                <div class="relative group">
+                                    <a href="#" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 {% if sale.order_type == 'retail' %}rounded-b-lg{% endif %}" onclick="showLoadOptions('{{ sale.receipt_id }}')">Load to Loading Sheet</a>
+                                    <div id="load-options-{{ sale.receipt_id }}" class="hidden absolute left-full top-0 ml-1 w-48 bg-white dark:bg-gray-800 border rounded-lg shadow-lg z-20">
+                                        <a href="{{ url_for('load_to_loading_sheet', receipt_id=sale.receipt_id, action='current') }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-t-lg">Add to Current</a>
+                                        <a href="{{ url_for('load_to_loading_sheet', receipt_id=sale.receipt_id, action='new') }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-b-lg">Start New</a>
                                     </div>
                                 </div>
                                 {% endif %}
@@ -171,39 +237,63 @@
         </div>
 
         <!-- Expenses List (Hidden by Default) -->
-        <div id="expenses-list" class="hidden">
-            <table>
-                <thead>
+        <div id="expenses-list" class="hidden overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50 dark:bg-gray-900">
                     <tr>
-                        <th>Description</th>
-                        <th>Amount</th>
-                        <th>Date</th>
-                        <th>Category</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Description</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Amount</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Category</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     {% for expense in expenses %}
-                    <tr>
-                        <td>{{ expense.description }}</td>
-                        <td>{{ expense.amount | round(2) }}</td>
-                        <td>{{ expense.date.strftime('%d/%m/%Y %H:%M:%S') }}</td>
-                        <td>{{ expense.category }}</td>
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" data-date="{{ expense.date.strftime('%Y-%m-%d') }}">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{{ expense.description }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600 dark:text-red-400">{{ expense.amount | round(2) }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{{ expense.date.strftime('%d/%m/%Y %H:%M:%S') }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                                {{ expense.category }}
+                            </span>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
+        
+        <!-- Empty State for Filtered Data -->
+        <div id="empty-state" class="hidden p-8 text-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p class="mt-4 text-gray-600 dark:text-gray-400 text-lg">No data found for the selected filter</p>
+            <p class="text-gray-500 dark:text-gray-500 text-sm mt-2">Try changing your filter criteria</p>
+        </div>
     </div>
 
     <!-- JavaScript -->
     <script>
+        // Time display function
         function updateTime() {
-            const nairobiTime = new Date().toLocaleString('en-US', { timeZone: 'Africa/Nairobi', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+            const nairobiTime = new Date().toLocaleString('en-US', { 
+                timeZone: 'Africa/Nairobi', 
+                day: '2-digit', 
+                month: '2-digit', 
+                year: 'numeric', 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit', 
+                hour12: false 
+            });
             document.getElementById('time-display').textContent = nairobiTime.replace(',', '');
         }
         updateTime();
         setInterval(updateTime, 1000);
 
+        // Get DOM elements
         const allBtn = document.getElementById('all-btn');
         const pendingBtn = document.getElementById('pending-btn');
         const completedBtn = document.getElementById('completed-btn');
@@ -213,165 +303,289 @@
         const expensesList = document.getElementById('expenses-list');
         const timeFilter = document.getElementById('time-filter');
         const loadingSpinner = document.getElementById('loading-spinner');
+        const emptyState = document.getElementById('empty-state');
+        
         let currentFilter = '{{ time_filter }}';
+        let currentStatusFilter = 'all'; // Track the current status filter (all, pending, completed)
 
+        // Show loading spinner
         function showLoading() {
             loadingSpinner.classList.remove('hidden');
         }
 
+        // Hide loading spinner
         function hideLoading() {
             loadingSpinner.classList.add('hidden');
         }
 
-        function groupSalesByPeriod(sales, period) {
+        // Format date for display in group headers
+        function formatGroupDate(dateString, period) {
+            const date = new Date(dateString);
+            
+            if (period === 'day') {
+                // Format: "Monday, January 1, 2023"
+                return date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            } else if (period === 'week') {
+                // Calculate week number
+                const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
+                const daysSinceYearStart = Math.floor((date - firstDayOfYear) / (1000 * 60 * 60 * 24));
+                const weekNumber = Math.ceil((daysSinceYearStart + firstDayOfYear.getDay() + 1) / 7);
+                
+                // Get start and end date of the week
+                const weekStart = new Date(date);
+                weekStart.setDate(date.getDate() - date.getDay());
+                const weekEnd = new Date(weekStart);
+                weekEnd.setDate(weekStart.getDate() + 6);
+                
+                // Format: "Week 5 (Jan 29 - Feb 4, 2023)"
+                return `Week ${weekNumber} (${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })})`;
+            } else if (period === 'month') {
+                // Format: "January 2023"
+                return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            } else if (period === 'year') {
+                // Format: "2023"        
+                return date.getFullYear().toString();
+            } else {
+                return 'All Time';
+            }
+        }
+
+        // Group sales or expenses by time period
+        function groupByPeriod(items, period) {
+            // If period is 'all', return single group
+            if (period === 'all') {
+                return { 'All Records': items };
+            }
+            
             const grouped = {};
-            sales.forEach(sale => {
-                const date = new Date(sale.dataset.date);
+            items.forEach(item => {
+                const date = new Date(item.dataset.date);
                 let key;
-                if (period === 'week') {
-                    const year = date.getFullYear();
-                    const month = date.getMonth();
-                    const day = date.getDate();
-                    const firstDayOfYear = new Date(year, 0, 1);
+                
+                if (period === 'day') {
+                    // Group by individual days
+                    key = date.toISOString().split('T')[0]; // YYYY-MM-DD
+                } else if (period === 'week') {
+                    // Group by week number within year
+                    const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
                     const daysSinceYearStart = Math.floor((date - firstDayOfYear) / (1000 * 60 * 60 * 24));
                     const weekNumber = Math.ceil((daysSinceYearStart + firstDayOfYear.getDay() + 1) / 7);
-                    key = `Week ${weekNumber} ${year}`;
+                    key = `${date.getFullYear()}-W${weekNumber.toString().padStart(2, '0')}`;
                 } else if (period === 'month') {
-                    const year = date.getFullYear();
-                    const month = date.toLocaleString('default', { month: 'long' });
-                    key = `${month} ${year}`;
-                } else if (period === 'day') {
-                    key = date.toISOString().split('T')[0];
+                    // Group by month and year
+                    key = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
                 } else if (period === 'year') {
+                    // Group by year
                     key = date.getFullYear().toString();
-                } else {
-                    key = 'All';
                 }
+                
                 if (!grouped[key]) {
                     grouped[key] = [];
                 }
-                grouped[key].push(sale);
+                grouped[key].push(item);
             });
+            
             return grouped;
         }
 
-        function renderGroupedSales(groupedSales) {
-            salesHistoryBody.innerHTML = '';
-            Object.keys(groupedSales).sort().forEach(group => {
+        // Sort group keys chronologically
+        function sortGroupKeys(keys, period) {
+            // For 'all' period, no sorting needed
+            if (period === 'all') {
+                return keys;
+            }
+            
+            // Otherwise sort chronologically
+            return keys.sort((a, b) => {
+                // For day, week, month, and year, we can sort alphabetically
+                // because we've formatted the keys to be chronologically sortable
+                return a.localeCompare(b);
+            });
+        }
+
+        // Render the grouped data with formatted headers
+        function renderGroupedItems(groupedItems, period, itemType) {
+            const container = itemType === 'sales' ? salesHistoryBody : document.querySelector('#expenses-list tbody');
+            container.innerHTML = '';
+            
+            // Get keys and sort them chronologically
+            const sortedKeys = sortGroupKeys(Object.keys(groupedItems), period);
+            
+            if (sortedKeys.length === 0) {
+                // Show empty state when no data
+                emptyState.classList.remove('hidden');
+                return;
+            }
+            
+            emptyState.classList.add('hidden');
+            
+            // Render each group
+            sortedKeys.forEach(key => {
+                // Create a formatted header for the group
+                const formattedHeader = formatGroupDate(key, period);
+                
+                // Create a group header row
                 const groupHeader = document.createElement('tr');
-                groupHeader.innerHTML = `<td colspan="7" class="bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white font-semibold p-2">${group}</td>`;
-                salesHistoryBody.appendChild(groupHeader);
-                groupedSales[group].forEach(sale => {
-                    salesHistoryBody.appendChild(sale);
+                groupHeader.className = 'bg-blue-50 dark:bg-blue-900/20';
+                groupHeader.innerHTML = `
+                    <td colspan="7" class="px-6 py-3 text-sm font-semibold text-blue-800 dark:text-blue-300">
+                        ${formattedHeader}
+                        <span class="ml-2 text-gray-500 dark:text-gray-400">(${groupedItems[key].length} ${groupedItems[key].length === 1 ? 'record' : 'records'})</span>
+                    </td>
+                `;
+                container.appendChild(groupHeader);
+                
+                // Add all items in this group
+                groupedItems[key].forEach(item => {
+                    container.appendChild(item.cloneNode(true));
                 });
             });
         }
 
-        function updateFilter(time) {
-            showLoading();
-            currentFilter = time;
-            fetch(`/?time=${time}`).then(res => res.text()).then(html => {
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, 'text/html');
-                salesHistory.innerHTML = doc.getElementById('sales-history').innerHTML;
-                expensesList.classList.add('hidden');
-                salesHistory.classList.remove('hidden');
-                const salesRows = Array.from(salesHistoryBody.querySelectorAll('tr[data-date]'));
-                const groupedSales = groupSalesByPeriod(salesRows, time);
-                renderGroupedSales(groupedSales);
-                hideLoading();
-            }).catch(err => {
-                console.error('Filter error:', err);
-                hideLoading();
-            });
+        // Filter sales by status (all, pending, completed)
+        function filterSalesByStatus(sales, status) {
+            if (status === 'all') {
+                return sales;
+            } else if (status === 'pending') {
+                return sales.filter(sale => sale.querySelector('.text-red-800') || sale.querySelector('.text-red-200'));
+            } else if (status === 'completed') {
+                return sales.filter(sale => sale.querySelector('.text-green-800') || sale.querySelector('.text-green-200'));
+            }
+            return sales;
         }
 
-        allBtn.addEventListener('click', () => {
+        // Update the data based on the selected time period and status filter
+        function updateData(timePeriod, statusFilter) {
             showLoading();
-            salesHistory.classList.remove('hidden');
-            expensesList.classList.add('hidden');
-            fetch(`/?time=${currentFilter}`).then(res => res.text()).then(html => {
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, 'text/html');
-                salesHistory.innerHTML = doc.getElementById('sales-history').innerHTML;
-                const salesRows = Array.from(salesHistoryBody.querySelectorAll('tr[data-date]'));
-                const groupedSales = groupSalesByPeriod(salesRows, currentFilter);
-                renderGroupedSales(groupedSales);
-                hideLoading();
-            }).catch(err => {
-                console.error('All button error:', err);
-                hideLoading();
-            });
+            
+            // Hide empty state initially
+            emptyState.classList.add('hidden');
+            
+            // Set current filters
+            currentFilter = timePeriod;
+            currentStatusFilter = statusFilter;
+            
+            // Fetch the latest data
+            fetch(`/?time=${timePeriod}`)
+                .then(response => response.text())
+                .then(html => {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    
+                    // If showing expenses, handle differently
+                    if (statusFilter === 'expenses') {
+                        // Show expenses, hide sales
+                        salesHistory.classList.add('hidden');
+                        expensesList.classList.remove('hidden');
+                        
+                        // Get all expense rows
+                        const expenseRows = Array.from(doc.querySelectorAll('#expenses-list tbody tr[data-date]'));
+                        
+                        if (expenseRows.length === 0) {
+                            emptyState.classList.remove('hidden');
+                        } else {
+                            // Group expenses by time period
+                            const groupedExpenses = groupByPeriod(expenseRows, timePeriod);
+                            
+                            // Render grouped expenses
+                            renderGroupedItems(groupedExpenses, timePeriod, 'expenses');
+                        }
+                    } else {
+                        // Show sales, hide expenses
+                        salesHistory.classList.remove('hidden');
+                        expensesList.classList.add('hidden');
+                        
+                        // Get all sales rows
+                        const allSalesRows = Array.from(doc.querySelectorAll('#sales-history-body tr[data-date]'));
+                        
+                        // Apply status filter
+                        const filteredSalesRows = filterSalesByStatus(allSalesRows, statusFilter);
+                        
+                        if (filteredSalesRows.length === 0) {
+                            emptyState.classList.remove('hidden');
+                        } else {
+                            // Group sales by time period
+                            const groupedSales = groupByPeriod(filteredSalesRows, timePeriod);
+                            
+                            // Render grouped sales
+                            renderGroupedItems(groupedSales, timePeriod, 'sales');
+                        }
+                    }
+                    
+                    hideLoading();
+                })
+                .catch(error => {
+                    console.error('Error fetching data:', error);
+                    hideLoading();
+                    
+                    // Show error in empty state
+                    emptyState.classList.remove('hidden');
+                    emptyState.querySelector('p').textContent = 'Error loading data. Please try again.';
+                });
+        }
+
+        // Event listeners for filter buttons
+        allBtn.addEventListener('click', () => {
+            updateData(currentFilter, 'all');
         });
 
         pendingBtn.addEventListener('click', () => {
-            showLoading();
-            salesHistory.classList.remove('hidden');
-            expensesList.classList.add('hidden');
-            fetch(`/?time=${currentFilter}`).then(res => res.text()).then(html => {
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, 'text/html');
-                const allSales = Array.from(doc.querySelectorAll('#sales-history table tbody tr[data-date]'));
-                const filteredSales = allSales.filter(sale => sale.querySelector('.text-red-600'));
-                const groupedSales = groupSalesByPeriod(filteredSales, currentFilter);
-                renderGroupedSales(groupedSales);
-                hideLoading();
-            }).catch(err => {
-                console.error('Pending button error:', err);
-                hideLoading();
-            });
+            updateData(currentFilter, 'pending');
         });
 
         completedBtn.addEventListener('click', () => {
-            showLoading();
-            salesHistory.classList.remove('hidden');
-            expensesList.classList.add('hidden');
-            fetch(`/?time=${currentFilter}`).then(res => res.text()).then(html => {
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, 'text/html');
-                const allSales = Array.from(doc.querySelectorAll('#sales-history table tbody tr[data-date]'));
-                const filteredSales = allSales.filter(sale => sale.querySelector('.text-green-600'));
-                const groupedSales = groupSalesByPeriod(filteredSales, currentFilter);
-                renderGroupedSales(groupedSales);
-                hideLoading();
-            }).catch(err => {
-                console.error('Completed button error:', err);
-                hideLoading();
-            });
+            updateData(currentFilter, 'completed');
         });
 
         expensesBtn.addEventListener('click', () => {
-            showLoading();
-            salesHistory.classList.add('hidden');
-            expensesList.classList.remove('hidden');
-            setTimeout(() => hideLoading(), 500); // Simulate loading for expenses
+            updateData(currentFilter, 'expenses');
         });
 
         timeFilter.addEventListener('change', (e) => {
-            updateFilter(e.target.value);
+            updateData(e.target.value, currentStatusFilter);
         });
 
+        // Toggle dropdown menu
         function toggleMenu(menuId) {
             const menu = document.getElementById(menuId);
+            
+            // Close all other menus first
+            document.querySelectorAll('[id^="menu-"]').forEach(m => {
+                if (m.id !== menuId) {
+                    m.classList.add('hidden');
+                }
+            });
+            
             menu.classList.toggle('hidden');
         }
 
+        // Show loading options submenu
         function showLoadOptions(receiptId) {
             const options = document.getElementById(`load-options-${receiptId}`);
             options.classList.toggle('hidden');
+            
+            // Prevent event bubbling
+            event.stopPropagation();
         }
 
+        // Close menus when clicking outside
         document.addEventListener('click', (e) => {
-            document.querySelectorAll('[id^="menu-"]').forEach(menu => {
-                if (!menu.contains(e.target) && !e.target.closest('button')) {
+            // Close dropdown menus
+            if (!e.target.closest('button[onclick^="toggleMenu"]')) {
+                document.querySelectorAll('[id^="menu-"]').forEach(menu => {
                     menu.classList.add('hidden');
-                }
-            });
-            document.querySelectorAll('[id^="load-options-"]').forEach(option => {
-                if (!option.contains(e.target) && !e.target.closest('a[href="#"]')) {
+                });
+            }
+            
+            // Close loading options submenus
+            if (!e.target.closest('a[onclick^="showLoadOptions"]')) {
+                document.querySelectorAll('[id^="load-options-"]').forEach(option => {
                     option.classList.add('hidden');
-                }
-            });
+                });
+            }
         });
+
+        // Initialize with default filters
+        updateData(currentFilter, 'all');
     </script>
 {% endblock %}
