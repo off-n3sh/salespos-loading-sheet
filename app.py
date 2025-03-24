@@ -111,6 +111,60 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def get_current_loading_sheet():
+    """Retrieve or initialize the current loading sheet from Firestore."""
+    current_ref = db.collection('metadata').document('current_loading_sheet')
+    current_doc = current_ref.get()
+    
+    if not current_doc.exists:
+        # Initialize a new current loading sheet if none exists
+        new_sheet = {
+            'items': [],
+            'total_items': 0,
+            'created_at': datetime.now(KENYA_TZ),
+            'order_ids': [],
+            'status': 'current'
+        }
+        current_ref.set(new_sheet)
+        return new_sheet
+    
+    return current_doc.to_dict()
+
+# Helper function to update the current loading sheet
+def update_current_loading_sheet(items_to_add, order_id):
+    """Update the current loading sheet with new items."""
+    current_ref = db.collection('metadata').document('current_loading_sheet')
+    current_sheet = get_current_loading_sheet()
+    
+    current_items = current_sheet.get('items', [])
+    current_order_ids = current_sheet.get('order_ids', [])
+    
+    # Aggregate items
+    for item in items_to_add:
+        found = False
+        for existing_item in current_items:
+            if existing_item['name'] == item['name']:
+                existing_item['quantity'] += item['quantity']
+                found = True
+                break
+        if not found:
+            current_items.append(item)
+    
+    # Add order_id if not already present
+    if order_id not in current_order_ids:
+        current_order_ids.append(order_id)
+    
+    updated_sheet = {
+        'items': current_items,
+        'total_items': sum(item['quantity'] for item in current_items),
+        'created_at': current_sheet['created_at'],
+        'order_ids': current_order_ids,
+        'status': 'current'
+    }
+    
+    current_ref.set(updated_sheet)
+    return updated_sheet
+
 # New Routes
 @app.route('/')
 def splash():
@@ -829,6 +883,7 @@ def expenses():
 @app.route('/load_to_loading_sheet/<receipt_id>/<action>')
 @login_required
 def load_to_loading_sheet(receipt_id, action):
+    """Add an order's items to a loading sheet (current or new)."""
     order_ref = db.collection('orders').where('receipt_id', '==', receipt_id).limit(1).stream()
     order_doc = next(order_ref, None)
     if not order_doc:
@@ -838,90 +893,95 @@ def load_to_loading_sheet(receipt_id, action):
     if order_dict.get('order_type', 'wholesale') == 'retail':
         return "Retail orders cannot be loaded to a loading sheet", 400
     
+    # Parse items from the order
     items_raw = order_dict.get('items', [])
     items_list = []
     i = 0
     while i < len(items_raw):
         if items_raw[i] == 'product':
-            product_name = items_raw[i + 1]
-            quantity = items_raw[i + 3] if i + 2 < len(items_raw) and items_raw[i + 2] == 'quantity' else 0
-            items_list.append({'name': product_name, 'quantity': quantity})
-            i += 6
+            try:
+                product_name = items_raw[i + 1]
+                quantity = items_raw[i + 3] if i + 2 < len(items_raw) and items_raw[i + 2] == 'quantity' else 0
+                price = items_raw[i + 5] if i + 4 < len(items_raw) and items_raw[i + 4] == 'price' else 0
+                if quantity > 0:
+                    items_list.append({'name': product_name, 'quantity': int(quantity), 'price': float(price)})
+                i += 6
+            except (IndexError, ValueError) as e:
+                print(f"Error parsing items for order {receipt_id}: {e}")
+                i += 1
         else:
             i += 1
 
-    loading_sheet_id = f"LOAD_{datetime.now(KENYA_TZ).strftime('%Y%m%d_%H%M%S')}"
-    
-    if action == 'current' and 'current_loading_sheet' in session:
-        current_items = session.get('current_loading_sheet', {}).get('items', [])
-        for item in items_list:
-            found = False
-            for existing_item in current_items:
-                if existing_item['name'] == item['name']:
-                    existing_item['quantity'] += item['quantity']
-                    found = True
-                    break
-            if not found:
-                current_items.append(item)
-        session['current_loading_sheet'] = {
-            'items': current_items,
-            'total_items': sum(item['quantity'] for item in current_items),
-            'created_at': session.get('current_loading_sheet', {}).get('created_at', datetime.now(KENYA_TZ).isoformat())
+    if not items_list:
+        return "No valid items found in the order", 400
+
+    # Handle the action
+    if action == 'current':
+        # Add to the current loading sheet
+        updated_sheet = update_current_loading_sheet(items_list, receipt_id)
+        log_user_action('Added to Loading Sheet', f"Order {receipt_id} added to current loading sheet by {session['user']['firstName']} {session['user']['lastName']}")
+    elif action == 'new':
+        # Archive the current loading sheet and start a new one
+        current_sheet = get_current_loading_sheet()
+        if current_sheet['items']:  # Only archive if there are items
+            loading_sheet_id = f"LOAD_{datetime.now(KENYA_TZ).strftime('%Y%m%d_%H%M%S')}"
+            db.collection('loading_sheets').document(loading_sheet_id).set({
+                'items': current_sheet['items'],
+                'total_items': current_sheet['total_items'],
+                'created_at': current_sheet['created_at'],
+                'completed_at': datetime.now(KENYA_TZ),
+                'order_ids': current_sheet['order_ids'],
+                'status': 'completed'
+            })
+            log_user_action('Completed Loading Sheet', f"Loading sheet {loading_sheet_id} completed with {current_sheet['total_items']} items")
+        
+        # Reset the current loading sheet with new items
+        new_sheet = {
+            'items': items_list,
+            'total_items': sum(item['quantity'] for item in items_list),
+            'created_at': datetime.now(KENYA_TZ),
+            'order_ids': [receipt_id],
+            'status': 'current'
         }
+        db.collection('metadata').document('current_loading_sheet').set(new_sheet)
+        log_user_action('Started New Loading Sheet', f"New loading sheet started from order {receipt_id} by {session['user']['firstName']} {session['user']['lastName']}")
     else:
-        session['current_loading_sheet'] = {
-            'items': items_list,
-            'total_items': sum(item['quantity'] for item in items_list),
-            'created_at': datetime.now(KENYA_TZ).isoformat()
-        }
-        db.collection('loading_sheets').document(loading_sheet_id).set({
-            'items': items_list,
-            'total_items': sum(item['quantity'] for item in items_list),
-            'created_at': datetime.now(KENYA_TZ)
-        })
+        return "Invalid action specified", 400
+
+    # Mark the order as added to a loading sheet
+    db.collection('orders').document(order_doc.id).update({
+        'added_to_loading_sheet': True,
+        'loading_sheet_id': loading_sheet_id if action == 'new' else 'current'
+    })
 
     return redirect(url_for('loading_sheets'))
 
 @app.route('/loading-sheets')
 @login_required
 def loading_sheets():
-    """Display the loading sheets page."""
-    current_loading_sheet = session.get('current_loading_sheet', None)
-    if current_loading_sheet:
-        aggregated_items = current_loading_sheet.get('items', [])
-        total_items = current_loading_sheet.get('total_items', 0)
-        # Fix the datetime serialization issue
-        created_at_str = current_loading_sheet.get('created_at')
-        if isinstance(created_at_str, str):
-            try:
-                created_at = datetime.fromisoformat(created_at_str)
-            except ValueError:
-                created_at = datetime.now(KENYA_TZ)
-        else:
-            created_at = current_loading_sheet.get('created_at', datetime.now(KENYA_TZ))
-    else:
-        aggregated_items = []
-        total_items = 0
-        created_at = None
+    """Display the loading sheets page with the current and recent sheets."""
+    # Get the current loading sheet
+    current_sheet = get_current_loading_sheet()
+    aggregated_items = current_sheet.get('items', [])
+    total_items = current_sheet.get('total_items', 0)
+    created_at = current_sheet.get('created_at', datetime.now(KENYA_TZ))
+    if isinstance(created_at, firestore.SERVER_TIMESTAMP):
+        created_at = datetime.now(KENYA_TZ)  # Fallback if timestamp isn't resolved
 
-    # Get recent sheets
+    # Fetch recent completed sheets from Firestore
     try:
         recent_sheets = []
-        for doc in db.collection('loading_sheets').order_by('created_at', direction=firestore.Query.DESCENDING).limit(5).get():
+        for doc in db.collection('loading_sheets').order_by('completed_at', direction=firestore.Query.DESCENDING).limit(5).stream():
             sheet_data = doc.to_dict()
             sheet_data['id'] = doc.id
-            # Convert Firestore timestamp to datetime if needed
-            if isinstance(sheet_data.get('created_at'), (firestore.SERVER_TIMESTAMP, datetime)):
-                sheet_data['created_at'] = sheet_data['created_at']
             recent_sheets.append(sheet_data)
     except Exception as e:
-        # Handle any database errors gracefully
         print(f"Error fetching recent sheets: {e}")
         recent_sheets = []
 
     now = datetime.now(KENYA_TZ)
     
-    # Get recent activity
+    # Fetch recent activity
     try:
         recent_activity = [
             {
@@ -930,18 +990,18 @@ def loading_sheets():
                 'shop_name': doc.to_dict().get('shop_name', 'Unknown Shop'),
                 'date': process_date(doc.to_dict().get('date', now))
             }
-            for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).limit(3).get()
+            for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).limit(3).stream()
         ]
     except Exception as e:
         print(f"Error fetching recent activity: {e}")
         recent_activity = []
 
-    return render_template('loading_sheets.html', 
-                          aggregated_items=aggregated_items, 
-                          current_date=now, 
-                          total_items=total_items, 
-                          created_at=created_at, 
-                          recent_sheets=recent_sheets, 
+    return render_template('loading_sheets.html',
+                          aggregated_items=aggregated_items,
+                          current_date=now,
+                          total_items=total_items,
+                          created_at=created_at,
+                          recent_sheets=recent_sheets,
                           recent_activity=recent_activity)
 
 @app.route('/view-loading-sheet')
@@ -1105,28 +1165,31 @@ def download_loading_sheet():
 @app.route('/create-loading-sheet')
 @login_required
 def create_loading_sheet():
-    """Create a new loading sheet by clearing the current one in session."""
-    if 'current_loading_sheet' in session:
-        session.pop('current_loading_sheet')
-    
-    log_user_action('Created New Loading Sheet', 'Started a fresh loading sheet')
+    """Archive the current loading sheet and start a fresh one."""
+    current_sheet = get_current_loading_sheet()
+    if current_sheet['items']:  # Only archive if there are items
+        loading_sheet_id = f"LOAD_{datetime.now(KENYA_TZ).strftime('%Y%m%d_%H%M%S')}"
+        db.collection('loading_sheets').document(loading_sheet_id).set({
+            'items': current_sheet['items'],
+            'total_items': current_sheet['total_items'],
+            'created_at': current_sheet['created_at'],
+            'completed_at': datetime.now(KENYA_TZ),
+            'order_ids': current_sheet['order_ids'],
+            'status': 'completed'
+        })
+        log_user_action('Completed Loading Sheet', f"Loading sheet {loading_sheet_id} completed with {current_sheet['total_items']} items")
+
+    # Reset the current loading sheet
+    db.collection('metadata').document('current_loading_sheet').set({
+        'items': [],
+        'total_items': 0,
+        'created_at': datetime.now(KENYA_TZ),
+        'order_ids': [],
+        'status': 'current'
+    })
+    log_user_action('Created New Loading Sheet', f"New empty loading sheet started by {session['user']['firstName']} {session['user']['lastName']}")
+
     return redirect(url_for('loading_sheets'))
-
-# ... existing routes like /loading-sheets, /dashboard, etc. ...
-
-@app.route('/get_loading_sheet/<sheet_id>')
-@login_required
-def get_loading_sheet(sheet_id):
-    try:
-        sheet_ref = db.collection('loading_sheets').document(sheet_id).get()
-        if not sheet_ref.exists:
-            return jsonify({"error": "Loading sheet not found"}), 404
-        
-        sheet_dict = sheet_ref.to_dict()
-        sheet_dict['id'] = sheet_id
-        return jsonify(sheet_dict)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 @app.route('/edit_order/<receipt_id>', methods=['POST'])
 @login_required
