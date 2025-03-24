@@ -866,13 +866,13 @@ def load_to_loading_sheet(receipt_id, action):
         session['current_loading_sheet'] = {
             'items': current_items,
             'total_items': sum(item['quantity'] for item in current_items),
-            'created_at': session.get('current_loading_sheet', {}).get('created_at', datetime.now(KENYA_TZ))
+            'created_at': session.get('current_loading_sheet', {}).get('created_at', datetime.now(KENYA_TZ).isoformat())
         }
     else:
         session['current_loading_sheet'] = {
             'items': items_list,
             'total_items': sum(item['quantity'] for item in items_list),
-            'created_at': datetime.now(KENYA_TZ)
+            'created_at': datetime.now(KENYA_TZ).isoformat()
         }
         db.collection('loading_sheets').document(loading_sheet_id).set({
             'items': items_list,
@@ -890,94 +890,226 @@ def loading_sheets():
     if current_loading_sheet:
         aggregated_items = current_loading_sheet.get('items', [])
         total_items = current_loading_sheet.get('total_items', 0)
-        created_at = current_loading_sheet.get('created_at', datetime.now(KENYA_TZ))
+        # Fix the datetime serialization issue
+        created_at_str = current_loading_sheet.get('created_at')
+        if isinstance(created_at_str, str):
+            try:
+                created_at = datetime.fromisoformat(created_at_str)
+            except ValueError:
+                created_at = datetime.now(KENYA_TZ)
+        else:
+            created_at = current_loading_sheet.get('created_at', datetime.now(KENYA_TZ))
     else:
         aggregated_items = []
         total_items = 0
         created_at = None
 
-    recent_sheets = [doc.to_dict() | {'id': doc.id} for doc in db.collection('loading_sheets').order_by('created_at', direction=firestore.Query.DESCENDING).limit(5).get()]
+    # Get recent sheets
+    try:
+        recent_sheets = []
+        for doc in db.collection('loading_sheets').order_by('created_at', direction=firestore.Query.DESCENDING).limit(5).get():
+            sheet_data = doc.to_dict()
+            sheet_data['id'] = doc.id
+            # Convert Firestore timestamp to datetime if needed
+            if isinstance(sheet_data.get('created_at'), (firestore.SERVER_TIMESTAMP, datetime)):
+                sheet_data['created_at'] = sheet_data['created_at']
+            recent_sheets.append(sheet_data)
+    except Exception as e:
+        # Handle any database errors gracefully
+        print(f"Error fetching recent sheets: {e}")
+        recent_sheets = []
 
     now = datetime.now(KENYA_TZ)
-    recent_activity = [
-        {
-            'receipt_id': doc.to_dict().get('receipt_id', doc.id),
-            'salesperson_name': doc.to_dict().get('salesperson_name', 'N/A'),
-            'shop_name': doc.to_dict().get('shop_name', 'Unknown Shop'),
-            'date': process_date(doc.to_dict().get('date'))
-        }
-        for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).limit(3).get()
-    ]
+    
+    # Get recent activity
+    try:
+        recent_activity = [
+            {
+                'receipt_id': doc.to_dict().get('receipt_id', doc.id),
+                'salesperson_name': doc.to_dict().get('salesperson_name', 'N/A'),
+                'shop_name': doc.to_dict().get('shop_name', 'Unknown Shop'),
+                'date': process_date(doc.to_dict().get('date', now))
+            }
+            for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).limit(3).get()
+        ]
+    except Exception as e:
+        print(f"Error fetching recent activity: {e}")
+        recent_activity = []
 
-    return render_template('loading_sheets.html', aggregated_items=aggregated_items, current_date=now, total_items=total_items, 
-                          created_at=created_at, recent_sheets=recent_sheets, recent_activity=recent_activity)
+    return render_template('loading_sheets.html', 
+                          aggregated_items=aggregated_items, 
+                          current_date=now, 
+                          total_items=total_items, 
+                          created_at=created_at, 
+                          recent_sheets=recent_sheets, 
+                          recent_activity=recent_activity)
+
+@app.route('/view-loading-sheet')
+@login_required
+def view_loading_sheet():
+    """View a specific loading sheet."""
+    sheet_id = request.args.get('sheet_id')
+    print_mode = request.args.get('print') == 'true'
+    
+    if sheet_id:
+        # Fetch loading sheet from Firestore
+        try:
+            sheet_ref = db.collection('loading_sheets').document(sheet_id).get()
+            if not sheet_ref.exists:
+                flash('Loading sheet not found', 'error')
+                return redirect(url_for('loading_sheets'))
+            
+            sheet_data = sheet_ref.to_dict()
+            sheet_data['id'] = sheet_id
+            
+            # Handle date conversion
+            if isinstance(sheet_data.get('created_at'), (firestore.SERVER_TIMESTAMP, datetime)):
+                created_at = sheet_data['created_at']
+            else:
+                created_at = datetime.now(KENYA_TZ)
+            
+            aggregated_items = sheet_data.get('items', [])
+            total_items = sheet_data.get('total_items', 0)
+            
+            return render_template('view_loading_sheet.html',
+                                aggregated_items=aggregated_items,
+                                total_items=total_items,
+                                created_at=created_at,
+                                current_date=datetime.now(KENYA_TZ),
+                                sheet_id=sheet_id,
+                                print_mode=print_mode)
+        except Exception as e:
+            flash(f'Error loading sheet: {str(e)}', 'error')
+            return redirect(url_for('loading_sheets'))
+    else:
+        flash('Sheet ID is required', 'error')
+        return redirect(url_for('loading_sheets'))
 
 @app.route('/download-loading-sheet')
 @login_required
 def download_loading_sheet():
-    current_loading_sheet = session.get('current_loading_sheet', None)
-    if not current_loading_sheet or not current_loading_sheet.get('items'):
-        return "No loading sheet available to download", 400
-
-    aggregated_items = current_loading_sheet.get('items', [])
-    total_items = current_loading_sheet.get('total_items', 0)
-    created_at = current_loading_sheet.get('created_at', datetime.now(KENYA_TZ))
-
-    buffer = BytesIO()
-    p = canvas.Canvas(buffer, pagesize=A4)
-    width, height = A4
-
-    p.setFont("Helvetica-Bold", 14)
-    p.drawCentredString(width / 2, height - 50, "Dreamland Distributors")
-    p.setFont("Helvetica", 10)
-    p.drawCentredString(width / 2, height - 70, "P.O Box 123-00200 Nairobi | Phone: 0725 530632")
-    p.line(50, height - 80, width - 50, height - 80)
-    p.setFont("Helvetica-Bold", 12)
-    p.drawCentredString(width / 2, height - 100, "Current Loading Sheet")
-    p.setFont("Helvetica", 10)
-    p.drawString(50, height - 120, f"Date: {created_at.strftime('%d/%m/%Y %H:%M')}")
-
-    y = height - 160
-    p.setFont("Helvetica", 10)
-    p.drawString(50, y, "Item")
-    p.drawString(200, y, "Details")
-    p.line(50, y - 5, width - 50, y - 5)
-    y -= 20
-
-    for item in aggregated_items:
-        p.drawString(50, y, item['name'])
-        notes = "2 pieces" if "sugar" in item['name'].lower() and "2k" in item['name'].lower() else f"{item['quantity']} pieces" if item['quantity'] > 1 else "Single unit"
-        p.drawString(200, y, notes)
-        y -= 20
-        if y < 50:
-            p.showPage()
-            y = height - 50
-
-    y -= 10
-    p.setFont("Helvetica", 10)
-    p.drawString(50, y, f"Total Items: {total_items}")
-    y -= 20
-    p.drawString(50, y, "Driver Signature: ____________________")
-    y -= 20
-    p.drawString(50, y, "Date Loaded: ____________________")
-
-    p.showPage()
-    p.save()
-
-    buffer.seek(0)
-    return Response(
-        buffer,
-        mimetype='application/pdf',
-        headers={"Content-Disposition": f"attachment;filename=loading_sheet_{created_at.strftime('%Y%m%d_%H%M')}.pdf"}
-    )
+    sheet_id = request.args.get('sheet_id')
     
+    # Handle specific sheet download if ID is provided
+    if sheet_id:
+        try:
+            sheet_doc = db.collection('loading_sheets').document(sheet_id).get()
+            if not sheet_doc.exists:
+                return "Loading sheet not found", 404
+                
+            sheet_data = sheet_doc.to_dict()
+            aggregated_items = sheet_data.get('items', [])
+            total_items = sheet_data.get('total_items', 0)
+            
+            # Handle created_at timestamp conversion
+            if isinstance(sheet_data.get('created_at'), (firestore.SERVER_TIMESTAMP, datetime)):
+                created_at = sheet_data['created_at']
+            else:
+                created_at = datetime.now(KENYA_TZ)
+        except Exception as e:
+            return f"Error fetching loading sheet: {str(e)}", 500
+    # Handle current sheet in session
+    else:
+        current_loading_sheet = session.get('current_loading_sheet', None)
+        if not current_loading_sheet or not current_loading_sheet.get('items'):
+            return "No loading sheet available to download", 400
+
+        aggregated_items = current_loading_sheet.get('items', [])
+        total_items = current_loading_sheet.get('total_items', 0)
+        
+        # Fix created_at datetime handling
+        created_at_str = current_loading_sheet.get('created_at')
+        if isinstance(created_at_str, str):
+            try:
+                created_at = datetime.fromisoformat(created_at_str)
+            except ValueError:
+                created_at = datetime.now(KENYA_TZ)
+        else:
+            created_at = current_loading_sheet.get('created_at', datetime.now(KENYA_TZ))
+
+    try:
+        # Generate PDF
+        buffer = BytesIO()
+        p = canvas.Canvas(buffer, pagesize=A4)
+        width, height = A4
+
+        # Header
+        p.setFont("Helvetica-Bold", 14)
+        p.drawCentredString(width / 2, height - 50, "Dreamland Distributors")
+        p.setFont("Helvetica", 10)
+        p.drawCentredString(width / 2, height - 70, "P.O Box 123-00200 Nairobi | Phone: 0725 530632")
+        p.line(50, height - 80, width - 50, height - 80)
+        p.setFont("Helvetica-Bold", 12)
+        p.drawCentredString(width / 2, height - 100, "Loading Sheet")
+        p.setFont("Helvetica", 10)
+        formatted_date = created_at.strftime('%d/%m/%Y %H:%M') if hasattr(created_at, 'strftime') else str(created_at)
+        p.drawString(50, height - 120, f"Date: {formatted_date}")
+
+        # Table header
+        y = height - 160
+        p.setFont("Helvetica-Bold", 10)
+        p.drawString(50, y, "Item")
+        p.drawString(300, y, "Details")
+        p.line(50, y - 5, width - 50, y - 5)
+        y -= 20
+
+        # Items
+        p.setFont("Helvetica", 10)
+        for item in aggregated_items:
+            if y < 100:  # Start new page if not enough space
+                p.showPage()
+                p.setFont("Helvetica", 10)
+                y = height - 50
+            
+            p.drawString(50, y, item['name'])
+            
+            if "sugar" in item['name'].lower() and "2k" in item['name'].lower():
+                notes = f"2 pieces x {item['quantity']}"
+            elif item['quantity'] > 1:
+                notes = f"{item['quantity']} pieces"
+            else:
+                notes = "Single unit"
+                
+            p.drawString(300, y, notes)
+            y -= 20
+
+        # Footer
+        y -= 20
+        p.line(50, y, width - 50, y)
+        y -= 20
+        
+        p.setFont("Helvetica-Bold", 10)
+        p.drawString(50, y, f"Total Items: {total_items}")
+        y -= 30
+        
+        p.drawString(50, y, "Driver Signature: ____________________")
+        y -= 20
+        p.drawString(50, y, "Date Loaded: ____________________")
+
+        p.showPage()
+        p.save()
+
+        buffer.seek(0)
+        filename = f"loading_sheet_{sheet_id if sheet_id else created_at.strftime('%Y%m%d_%H%M') if hasattr(created_at, 'strftime') else 'current'}.pdf"
+        
+        return Response(
+            buffer,
+            mimetype='application/pdf',
+            headers={"Content-Disposition": f"attachment;filename={filename}"}
+        )
+    except Exception as e:
+        return f"Error generating PDF: {str(e)}", 500
+
 @app.route('/get_loading_sheet/<sheet_id>')
 @login_required
 def get_loading_sheet(sheet_id):
-    sheet_ref = db.collection('loading_sheets').document(sheet_id).get()
-    if not sheet_ref.exists:
-        return "Loading sheet not found", 404
-    
-    sheet_dict = sheet_ref.to_dict()
-    sheet_dict['id'] = sheet_id
-    return jsonify(sheet_dict)
+    try:
+        sheet_ref = db.collection('loading_sheets').document(sheet_id).get()
+        if not sheet_ref.exists:
+            return jsonify({"error": "Loading sheet not found"}), 404
+        
+        sheet_dict = sheet_ref.to_dict()
+        sheet_dict['id'] = sheet_id
+        return jsonify(sheet_dict)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
