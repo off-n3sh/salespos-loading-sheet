@@ -15,33 +15,64 @@
     </div>
 
     <!-- Orders List with Filters -->
-    <div class="card">
-        <h2 class="card-header">Recent Orders</h2>
-        <div class="sales-history-btn-group mb-4">
-            <button data-filter="all" class="btn btn-primary filter-btn bg-blue-700">All</button>
-            <button data-filter="today" class="btn btn-primary filter-btn">Today</button>
-            <button data-filter="week" class="btn btn-primary filter-btn">This Week</button>
+    <div class="card bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
+        <div class="p-5 border-b border-gray-200 dark:border-gray-700">
+            <h2 class="text-xl font-bold text-gray-900 dark:text-white">Recent Orders</h2>
         </div>
-        <div id="orders-list" class="space-y-4">
+        <div class="p-4 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex flex-wrap gap-3 items-center">
+            <div class="flex space-x-2">
+                <button data-filter="all" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
+                    All <span class="ml-2 bg-white bg-opacity-20 px-2 py-0.5 rounded-full text-xs">{{ orders | length }}</span>
+                </button>
+                <button data-filter="today" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
+                    Today <span class="ml-2 bg-white bg-opacity-20 px-2 py-0.5 rounded-full text-xs">{{ orders | selectattr('date', 'eq', today) | list | length }}</span>
+                </button>
+                <button data-filter="week" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
+                    This Week <span class="ml-2 bg-white bg-opacity-20 px-2 py-0.5 rounded-full text-xs">{{ orders | selectattr('date', 'ge', week_start) | list | length }}</span>
+                </button>
+            </div>
+        </div>
+        <div id="orders-list" class="p-4">
             {% for order in orders %}
-            <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow flex justify-between items-center order-item {{ 'border-l-4 border-yellow-500' if order.balance > 0 else '' }}"
+            <div class="order-item p-4 rounded-lg border border-gray-200 dark:border-gray-700 mb-4 {{ 'border-l-4 border-yellow-500' if order.balance > 0 else '' }}"
                  data-date="{{ order.date.strftime('%Y-%m-%d') }}" data-balance="{{ order.balance }}" data-receipt-id="{{ order.receipt_id }}" data-items='{{ order.items_list|tojson|safe }}'>
-                <div>
-                    <h3 class="font-semibold text-gray-900 dark:text-white">{{ order.receipt_id }} - {{ order.shop_name }}</h3>
-                    <p class="text-gray-700 dark:text-gray-300">Salesperson: {{ order.salesperson_name }}</p>
-                    <p class="text-gray-700 dark:text-gray-300">Items: {{ order.total_items }}</p>
-                    <p class="text-gray-700 dark:text-gray-300">Payment: KSh {{ order.payment | round(2) }} | Balance: KSh {{ order.balance | round(2) }}</p>
-                    <p class="text-gray-700 dark:text-gray-300">Date: {{ order.date.strftime('%d/%m/%Y') }}</p>
-                    <p class="text-gray-700 dark:text-gray-300">Type: {{ order.order_type }}</p>
-                </div>
-                <div class="flex space-x-2">
-                    <a href="{{ url_for('receipt', order_id=order.receipt_id) }}" class="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600">View</a>
-                    <button data-receipt-id="{{ order.receipt_id }}" class="edit-order-btn bg-purple-500 text-white px-2 py-1 rounded hover:bg-purple-600">Edit</button>
-                    <button data-receipt-id="{{ order.receipt_id }}" class="delete-order-btn bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">Delete</button>
-                    {% if order.balance > 0 %}
-                    <button data-receipt-id="{{ order.receipt_id }}" data-balance="{{ order.balance }}" class="mark-paid-btn bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600">Mark Paid</button>
-                    <button data-receipt-id="{{ order.receipt_id }}" data-items='{{ order.items_list|tojson|safe }}' class="return-stock-btn bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600">Return Stock</button>
-                    {% endif %}
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h3 class="font-semibold text-gray-900 dark:text-white text-lg">{{ order.receipt_id }} - {{ order.shop_name }}</h3>
+                        <p class="text-gray-600 dark:text-gray-400 text-sm mt-1">Salesperson: {{ order.salesperson_name }}</p>
+                        <p class="text-gray-600 dark:text-gray-400 text-sm">Items: {{ order.total_items }}</p>
+                        <p class="text-gray-600 dark:text-gray-400 text-sm">
+                            Payment: KSh {{ order.payment | round(2) }} | 
+                            <span class="{{ 'text-red-500 dark:text-red-400' if order.balance > 0 else 'text-green-500 dark:text-green-400' }}">
+                                Balance: KSh {{ order.balance | round(2) }}
+                            </span>
+                        </p>
+                        <p class="text-gray-600 dark:text-gray-400 text-sm">Date: {{ order.date.strftime('%d/%m/%Y') }}</p>
+                        <p class="text-gray-600 dark:text-gray-400 text-sm">
+                            Type: 
+                            <span class="px-2 py-1 rounded-full text-xs font-medium {{ 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' if order.order_type == 'retail' else 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' }}">
+                                {{ order.order_type }}
+                            </span>
+                        </p>
+                    </div>
+                    <div class="relative">
+                        <button class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none" onclick="toggleMenu('menu-{{ order.receipt_id }}')">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                            </svg>
+                        </button>
+                        <div id="menu-{{ order.receipt_id }}" class="hidden absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 border rounded-lg shadow-lg z-20">
+                            <a href="{{ url_for('receipt', order_id=order.receipt_id) }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-t-lg">View Receipt</a>
+                            <button onclick="editOrder('{{ order.receipt_id }}', '{{ order.order_type }}', '{{ order.shop_name }}', '{{ order.items_list|tojson|safe }}')" class="block w-full text-left px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Edit Order</button>
+                            <button onclick="deleteOrder('{{ order.receipt_id }}')" class="block w-full text-left px-4 py-2 text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700">Delete Order</button>
+                            {% if order.balance > 0 %}
+                            <button onclick="markPaid('{{ order.receipt_id }}', {{ order.balance }})" class="block w-full text-left px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Mark as Paid</button>
+                            <button onclick="returnStock('{{ order.receipt_id }}', '{{ order.items_list|tojson|safe }}')" class="block w-full text-left px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-b-lg">Return Stock</button>
+                            {% else %}
+                            <button onclick="returnStock('{{ order.receipt_id }}', '{{ order.items_list|tojson|safe }}')" class="block w-full text-left px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-b-lg">Return Stock</button>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
             </div>
             {% endfor %}
@@ -229,6 +260,20 @@
         const manualTotal = document.getElementById('manual-total');
 
         let currentContainer;
+
+        function toggleMenu(menuId) {
+            const menu = document.getElementById(menuId);
+            document.querySelectorAll('[id^="menu-"]').forEach(m => {
+                if (m.id !== menuId) m.classList.add('hidden');
+            });
+            menu.classList.toggle('hidden');
+        }
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('button[onclick^="toggleMenu"]')) {
+                document.querySelectorAll('[id^="menu-"]').forEach(menu => menu.classList.add('hidden'));
+            }
+        });
 
         function resetModal(container) {
             const header = container.querySelector('.item-row-header');
@@ -432,10 +477,10 @@
                 returnItemsContainer.innerHTML = '<p class="text-gray-700 dark:text-gray-300">No items available for return.</p>';
             }
 
-            let isSubmitting = false; // Prevent multiple submissions
+            let isSubmitting = false;
             form.onsubmit = function(e) {
                 e.preventDefault();
-                if (isSubmitting) return; // Block multiple clicks
+                if (isSubmitting) return;
 
                 const submitBtn = form.querySelector('.submit-btn');
                 submitBtn.classList.add('processing');
@@ -683,40 +728,6 @@
                 alert('An error occurred while submitting the wholesale order.');
                 submitBtn.classList.remove('processing');
                 submitBtn.disabled = false;
-            });
-        });
-
-        document.querySelectorAll('.mark-paid-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const receiptId = btn.getAttribute('data-receipt-id');
-                const balance = parseFloat(btn.getAttribute('data-balance'));
-                markPaid(receiptId, balance);
-            });
-        });
-
-        document.querySelectorAll('.return-stock-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const receiptId = btn.getAttribute('data-receipt-id');
-                const itemsJson = btn.getAttribute('data-items');
-                returnStock(receiptId, itemsJson);
-            });
-        });
-
-        document.querySelectorAll('.edit-order-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const orderItem = btn.closest('.order-item');
-                const receiptId = orderItem.getAttribute('data-receipt-id');
-                const orderType = orderItem.querySelector('p:nth-child(6)').textContent.split(': ')[1];
-                const shopName = orderItem.querySelector('h3').textContent.split(' - ')[1];
-                const itemsJson = orderItem.getAttribute('data-items');
-                editOrder(receiptId, orderType, shopName, itemsJson);
-            });
-        });
-
-        document.querySelectorAll('.delete-order-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const receiptId = btn.getAttribute('data-receipt-id');
-                deleteOrder(receiptId);
             });
         });
 
