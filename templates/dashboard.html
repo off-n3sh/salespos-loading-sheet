@@ -217,12 +217,12 @@
                                     <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
                                 </svg>
                             </button>
-                            <div id="menu-{{ sale.receipt_id }}" class="hidden absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 border rounded-lg shadow-lg z-10">
+                            <div id="menu-{{ sale.receipt_id }}" class="hidden absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 border rounded-lg shadow-lg z-20">
                                 <a href="{{ url_for('receipt', order_id=sale.receipt_id) }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-t-lg">View Receipt</a>
                                 {% if sale.order_type != 'retail' %}
-                                <div class="relative group">
-                                    <a href="#" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 {% if sale.order_type == 'retail' %}rounded-b-lg{% endif %}" onclick="showLoadOptions('{{ sale.receipt_id }}')">Load to Loading Sheet</a>
-                                    <div id="load-options-{{ sale.receipt_id }}" class="hidden absolute left-full top-0 ml-1 w-48 bg-white dark:bg-gray-800 border rounded-lg shadow-lg z-20">
+                                <div class="relative">
+                                    <a href="#" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" onclick="event.preventDefault(); showLoadOptions('{{ sale.receipt_id }}');">Load to Loading Sheet</a>
+                                    <div id="load-options-{{ sale.receipt_id }}" class="hidden absolute right-full top-0 mr-1 w-48 bg-white dark:bg-gray-800 border rounded-lg shadow-lg z-30">
                                         <a href="{{ url_for('load_to_loading_sheet', receipt_id=sale.receipt_id, action='current') }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-t-lg">Add to Current</a>
                                         <a href="{{ url_for('load_to_loading_sheet', receipt_id=sale.receipt_id, action='new') }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-b-lg">Start New</a>
                                     </div>
@@ -504,16 +504,16 @@
         // Show loading options submenu
         function showLoadOptions(receiptId) {
             const options = document.getElementById(`load-options-${receiptId}`);
+            document.querySelectorAll('[id^="load-options-"]').forEach(opt => {
+                if (opt.id !== `load-options-${receiptId}`) opt.classList.add('hidden');
+            });
             options.classList.toggle('hidden');
-            event.stopPropagation();
         }
 
         // Close menus when clicking outside
         document.addEventListener('click', (e) => {
-            if (!e.target.closest('button[onclick^="toggleMenu"]')) {
+            if (!e.target.closest('button[onclick^="toggleMenu"]') && !e.target.closest('a[onclick^="showLoadOptions"]')) {
                 document.querySelectorAll('[id^="menu-"]').forEach(menu => menu.classList.add('hidden'));
-            }
-            if (!e.target.closest('a[onclick^="showLoadOptions"]')) {
                 document.querySelectorAll('[id^="load-options-"]').forEach(option => option.classList.add('hidden'));
             }
         });
