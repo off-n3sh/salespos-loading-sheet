@@ -1127,3 +1127,54 @@ def get_loading_sheet(sheet_id):
         return jsonify(sheet_dict)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route('/edit_order/<receipt_id>', methods=['POST'])
+@login_required
+def edit_order(receipt_id):
+    order_ref = db.collection('orders').where('receipt_id', '==', receipt_id).limit(1).stream()
+    order_doc = next(order_ref, None)
+    if not order_doc:
+        return "Order not found", 404
+    
+    order_dict = order_doc.to_dict()
+    items_raw = request.form.getlist('items[]')
+    new_items = []
+    i = 0
+    while i < len(items_raw):
+        if items_raw[i] == 'product':
+            product_name = items_raw[i + 1]
+            quantity = int(items_raw[i + 3]) if i + 2 < len(items_raw) and items_raw[i + 2] == 'quantity' else 0
+            new_items.append({'name': product_name, 'quantity': quantity})
+            i += 6
+        else:
+            i += 1
+
+    # Append new items to existing items
+    existing_items = order_dict.get('items_list', [])
+    for new_item in new_items:
+        found = False
+        for existing_item in existing_items:
+            if existing_item['name'] == new_item['name']:
+                existing_item['quantity'] += new_item['quantity']
+                found = True
+                break
+        if not found:
+            existing_items.append(new_item)
+    
+    order_dict['items_list'] = existing_items
+    order_dict['total_items'] = sum(item['quantity'] for item in existing_items)
+    db.collection('orders').document(order_doc.id).update(order_dict)
+    flash('Order updated successfully', 'success')
+    return '', 200
+
+@app.route('/delete_order/<receipt_id>', methods=['POST'])
+@login_required
+def delete_order(receipt_id):
+    order_ref = db.collection('orders').where('receipt_id', '==', receipt_id).limit(1).stream()
+    order_doc = next(order_ref, None)
+    if not order_doc:
+        return "Order not found", 404
+    
+    db.collection('orders').document(order_doc.id).delete()
+    flash('Order deleted successfully', 'success')
+    return '', 200

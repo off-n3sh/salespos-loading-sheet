@@ -25,7 +25,7 @@
         <div id="orders-list" class="space-y-4">
             {% for order in orders %}
             <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow flex justify-between items-center order-item {{ 'border-l-4 border-yellow-500' if order.balance > 0 else '' }}"
-                 data-date="{{ order.date.strftime('%Y-%m-%d') }}" data-balance="{{ order.balance }}">
+                 data-date="{{ order.date.strftime('%Y-%m-%d') }}" data-balance="{{ order.balance }}" data-receipt-id="{{ order.receipt_id }}" data-items='{{ order.items_list|tojson|safe }}'>
                 <div>
                     <h3 class="font-semibold text-gray-900 dark:text-white">{{ order.receipt_id }} - {{ order.shop_name }}</h3>
                     <p class="text-gray-700 dark:text-gray-300">Salesperson: {{ order.salesperson_name }}</p>
@@ -36,6 +36,8 @@
                 </div>
                 <div class="flex space-x-2">
                     <a href="{{ url_for('receipt', order_id=order.receipt_id) }}" class="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600">View</a>
+                    <button data-receipt-id="{{ order.receipt_id }}" class="edit-order-btn bg-purple-500 text-white px-2 py-1 rounded hover:bg-purple-600">Edit</button>
+                    <button data-receipt-id="{{ order.receipt_id }}" class="delete-order-btn bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">Delete</button>
                     {% if order.balance > 0 %}
                     <button data-receipt-id="{{ order.receipt_id }}" data-balance="{{ order.balance }}" class="mark-paid-btn bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600">Mark Paid</button>
                     <button data-receipt-id="{{ order.receipt_id }}" data-items='{{ order.items_list|tojson|safe }}' class="return-stock-btn bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600">Return Stock</button>
@@ -111,6 +113,38 @@
         </div>
     </div>
 
+    <!-- Edit Order Modal -->
+    <div id="edit-order-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Edit Order #<span id="edit-order-id"></span></h3>
+            <form id="edit-order-form" method="POST" action="" class="space-y-4">
+                <input type="hidden" name="order_type" id="edit-order-type">
+                <input type="hidden" name="salesperson_name" value="{{ session['user']['firstName'] }} {{ session['user']['lastName'] }}">
+                <input name="shop_name" id="edit-shop-name" placeholder="Shop Name" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 w-full" readonly>
+                <div id="edit-items-container" class="space-y-2">
+                    <div class="grid grid-cols-6 gap-2 item-row-header text-sm font-semibold">
+                        <span class="text-left pl-2">Item</span>
+                        <span class="text-center">Qty</span>
+                        <span class="text-center">Price</span>
+                        <span class="text-center">Stock</span>
+                        <span class="text-center">Total</span>
+                        <span class="text-center">Remove</span>
+                    </div>
+                    <button type="button" class="add-item bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 w-full">Add Item</button>
+                </div>
+                <button type="button" id="add-edit-manual" class="bg-purple-500 text-white px-2 py-1 rounded hover:bg-purple-600">Add Manual Item</button>
+                <div class="grid grid-cols-2 gap-2">
+                    <span class="font-semibold text-gray-900 dark:text-white">Subtotal:</span>
+                    <span id="edit-order-total" class="text-gray-900 dark:text-white text-right">0.00</span>
+                </div>
+                <div class="flex space-x-2">
+                    <button type="submit" class="btn btn-primary bg-green-500 hover:bg-green-600 flex-1 submit-btn">Update</button>
+                    <button type="button" id="close-edit-modal" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 flex-1">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Manual Item Modal -->
     <div id="manual-item-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-60">
         <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-lg w-96">
@@ -156,7 +190,7 @@
                     <div id="return-stock-items-container" class="space-y-3 mt-2"></div>
                 </div>
                 <div class="flex space-x-2">
-                    <button type="submit" class="btn btn-primary bg-yellow-500 hover:bg-yellow-600 flex-1">Submit</button>
+                    <button type="submit" class="btn btn-primary bg-yellow-500 hover:bg-yellow-600 flex-1 submit-btn">Submit</button>
                     <button type="button" id="close-return-modal" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 flex-1">Cancel</button>
                 </div>
             </form>
@@ -171,6 +205,7 @@
     <script>
         const retailModal = document.getElementById('retail-modal');
         const wholesaleModal = document.getElementById('wholesale-modal');
+        const editModal = document.getElementById('edit-order-modal');
         const manualModal = document.getElementById('manual-item-modal');
         const paidModal = document.getElementById('mark-paid-modal');
         const returnModal = document.getElementById('return-stock-modal');
@@ -178,14 +213,17 @@
         const openWholesale = document.getElementById('open-wholesale-modal');
         const closeRetail = document.getElementById('close-retail-modal');
         const closeWholesale = document.getElementById('close-wholesale-modal');
+        const closeEdit = document.getElementById('close-edit-modal');
         const closeManual = document.getElementById('close-manual-modal');
         const closePaid = document.getElementById('close-paid-modal');
         const closeReturn = document.getElementById('close-return-modal');
         const addRetailManual = document.getElementById('add-retail-manual');
         const addWholesaleManual = document.getElementById('add-wholesale-manual');
+        const addEditManual = document.getElementById('add-edit-manual');
         const addManualToOrder = document.getElementById('add-manual-to-order');
         const retailContainer = document.getElementById('retail-items-container');
         const wholesaleContainer = document.getElementById('wholesale-items-container');
+        const editContainer = document.getElementById('edit-items-container');
         const manualQty = document.getElementById('manual-item-qty');
         const manualPrice = document.getElementById('manual-item-price');
         const manualTotal = document.getElementById('manual-total');
@@ -198,7 +236,7 @@
             container.innerHTML = '';
             container.appendChild(header);
             container.appendChild(initialAddBtn);
-            updateSubtotal();
+            updateSubtotal(container);
         }
 
         openRetail.addEventListener('click', () => {
@@ -223,6 +261,10 @@
             resetModal(wholesaleContainer);
             wholesaleModal.classList.add('hidden');
         });
+        closeEdit.addEventListener('click', () => {
+            resetModal(editContainer);
+            editModal.classList.add('hidden');
+        });
         closeManual.addEventListener('click', () => manualModal.classList.add('hidden'));
         closePaid.addEventListener('click', () => paidModal.classList.add('hidden'));
         closeReturn.addEventListener('click', () => returnModal.classList.add('hidden'));
@@ -235,6 +277,11 @@
         addWholesaleManual.addEventListener('click', () => {
             manualModal.classList.remove('hidden');
             currentContainer = wholesaleContainer;
+        });
+
+        addEditManual.addEventListener('click', () => {
+            manualModal.classList.remove('hidden');
+            currentContainer = editContainer;
         });
 
         function attachAddItemListeners(container) {
@@ -269,10 +316,10 @@
             });
             div.querySelector('.remove-item').addEventListener('click', () => {
                 div.remove();
-                updateSubtotal();
+                updateSubtotal(container);
             });
             attachPriceListener(div);
-            updateSubtotal();
+            updateSubtotal(container);
         }
 
         addManualToOrder.addEventListener('click', () => {
@@ -295,13 +342,13 @@
                 currentContainer.insertBefore(div, addBtn);
                 div.querySelector('.remove-item').addEventListener('click', () => {
                     div.remove();
-                    updateSubtotal();
+                    updateSubtotal(currentContainer);
                 });
                 div.querySelector('.qty-input').addEventListener('input', () => updatePriceAndTotal(div));
                 manualModal.classList.add('hidden');
                 document.getElementById('manual-item-form').reset();
                 manualTotal.textContent = 'Total: 0';
-                updateSubtotal();
+                updateSubtotal(currentContainer);
             }
         });
 
@@ -385,11 +432,16 @@
                 returnItemsContainer.innerHTML = '<p class="text-gray-700 dark:text-gray-300">No items available for return.</p>';
             }
 
+            let isSubmitting = false; // Prevent multiple submissions
             form.onsubmit = function(e) {
                 e.preventDefault();
+                if (isSubmitting) return; // Block multiple clicks
+
                 const submitBtn = form.querySelector('.submit-btn');
                 submitBtn.classList.add('processing');
                 submitBtn.disabled = true;
+                isSubmitting = true;
+
                 const formData = new FormData(this);
                 let hasReturns = false;
                 items.forEach(item => {
@@ -400,6 +452,7 @@
                             alert(`Cannot return more than ${item.quantity} units of ${item.name}.`);
                             submitBtn.classList.remove('processing');
                             submitBtn.disabled = false;
+                            isSubmitting = false;
                             e.stopPropagation();
                             return;
                         }
@@ -410,6 +463,7 @@
                     alert('Please specify at least one item to return.');
                     submitBtn.classList.remove('processing');
                     submitBtn.disabled = false;
+                    isSubmitting = false;
                     return;
                 }
 
@@ -423,17 +477,77 @@
                         alert('Stock returns logged successfully. Please update the stock manually.');
                         window.location.href = '/orders';
                     } else {
-                        alert('Error logging stock returns');
+                        response.text().then(text => alert('Error logging stock returns: ' + text));
+                        submitBtn.classList.remove('processing');
+                        submitBtn.disabled = false;
+                        isSubmitting = false;
+                    }
+                })
+                .catch(error => {
+                    alert('An error occurred while logging the stock returns: ' + error);
+                    submitBtn.classList.remove('processing');
+                    submitBtn.disabled = false;
+                    isSubmitting = false;
+                });
+            };
+        }
+
+        function editOrder(receiptId, orderType, shopName, itemsJson) {
+            editModal.classList.remove('hidden');
+            document.getElementById('edit-order-id').textContent = receiptId;
+            document.getElementById('edit-order-type').value = orderType;
+            document.getElementById('edit-shop-name').value = shopName || '';
+            const form = document.getElementById('edit-order-form');
+            form.action = `/edit_order/${receiptId}`;
+            resetModal(editContainer);
+            attachAddItemListeners(editContainer);
+
+            form.onsubmit = function(e) {
+                e.preventDefault();
+                const submitBtn = form.querySelector('.submit-btn');
+                submitBtn.classList.add('processing');
+                submitBtn.disabled = true;
+
+                const formData = new FormData(this);
+                fetch(this.action, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (response.ok) {
+                        editModal.classList.add('hidden');
+                        window.location.href = '/orders';
+                    } else {
+                        response.text().then(text => alert('Error updating order: ' + text));
                         submitBtn.classList.remove('processing');
                         submitBtn.disabled = false;
                     }
                 })
                 .catch(error => {
-                    alert('An error occurred while logging the stock returns');
+                    alert('An error occurred while updating the order: ' + error);
                     submitBtn.classList.remove('processing');
                     submitBtn.disabled = false;
                 });
             };
+        }
+
+        function deleteOrder(receiptId) {
+            if (!confirm(`Are you sure you want to delete order #${receiptId}?`)) return;
+
+            fetch(`/delete_order/${receiptId}`, {
+                method: 'POST'
+            })
+            .then(response => {
+                if (response.ok) {
+                    alert('Order deleted successfully.');
+                    window.location.href = '/orders';
+                } else {
+                    response.text().then(text => alert('Error deleting order: ' + text));
+                }
+            })
+            .catch(error => {
+                alert('An error occurred while deleting the order: ' + error);
+            });
         }
 
         manualQty.addEventListener('input', updateManualTotal);
@@ -462,20 +576,20 @@
                     stockDisplay.value = stockQty;
                     const qty = parseInt(qtyInput.value) || 0;
                     totalDisplay.value = (basePrice * qty).toFixed(2);
-                    updateSubtotal();
+                    updateSubtotal(row.closest('.space-y-2'));
                 } else {
                     basePrice = 0;
                     priceDisplay.value = '';
                     stockDisplay.value = '';
                     totalDisplay.value = '';
-                    updateSubtotal();
+                    updateSubtotal(row.closest('.space-y-2'));
                 }
             });
 
             qtyInput.addEventListener('input', () => {
                 const qty = parseInt(qtyInput.value) || 0;
                 totalDisplay.value = (basePrice * qty).toFixed(2);
-                updateSubtotal();
+                updateSubtotal(row.closest('.space-y-2'));
             });
         }
 
@@ -486,12 +600,12 @@
             const basePrice = parseFloat(row.querySelector('input[type="hidden"]')?.value.split('|')[5]) || parseFloat(priceDisplay.value) || 0;
             const qty = parseInt(qtyInput.value) || 0;
             totalDisplay.value = (basePrice * qty).toFixed(2);
-            updateSubtotal();
+            updateSubtotal(row.closest('.space-y-2'));
         }
 
-        function updateSubtotal() {
+        function updateSubtotal(container) {
             let subtotal = 0;
-            const activeContainer = retailModal.classList.contains('hidden') ? wholesaleContainer : retailContainer;
+            const activeContainer = container || (retailModal.classList.contains('hidden') ? (editModal.classList.contains('hidden') ? wholesaleContainer : editContainer) : retailContainer);
             const rows = activeContainer.querySelectorAll('.item-row');
             rows.forEach(row => {
                 const totalDisplay = row.querySelector('.total-display');
@@ -585,6 +699,24 @@
                 const receiptId = btn.getAttribute('data-receipt-id');
                 const itemsJson = btn.getAttribute('data-items');
                 returnStock(receiptId, itemsJson);
+            });
+        });
+
+        document.querySelectorAll('.edit-order-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const orderItem = btn.closest('.order-item');
+                const receiptId = orderItem.getAttribute('data-receipt-id');
+                const orderType = orderItem.querySelector('p:nth-child(6)').textContent.split(': ')[1];
+                const shopName = orderItem.querySelector('h3').textContent.split(' - ')[1];
+                const itemsJson = orderItem.getAttribute('data-items');
+                editOrder(receiptId, orderType, shopName, itemsJson);
+            });
+        });
+
+        document.querySelectorAll('.delete-order-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const receiptId = btn.getAttribute('data-receipt-id');
+                deleteOrder(receiptId);
             });
         });
 
@@ -683,14 +815,14 @@
             color: #d1d5db; 
             width: 100%; 
         }
-        #retail-modal, #wholesale-modal, #mark-paid-modal, #return-stock-modal { 
+        #retail-modal, #wholesale-modal, #mark-paid-modal, #return-stock-modal, #edit-order-modal { 
             overflow-y: hidden; 
             z-index: 50; 
         }
         #manual-item-modal { 
             z-index: 60; 
         }
-        #retail-modal > div, #wholesale-modal > div, #mark-paid-modal > div, #return-stock-modal > div { 
+        #retail-modal > div, #wholesale-modal > div, #mark-paid-modal > div, #return-stock-modal > div, #edit-order-modal > div { 
             max-height: 80vh; 
             overflow-y: auto; 
         }
