@@ -1,154 +1,137 @@
 {% extends "base.html" %}
 {% block title %}Receipt - {{ order.receipt_id }}{% endblock %}
 {% block content %}
-    <div class="receipt-container p-0 mx-auto" style="width: 72mm; background-color: #ffffff; color: #000000;">
-        <!-- Print Button (only visible on screen) -->
-        <div class="print-control text-center mb-2">
-            <button id="printButton" onclick="printpage()" class="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-900 focus:outline-none">
-                Print Receipt
-            </button>
-        </div>
-
+<div class="p-4" style="background-color: #FFF0F5; color: #000000;">
+    <div class="max-w-xs mx-auto" style="width: 72mm;">
+        <!-- Print Button -->
+        <input name="print" type="button" value="Print" id="printButton" onclick="printpage()" class="mb-4 px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-900 focus:outline-none">
+        
         <!-- Receipt Content -->
-        <div class="receipt-content px-2" style="font-size: 12px; line-height: 1.2;">
+        <div class="receipt-body" style="border: 1px solid #000; padding: 8px; background-color: #ffffff;">
             <!-- Header -->
-            <div class="receipt-header text-center mb-2 pb-2" style="border-bottom: 1px dashed #ccc;">
-                <div class="font-bold" style="font-size: 14px;">DREAMLAND DISTRIBUTORS</div>
+            <div class="text-center mb-3">
+                <div style="font-size: 16px; font-weight: bold;">DREAMLAND DISTRIBUTORS</div>
                 <div>P.O Box 123-00200 Nairobi</div>
                 <div>Phone: 0725 530632</div>
                 <div>Paybill No: 222111 | Account No: 360522</div>
                 <div>PIN: P051472913X</div>
+                <hr style="border-top: 1px dashed #000; margin: 8px 0;">
             </div>
 
             <!-- Receipt Info -->
-            <div class="receipt-info mb-2">
-                <div class="flex justify-between">
-                    <div><strong>Receipt #:</strong> {{ order.receipt_id }}</div>
-                    <div>Till: 123456</div>
-                </div>
-                <div class="flex justify-between">
-                    <div>Date: {{ order.date.strftime('%d/%m/%Y') }}</div>
-                    <div>Time: {{ order.date.strftime('%H:%M:%S') }}</div>
-                </div>
-                <div class="mb-1"><strong>Customer:</strong> {{ order.shop_name }}</div>
+            <div class="mb-3">
+                <table width="100%" cellspacing="0" cellpadding="2" style="font-size: 12px;">
+                    <tr>
+                        <td width="50%"><strong>Receipt #:</strong> {{ order.receipt_id }}</td>
+                        <td width="50%" align="right">Till: 123456</td>
+                    </tr>
+                    <tr>
+                        <td>Date: {{ order.date.strftime('%d/%m/%Y') }}</td>
+                        <td align="right">Time: {{ order.date.strftime('%H:%M:%S') }}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="2"><strong>Customer:</strong> {{ order.shop_name }}</td>
+                    </tr>
+                </table>
+                <hr style="border-top: 1px solid #000; margin: 8px 0;">
             </div>
 
             <!-- Items Table -->
-            <div class="items-table mb-3">
-                <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
-                    <thead>
-                        <tr style="border-top: 1px solid #000; border-bottom: 1px solid #000;">
-                            <th style="text-align: left; padding: 3px 2px; width: 40%;">Item</th>
-                            <th style="text-align: center; padding: 3px 2px; width: 15%;">Qty</th>
-                            <th style="text-align: right; padding: 3px 2px; width: 20%;">Price</th>
-                            <th style="text-align: right; padding: 3px 2px; width: 25%;">Amount</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for item in order.order_items %}
-                        <tr style="border-bottom: 1px dotted #ccc;">
-                            <td style="text-align: left; padding: 3px 2px;">{{ item.name }}</td>
-                            <td style="text-align: center; padding: 3px 2px;">{{ item.quantity }}</td>
-                            <td style="text-align: right; padding: 3px 2px;">{{ item.price }}</td>
-                            <td style="text-align: right; padding: 3px 2px;">{{ item.amount }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
+            <div class="mb-3">
+                <table width="100%" cellspacing="0" cellpadding="2" style="font-size: 12px;">
+                    <tr style="border-bottom: 1px solid #000;">
+                        <th align="left" width="40%">Item</th>
+                        <th align="center" width="15%">Qty</th>
+                        <th align="right" width="20%">Price</th>
+                        <th align="right" width="25%">Amount</th>
+                    </tr>
+                    {% for item in order.order_items %}
+                    <tr style="border-bottom: 1px dotted #ccc;">
+                        <td>{{ item.name }}</td>
+                        <td align="center">{{ item.quantity }}</td>
+                        <td align="right">{{ item.price }}</td>
+                        <td align="right">{{ item.amount }}</td>
+                    </tr>
+                    {% endfor %}
                 </table>
+                <hr style="border-top: 1px dotted #000; margin: 8px 0;">
             </div>
 
             <!-- Summary -->
-            <div class="summary mb-3">
-                <div class="flex justify-between mb-1">
-                    <div>Subtotal:</div>
-                    <div>{{ order.order_items | sum(attribute='amount') }}</div>
-                </div>
-                <div class="flex justify-between mb-1">
-                    <div>Tax (16% VAT):</div>
-                    <div>{{ ((order.order_items | sum(attribute='amount') * 0.16) / 1.16) | round(2) }}</div>
-                </div>
-                <div class="flex justify-between font-bold" style="border-top: 1px solid #000; padding-top: 3px;">
-                    <div>Total Items:</div>
-                    <div>{{ order.total_items }}</div>
-                </div>
+            <div class="mb-3">
+                <table width="100%" cellspacing="0" cellpadding="2" style="font-size: 12px;">
+                    <tr>
+                        <td>Subtotal:</td>
+                        <td align="right">{{ order.order_items | sum(attribute='amount') }}</td>
+                    </tr>
+                    <tr>
+                        <td>Tax (16% VAT):</td>
+                        <td align="right">{{ ((order.order_items | sum(attribute='amount') * 0.16) / 1.16) | round(2) }}</td>
+                    </tr>
+                    <tr style="font-weight: bold;">
+                        <td>Total Items:</td>
+                        <td align="right">{{ order.total_items }}</td>
+                    </tr>
+                </table>
+                <hr style="border-top: 1px dashed #000; margin: 8px 0;">
             </div>
 
             <!-- Payment Info -->
-            <div class="payment-info mb-3" style="border-top: 1px dashed #ccc; border-bottom: 1px dashed #ccc; padding: 6px 0;">
-                <div class="flex justify-between font-bold mb-1">
-                    <div>Paid Amount:</div>
-                    <div>{{ order.payment }}</div>
-                </div>
-                <div class="flex justify-between font-bold mb-1">
-                    <div>Balance:</div>
-                    <div>{{ order.balance }}</div>
-                </div>
-                <div class="flex justify-between font-bold">
-                    <div>Change:</div>
-                    <div>0</div>
-                </div>
+            <div class="mb-3">
+                <table width="100%" cellspacing="0" cellpadding="2" style="font-size: 12px; font-weight: bold;">
+                    <tr>
+                        <td>Paid Amount:</td>
+                        <td align="right">{{ order.payment }}</td>
+                    </tr>
+                    <tr>
+                        <td>Balance:</td>
+                        <td align="right">{{ order.balance }}</td>
+                    </tr>
+                    <tr>
+                        <td>Change:</td>
+                        <td align="right">0</td>
+                    </tr>
+                </table>
+                <hr style="border-top: 1px dashed #000; margin: 8px 0;">
             </div>
 
             <!-- Footer -->
-            <div class="receipt-footer text-center" style="font-size: 10px;">
+            <div class="text-center" style="font-size: 11px;">
                 <div>Prices inclusive of VAT where applicable</div>
                 <div>You were served by: {{ order.salesperson_name }}</div>
                 <div>Once goods sold, no return</div>
-                <div class="mt-2 font-bold">Thank you for your business!</div>
+                <div style="margin-top: 8px; font-weight: bold;">Thank you for your business!</div>
             </div>
         </div>
     </div>
+</div>
 
-    <script type="text/javascript">
-        function printpage() {
-            document.getElementById('printButton').style.visibility = "hidden";
-            window.print();
-            document.getElementById('printButton').style.visibility = "visible";
-        }
-    </script>
+<script type="text/javascript">
+    function printpage() {
+        document.getElementById('printButton').style.visibility = "hidden";
+        window.print();
+        document.getElementById('printButton').style.visibility = "visible";
+    }
+</script>
 
-    <style>
-        @media print {
-            body {
-                margin: 0;
-                padding: 0;
-                background: white;
-            }
-            
-            .print-control {
-                display: none;
-            }
-            
-            .receipt-container {
-                width: 72mm;
-                margin: 0 auto;
-                border: none;
-                box-shadow: none;
-            }
-            
-            /* Hide everything except our receipt when printing */
-            body > *:not(.receipt-container) {
-                display: none !important;
-            }
-            
-            @page {
-                size: 80mm 297mm;
-                margin: 0;
-            }
-        }
-        
-        /* Flex utilities */
-        .flex { display: flex; }
-        .justify-between { justify-content: space-between; }
-        .text-center { text-align: center; }
-        .font-bold { font-weight: bold; }
-        .mb-1 { margin-bottom: 0.25rem; }
-        .mb-2 { margin-bottom: 0.5rem; }
-        .mb-3 { margin-bottom: 0.75rem; }
-        .mt-2 { margin-top: 0.5rem; }
-        .p-0 { padding: 0; }
-        .px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
-        .pb-2 { padding-bottom: 0.5rem; }
-        .mx-auto { margin-left: auto; margin-right: auto; }
-    </style>
+<style type="text/css" media="print">
+    #printButton {
+        display: none;
+    }
+    body {
+        margin: 0;
+        padding: 0;
+    }
+    .p-4 {
+        padding: 0 !important;
+        background-color: #ffffff !important;
+    }
+    .receipt-body {
+        border: none !important;
+    }
+    @page {
+        size: 80mm 297mm;
+        margin: 0;
+    }
+</style>
 {% endblock %}
