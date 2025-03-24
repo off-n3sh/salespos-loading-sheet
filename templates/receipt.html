@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Receipt - {{ order.receipt_id }}{% endblock %}
 {% block content %}
-    <div class="receipt-container p-0 mx-auto" style="max-width: 72mm; background-color: #ffffff; color: #000000;">
+    <div class="receipt-container p-0 mx-auto" style="width: 72mm; background-color: #ffffff; color: #000000;">
         <!-- Print Button (only visible on screen) -->
         <div class="print-control text-center mb-2">
             <button id="printButton" onclick="printpage()" class="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-900 focus:outline-none">
@@ -10,13 +10,14 @@
         </div>
 
         <!-- Receipt Content -->
-        <div class="receipt-content p-2" style="font-size: 12px; line-height: 1.2;">
+        <div class="receipt-content px-2" style="font-size: 12px; line-height: 1.2;">
             <!-- Header -->
             <div class="receipt-header text-center mb-2 pb-2" style="border-bottom: 1px dashed #ccc;">
                 <div class="font-bold" style="font-size: 14px;">DREAMLAND DISTRIBUTORS</div>
                 <div>P.O Box 123-00200 Nairobi</div>
                 <div>Phone: 0725 530632</div>
                 <div>Paybill No: 222111 | Account No: 360522</div>
+                <div>PIN: P051472913X</div>
             </div>
 
             <!-- Receipt Info -->
@@ -30,7 +31,6 @@
                     <div>Time: {{ order.date.strftime('%H:%M:%S') }}</div>
                 </div>
                 <div class="mb-1"><strong>Customer:</strong> {{ order.shop_name }}</div>
-                <div><strong>Served by:</strong> {{ order.salesperson_name }}</div>
             </div>
 
             <!-- Items Table -->
@@ -89,15 +89,10 @@
                 </div>
             </div>
 
-            <!-- Signature Area -->
-            <div class="signature-area text-center mb-3">
-                <div style="min-height: 40px; border-bottom: 1px solid #ccc;"></div>
-                <div style="font-size: 10px; margin-top: 2px;">Signature</div>
-            </div>
-
             <!-- Footer -->
             <div class="receipt-footer text-center" style="font-size: 10px;">
                 <div>Prices inclusive of VAT where applicable</div>
+                <div>You were served by: {{ order.salesperson_name }}</div>
                 <div>Once goods sold, no return</div>
                 <div class="mt-2 font-bold">Thank you for your business!</div>
             </div>
@@ -131,6 +126,11 @@
                 box-shadow: none;
             }
             
+            /* Hide everything except our receipt when printing */
+            body > *:not(.receipt-container) {
+                display: none !important;
+            }
+            
             @page {
                 size: 80mm 297mm;
                 margin: 0;
@@ -147,7 +147,7 @@
         .mb-3 { margin-bottom: 0.75rem; }
         .mt-2 { margin-top: 0.5rem; }
         .p-0 { padding: 0; }
-        .p-2 { padding: 0.5rem; }
+        .px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
         .pb-2 { padding-bottom: 0.5rem; }
         .mx-auto { margin-left: auto; margin-right: auto; }
     </style>
