@@ -1099,6 +1099,20 @@ def download_loading_sheet():
         )
     except Exception as e:
         return f"Error generating PDF: {str(e)}", 500
+        
+# ... existing imports and setup ...
+
+@app.route('/create-loading-sheet')
+@login_required
+def create_loading_sheet():
+    """Create a new loading sheet by clearing the current one in session."""
+    if 'current_loading_sheet' in session:
+        session.pop('current_loading_sheet')
+    
+    log_user_action('Created New Loading Sheet', 'Started a fresh loading sheet')
+    return redirect(url_for('loading_sheets'))
+
+# ... existing routes like /loading-sheets, /dashboard, etc. ...
 
 @app.route('/get_loading_sheet/<sheet_id>')
 @login_required
