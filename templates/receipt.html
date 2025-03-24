@@ -1,26 +1,26 @@
 {% extends "base.html" %}
 {% block title %}Receipt - {{ order.receipt_id }}{% endblock %}
 {% block content %}
-<div class="p-4" style="background-color: #FFF0F5; color: #000000;">
+<div class="p-2" style="background-color: #FFF0F5; color: #000000;">
     <div class="max-w-xs mx-auto" style="width: 72mm;">
         <!-- Print Button -->
-        <input name="print" type="button" value="Print" id="printButton" onclick="printpage()" class="mb-4 px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-900 focus:outline-none">
+        <input name="print" type="button" value="Print" id="printButton" onclick="printpage()" class="mb-2 px-3 py-1 bg-gray-800 text-white rounded hover:bg-gray-900 focus:outline-none">
         
         <!-- Receipt Content -->
-        <div class="receipt-body" style="border: 1px solid #000; padding: 8px; background-color: #ffffff;">
+        <div class="receipt-body" style="border: 1px solid #000; padding: 6px; background-color: #ffffff;">
             <!-- Header -->
-            <div class="text-center mb-3">
-                <div style="font-size: 16px; font-weight: bold;">DREAMLAND DISTRIBUTORS</div>
-                <div>P.O Box 123-00200 Nairobi</div>
-                <div>Phone: 0725 530632</div>
-                <div>Paybill No: 222111 | Account No: 360522</div>
-                <div>PIN: P051472913X</div>
-                <hr style="border-top: 1px dashed #000; margin: 8px 0;">
+            <div class="text-center mb-2">
+                <div style="font-size: 14px; font-weight: bold;">DREAMLAND DISTRIBUTORS</div>
+                <div style="font-size: 11px;">P.O Box 123-00200 Nairobi</div>
+                <div style="font-size: 11px;">Phone: 0725 530632</div>
+                <div style="font-size: 11px;">Paybill No: 222111 | Account No: 360522</div>
+                <div style="font-size: 11px;">PIN: P051472913X</div>
+                <hr style="border-top: 1px dashed #000; margin: 4px 0;">
             </div>
 
             <!-- Receipt Info -->
-            <div class="mb-3">
-                <table width="100%" cellspacing="0" cellpadding="2" style="font-size: 12px;">
+            <div class="mb-2">
+                <table width="100%" cellspacing="0" cellpadding="1" style="font-size: 11px;">
                     <tr>
                         <td width="50%"><strong>Receipt #:</strong> {{ order.receipt_id }}</td>
                         <td width="50%" align="right">Till: 123456</td>
@@ -33,12 +33,12 @@
                         <td colspan="2"><strong>Customer:</strong> {{ order.shop_name }}</td>
                     </tr>
                 </table>
-                <hr style="border-top: 1px solid #000; margin: 8px 0;">
+                <hr style="border-top: 1px solid #000; margin: 4px 0;">
             </div>
 
             <!-- Items Table -->
-            <div class="mb-3">
-                <table width="100%" cellspacing="0" cellpadding="2" style="font-size: 12px;">
+            <div class="mb-2">
+                <table width="100%" cellspacing="0" cellpadding="1" style="font-size: 11px;">
                     <tr style="border-bottom: 1px solid #000;">
                         <th align="left" width="40%">Item</th>
                         <th align="center" width="15%">Qty</th>
@@ -54,12 +54,12 @@
                     </tr>
                     {% endfor %}
                 </table>
-                <hr style="border-top: 1px dotted #000; margin: 8px 0;">
+                <hr style="border-top: 1px dotted #000; margin: 4px 0;">
             </div>
 
             <!-- Summary -->
-            <div class="mb-3">
-                <table width="100%" cellspacing="0" cellpadding="2" style="font-size: 12px;">
+            <div class="mb-2">
+                <table width="100%" cellspacing="0" cellpadding="1" style="font-size: 11px;">
                     <tr>
                         <td>Subtotal:</td>
                         <td align="right">{{ order.order_items | sum(attribute='amount') }}</td>
@@ -73,12 +73,12 @@
                         <td align="right">{{ order.total_items }}</td>
                     </tr>
                 </table>
-                <hr style="border-top: 1px dashed #000; margin: 8px 0;">
+                <hr style="border-top: 1px dashed #000; margin: 4px 0;">
             </div>
 
             <!-- Payment Info -->
-            <div class="mb-3">
-                <table width="100%" cellspacing="0" cellpadding="2" style="font-size: 12px; font-weight: bold;">
+            <div class="mb-2">
+                <table width="100%" cellspacing="0" cellpadding="1" style="font-size: 11px; font-weight: bold;">
                     <tr>
                         <td>Paid Amount:</td>
                         <td align="right">{{ order.payment }}</td>
@@ -92,15 +92,15 @@
                         <td align="right">0</td>
                     </tr>
                 </table>
-                <hr style="border-top: 1px dashed #000; margin: 8px 0;">
+                <hr style="border-top: 1px dashed #000; margin: 4px 0;">
             </div>
 
             <!-- Footer -->
-            <div class="text-center" style="font-size: 11px;">
+            <div class="text-center" style="font-size: 10px;">
                 <div>Prices inclusive of VAT where applicable</div>
                 <div>You were served by: {{ order.salesperson_name }}</div>
                 <div>Once goods sold, no return</div>
-                <div style="margin-top: 8px; font-weight: bold;">Thank you for your business!</div>
+                <div style="margin-top: 4px; font-weight: bold;">Thank you for your business!</div>
             </div>
         </div>
     </div>
@@ -122,7 +122,7 @@
         margin: 0;
         padding: 0;
     }
-    .p-4 {
+    .p-2 {
         padding: 0 !important;
         background-color: #ffffff !important;
     }
@@ -130,7 +130,7 @@
         border: none !important;
     }
     @page {
-        size: 80mm 297mm;
+        size: 80mm auto; /* Width fixed at 80mm, height auto to fit content */
         margin: 0;
     }
 </style>
