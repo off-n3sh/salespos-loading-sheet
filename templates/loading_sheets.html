@@ -1,41 +1,69 @@
 {% extends "base.html" %}
 {% block title %}Loading Sheets{% endblock %}
 {% block content %}
-    <div class="p-6 max-w-4xl mx-auto">
-        <!-- Current Loading Sheet -->
-        <div id="current-loading-sheet" class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-8 print:border-0">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Current Loading Sheet</h2>
-                <div class="flex space-x-4">
-                    <button onclick="printCurrentSheet()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none transition">Print</button>
-                    <a href="{{ url_for('download_loading_sheet') }}" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">Download PDF</a>
+<div class="max-w-6xl mx-auto px-4 py-8">
+    <!-- Page Header -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-4 md:mb-0">
+            Loading Sheets Management
+        </h1>
+        <div class="flex space-x-3">
+            <a href="{{ url_for('create_loading_sheet') }}" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                New Sheet
+            </a>
+        </div>
+    </div>
+
+    <!-- Current Loading Sheet Card -->
+    <div id="current-loading-sheet" class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-8">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b pb-4">
+            <h2 class="text-xl font-bold text-gray-900 dark:text-white">Current Loading Sheet</h2>
+            <div class="flex space-x-3 mt-4 md:mt-0">
+                <button id="print-button" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2z" />
+                    </svg>
+                    Print
+                </button>
+                <a href="{{ url_for('download_loading_sheet') }}" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Download PDF
+                </a>
+            </div>
+        </div>
+
+        <div class="loading-sheet-content border border-gray-200 dark:border-gray-600 rounded-lg p-6">
+            <!-- Header -->
+            <div class="text-center mb-6">
+                <h3 class="text-xl font-bold text-gray-900 dark:text-white">Dreamland Distributors</h3>
+                <p class="text-gray-600 dark:text-gray-400">P.O Box 123-00200 Nairobi | Phone: 0725 530632</p>
+                <div class="flex justify-center items-center space-x-6 mt-3">
+                    <p class="text-sm font-medium"><strong>Date:</strong> {{ current_date.strftime('%d/%m/%Y %H:%M') if current_date else '' }}</p>
+                    {% if created_at %}
+                        <p class="text-sm font-medium"><strong>Created At:</strong> {{ created_at.strftime('%d/%m/%Y %H:%M') }}</p>
+                    {% endif %}
                 </div>
             </div>
 
-            <div class="border border-gray-300 dark:border-gray-600 rounded-lg p-5 print:border print:p-6">
-                <!-- Header -->
-                <div class="text-center mb-6 print:mb-8">
-                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Dreamland Distributors</h3>
-                    <p class="text-sm text-gray-600 dark:text-gray-400">P.O Box 123-00200 Nairobi | Phone: 0725 530632</p>
-                    <p class="text-sm font-medium mt-1"><strong>Date:</strong> {{ current_date.strftime('%d/%m/%Y %H:%M') if current_date else '' }}</p>
-                    {% if created_at %}
-                        <p class="text-sm font-medium mt-1"><strong>Created At:</strong> {{ created_at.strftime('%d/%m/%Y %H:%M') }}</p>
-                    {% endif %}
-                </div>
-
-                <!-- Goods Table -->
-                <table class="w-full border-collapse border border-gray-300 dark:border-gray-600 text-sm print:text-base">
+            <!-- Goods Table -->
+            <div class="overflow-x-auto">
+                <table class="w-full border-collapse text-sm">
                     <thead>
                         <tr class="bg-gray-100 dark:bg-gray-700">
-                            <th class="border border-gray-300 dark:border-gray-600 p-3 text-left font-medium">Item</th>
-                            <th class="border border-gray-300 dark:border-gray-600 p-3 text-left font-medium">Details</th>
+                            <th class="border border-gray-200 dark:border-gray-600 px-4 py-3 text-left font-semibold">Item</th>
+                            <th class="border border-gray-200 dark:border-gray-600 px-4 py-3 text-left font-semibold">Details</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for item in aggregated_items %}
-                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
-                            <td class="border border-gray-300 dark:border-gray-600 p-3">{{ item.name }}</td>
-                            <td class="border border-gray-300 dark:border-gray-600 p-3">
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                            <td class="border border-gray-200 dark:border-gray-600 px-4 py-3">{{ item.name }}</td>
+                            <td class="border border-gray-200 dark:border-gray-600 px-4 py-3">
                                 {% if "sugar" in item.name.lower() and "2k" in item.name.lower() %}
                                     2 pieces x {{ item.quantity }}
                                 {% elif item.quantity > 1 %}
@@ -48,139 +76,168 @@
                         {% endfor %}
                     </tbody>
                 </table>
+            </div>
 
-                <!-- Footer -->
-                <div class="mt-6 text-center print:mt-8">
-                    <p class="text-sm font-medium text-gray-900 dark:text-white">Total Items: {{ total_items }}</p>
-                    <div class="mt-4 space-y-2">
+            <!-- Footer -->
+            <div class="mt-8 text-center">
+                <p class="text-lg font-medium text-gray-900 dark:text-white">Total Items: {{ total_items }}</p>
+                <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="border-t pt-4">
                         <p><strong>Driver Signature:</strong> ____________________</p>
+                    </div>
+                    <div class="border-t pt-4">
                         <p><strong>Date Loaded:</strong> ____________________</p>
                     </div>
                 </div>
             </div>
         </div>
-
-        <!-- Recent Loading Sheets -->
-        {% if recent_sheets %}
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-                <h3 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Recent Loading Sheets</h3>
-                <div class="space-y-4">
-                    {% for sheet in recent_sheets %}
-                    <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg shadow transition hover:shadow-md">
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <p class="text-gray-900 dark:text-white"><strong>ID:</strong> {{ sheet.id }}</p>
-                                <p class="text-gray-600 dark:text-gray-400 mt-1">Total Items: {{ sheet.total_items }}</p>
-                                <p class="text-gray-600 dark:text-gray-400 mt-1">Created At: {{ sheet.created_at.strftime('%d/%m/%Y %H:%M') }}</p>
-                            </div>
-                            <div class="flex justify-end space-x-2">
-                                <button onclick="printLoadingSheet('{{ sheet.id }}')" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Print</button>
-                                <a href="{{ url_for('download_loading_sheet') }}?sheet_id={{ sheet.id }}" class="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">Download</a>
-                            </div>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-        {% endif %}
-
-        <!-- Recent Activity -->
-        {% if recent_activity %}
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mt-8">
-                <h3 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Recent Activity</h3>
-                <div class="space-y-4">
-                    {% for activity in recent_activity %}
-                    <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg shadow">
-                        <p class="text-gray-900 dark:text-white"><strong>ID:</strong> {{ activity.receipt_id }}</p>
-                        <p class="text-gray-600 dark:text-gray-400 mt-1">Salesperson: {{ activity.salesperson_name }}</p>
-                        <p class="text-gray-600 dark:text-gray-400 mt-1">Shop: {{ activity.shop_name }}</p>
-                        <p class="text-gray-600 dark:text-gray-400 mt-1">Date: {{ activity.date.strftime('%d/%m/%Y %H:%M') }}</p>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-        {% endif %}
     </div>
 
-    <!-- Print Styles -->
-    <style type="text/css" media="print">
-        body {
-            background-color: #ffffff;
-            color: #000000;
-            margin: 0;
-            padding: 0;
-        }
-        /* Hide everything except the print target */
-        body > * {
-            display: none;
-        }
-        #print-target {
-            display: block !important;
-            width: 100%;
-            padding: 1cm;
-            box-sizing: border-box;
-        }
-        #print-target table {
-            width: 100%;
-            font-size: 12pt;
-            border-collapse: collapse;
-        }
-        #print-target th, #print-target td {
-            padding: 8px;
-            border: 1px solid #000000;
-        }
-        #print-target .bg-gray-100, #print-target .bg-gray-700 {
-            background-color: #ffffff !important;
-        }
-        #print-target .border, #print-target .rounded {
-            border: 1px solid #000000 !important;
-            border-radius: 0 !important;
-        }
-        #print-target .flex, #print-target .space-x-4 {
-            display: none !important;
-        }
-    </style>
+    <!-- Recent Loading Sheets Section -->
+    {% if recent_sheets %}
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-8">
+        <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Recent Loading Sheets
+        </h3>
+        <div class="space-y-4">
+            {% for sheet in recent_sheets %}
+            <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 transition hover:shadow-md">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="col-span-2">
+                        <p class="text-gray-900 dark:text-white font-medium">Sheet #{{ sheet.id }}</p>
+                        <div class="flex flex-wrap gap-x-6 gap-y-1 mt-2 text-sm text-gray-600 dark:text-gray-400">
+                            <p>Total Items: {{ sheet.total_items }}</p>
+                            <p>Created: {{ sheet.created_at.strftime('%d/%m/%Y %H:%M') }}</p>
+                        </div>
+                    </div>
+                    <div class="flex justify-start md:justify-end items-center space-x-2">
+                        <button onclick="printLoadingSheet('{{ sheet.id }}')" class="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2z" />
+                            </svg>
+                            Print
+                        </button>
+                        <a href="{{ url_for('download_loading_sheet') }}?sheet_id={{ sheet.id }}" class="px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 transition flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            Download
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
 
-    <!-- Screen Styles -->
-    <style type="text/css" media="screen">
-        #print-target {
-            display: none;
-        }
-        .shadow-hover:hover {
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-    </style>
+    <!-- Recent Activity Section -->
+    {% if recent_activity %}
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+        <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Recent Activity
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {% for activity in recent_activity %}
+            <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 shadow">
+                <p class="text-gray-900 dark:text-white font-medium">Receipt #{{ activity.receipt_id }}</p>
+                <div class="mt-2 space-y-1 text-sm text-gray-600 dark:text-gray-400">
+                    <p>Salesperson: {{ activity.salesperson_name }}</p>
+                    <p>Shop: {{ activity.shop_name }}</p>
+                    <p>Date: {{ activity.date.strftime('%d/%m/%Y %H:%M') }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
 
-    <!-- JavaScript for Printing -->
-    <script>
-        function printCurrentSheet() {
-            const printTarget = document.createElement('div');
-            printTarget.id = 'print-target';
-            printTarget.innerHTML = document.getElementById('current-loading-sheet').innerHTML;
-            document.body.appendChild(printTarget);
+<!-- Print Styles - Modified to handle entire page print -->
+<style type="text/css" media="print">
+    @page {
+        size: A4;
+        margin: 1cm;
+    }
+    
+    body {
+        background-color: white !important;
+        color: black !important;
+        font-size: 12pt;
+    }
+    
+    /* Hide non-essential elements during print */
+    nav, button, .no-print {
+        display: none !important;
+    }
+    
+    /* Ensure content is visible */
+    .loading-sheet-content {
+        display: block !important;
+        width: 100% !important;
+        border: 1px solid #000 !important;
+        padding: 20px !important;
+        margin: 0 !important;
+    }
+    
+    /* Table styling for print */
+    table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+    }
+    
+    th, td {
+        border: 1px solid #000 !important;
+        padding: 8px !important;
+        text-align: left !important;
+    }
+    
+    /* Remove background colors and make text black */
+    * {
+        background-color: transparent !important;
+        color: black !important;
+    }
+    
+    /* Add page break after each loading sheet */
+    .loading-sheet-content {
+        page-break-after: always;
+    }
+    
+    /* Hide everything except loading sheet content when printing */
+    .max-w-6xl > *:not(#current-loading-sheet) {
+        display: none !important;
+    }
+    
+    #current-loading-sheet > div:first-child {
+        display: none !important;
+    }
+}
+</style>
+
+<!-- JavaScript for Printing -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Print current sheet
+        document.getElementById('print-button').addEventListener('click', function() {
             window.print();
-            printTarget.remove();
-        }
+        });
+    });
 
-        function printLoadingSheet(sheetId) {
-            fetch(`/loading-sheets?sheet_id=${sheetId}`)  // Fetch the page with sheet_id parameter
-                .then(response => response.text())
-                .then(data => {
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(data, 'text/html');
-                    const loadingSheet = doc.querySelector('#current-loading-sheet').innerHTML;
-
-                    const printTarget = document.createElement('div');
-                    printTarget.id = 'print-target';
-                    printTarget.innerHTML = loadingSheet;
-                    document.body.appendChild(printTarget);
-                    window.print();
-                    printTarget.remove();
-                })
-                .catch(error => {
-                    console.error('Error fetching loading sheet:', error);
-                    alert('Failed to load the loading sheet for printing.');
-                });
-        }
-    </script>
+    // Print specific loading sheet by ID
+    function printLoadingSheet(sheetId) {
+        // Open the sheet in a new window/tab for printing
+        const printWindow = window.open(`{{ url_for('view_loading_sheet') }}?sheet_id=${sheetId}&print=true`, '_blank');
+        
+        // Add event listener to trigger print when content is loaded
+        printWindow.onload = function() {
+            printWindow.print();
+        };
+    }
+</script>
 {% endblock %}
