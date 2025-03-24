@@ -133,7 +133,7 @@
                 <button id="all-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
                     All <span class="ml-2 bg-white bg-opacity-20 px-2 py-0.5 rounded-full text-xs">{{ sales_history | length }}</span>
                 </button>
-                <button id="pending-btn" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
+                <button id="pending-btn" class="px tháng tư py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
                     Pending <span class="ml-2 bg-white bg-opacity-20 px-2 py-0.5 rounded-full text-xs">{{ sales_history | selectattr('balance', '>', 0) | list | length }}</span>
                 </button>
                 <button id="completed-btn" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
@@ -218,13 +218,13 @@
                                 </svg>
                             </button>
                             <div id="menu-{{ sale.receipt_id }}" class="hidden absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 border rounded-lg shadow-lg z-20">
-                                <a href="{{ url_for('receipt', order_id=sale.receipt_id) }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-t-lg">View Receipt</a>
+                                <a href="{{ url_for('receipt', order_id=sale.receipt_id) }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">View Receipt</a>
                                 {% if sale.order_type != 'retail' %}
-                                <div class="relative">
-                                    <a href="#" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" onclick="event.preventDefault(); showLoadOptions('{{ sale.receipt_id }}');">Load to Loading Sheet</a>
-                                    <div id="load-options-{{ sale.receipt_id }}" class="hidden absolute right-full top-0 mr-1 w-48 bg-white dark:bg-gray-800 border rounded-lg shadow-lg z-30">
-                                        <a href="{{ url_for('load_to_loading_sheet', receipt_id=sale.receipt_id, action='current') }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-t-lg">Add to Current</a>
-                                        <a href="{{ url_for('load_to_loading_sheet', receipt_id=sale.receipt_id, action='new') }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-b-lg">Start New</a>
+                                <div class="relative" onmouseleave="hideLoadOptions('{{ sale.receipt_id }}')">
+                                    <button class="w-full text-left px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" onmouseover="showLoadOptions('{{ sale.receipt_id }}')">Load to Loading Sheet</button>
+                                    <div id="load-options-{{ sale.receipt_id }}" class="hidden absolute left-full top-0 ml-1 w-48 bg-white dark:bg-gray-800 border rounded-lg shadow-lg z-30">
+                                        <a href="{{ url_for('load_to_loading_sheet', receipt_id=sale.receipt_id, action='current') }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Add to Current</a>
+                                        <a href="{{ url_for('load_to_loading_sheet', receipt_id=sale.receipt_id, action='new') }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Start New</a>
                                     </div>
                                 </div>
                                 {% endif %}
@@ -306,7 +306,7 @@
         const emptyState = document.getElementById('empty-state');
         
         let currentFilter = '{{ time_filter }}';
-        let currentStatusFilter = 'all'; // Track the current status filter (all, pending, completed)
+        let currentStatusFilter = 'all';
 
         // Show loading spinner
         function showLoading() {
@@ -492,10 +492,11 @@
         expensesBtn.addEventListener('click', () => updateData(currentFilter, 'expenses'));
         timeFilter.addEventListener('change', (e) => updateData(e.target.value, currentStatusFilter));
 
-        // Toggle dropdown menu
+        // Toggle main dropdown menu
         function toggleMenu(menuId) {
             const menu = document.getElementById(menuId);
-            document.querySelectorAll('[id^="menu-"]').forEach(m => {
+            const allMenus = document.querySelectorAll('[id^="menu-"]');
+            allMenus.forEach(m => {
                 if (m.id !== menuId) m.classList.add('hidden');
             });
             menu.classList.toggle('hidden');
@@ -504,15 +505,20 @@
         // Show loading options submenu
         function showLoadOptions(receiptId) {
             const options = document.getElementById(`load-options-${receiptId}`);
-            document.querySelectorAll('[id^="load-options-"]').forEach(opt => {
-                if (opt.id !== `load-options-${receiptId}`) opt.classList.add('hidden');
-            });
-            options.classList.toggle('hidden');
+            options.classList.remove('hidden');
+        }
+
+        // Hide loading options submenu
+        function hideLoadOptions(receiptId) {
+            const options = document.getElementById(`load-options-${receiptId}`);
+            options.classList.add('hidden');
         }
 
         // Close menus when clicking outside
         document.addEventListener('click', (e) => {
-            if (!e.target.closest('button[onclick^="toggleMenu"]') && !e.target.closest('a[onclick^="showLoadOptions"]')) {
+            if (!e.target.closest('button[onclick^="toggleMenu"]') && 
+                !e.target.closest('button[onmouseover^="showLoadOptions"]') &&
+                !e.target.closest('[id^="load-options-"]')) {
                 document.querySelectorAll('[id^="menu-"]').forEach(menu => menu.classList.add('hidden'));
                 document.querySelectorAll('[id^="load-options-"]').forEach(option => option.classList.add('hidden'));
             }
