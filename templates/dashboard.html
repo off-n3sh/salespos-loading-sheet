@@ -34,7 +34,7 @@
                 <div class="flex items-center justify-between relative z-10">
                     <div>
                         <h3 class="text-lg font-medium text-blue-100">Total Sales</h3>
-                        <p class="text-4xl font-bold mt-2">{{ net_sales | round(2) | default(0) }}</p>
+                        <p class="text-4xl font-bold mt-2">{{ (retail_sales + wholesale_sales_today) | round(2) | default(0) }}</p>
                         <p class="text-blue-100 mt-2 text-sm">Today's business performance</p>
                     </div>
                     <div class="bg-white bg-opacity-20 p-4 rounded-full">
@@ -133,7 +133,7 @@
                 <button id="all-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
                     All <span class="ml-2 bg-white bg-opacity-20 px-2 py-0.5 rounded-full text-xs">{{ sales_history | length }}</span>
                 </button>
-                <button id="pending-btn" class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-md text-sm font-medium flex items-center transition-colors">
+                <button id="pending-btn" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
                     Pending <span class="ml-2 bg-white bg-opacity-20 px-2 py-0.5 rounded-full text-xs">{{ sales_history | selectattr('balance', '>', 0) | list | length }}</span>
                 </button>
                 <button id="completed-btn" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
@@ -195,7 +195,7 @@
                             <div class="text-sm text-gray-500 dark:text-gray-400">{{ sale.salesperson_name | default('N/A') }}</div>
                             <div class="text-sm text-gray-500 dark:text-gray-400">{{ sale.date.strftime('%d/%m/%Y %H:%M:%S') }}</div>
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-black">
                             {{ sale.closed_date.strftime('%d/%m/%Y %H:%M:%S') if sale.closed_date else 'Not Closed' }}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
@@ -203,7 +203,7 @@
                                 {{ sale.order_type }}
                             </span>
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-black">
                             {{ sale.payment | round(2) }}/{{ (sale.payment + sale.balance) | round(2) }}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
@@ -428,9 +428,9 @@
                 const groupHeader = document.createElement('tr');
                 groupHeader.className = 'bg-blue-50 dark:bg-blue-900/20';
                 groupHeader.innerHTML = `
-                    <td colspan="7" class="px-6 py-3 text-sm font-semibold text-blue-800 dark:text-blue-300">
+                    <td colspan="7" class="px-6 py-3 text-sm font-semibold text-blue-800 dark:text-black">
                         ${formattedHeader}
-                        <span class="ml-2 text-gray-500 dark:text-gray-400">(${groupedItems[key].length} ${groupedItems[key].length === 1 ? 'record' : 'records'})</span>
+                        <span class="ml-2 text-gray-500 dark:text-black">(${groupedItems[key].length} ${groupedItems[key].length === 1 ? 'record' : 'records'})</span>
                     </td>
                 `;
                 container.appendChild(groupHeader);
