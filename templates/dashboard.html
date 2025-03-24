@@ -195,7 +195,7 @@
                             <div class="text-sm text-gray-500 dark:text-gray-400">{{ sale.salesperson_name | default('N/A') }}</div>
                             <div class="text-sm text-gray-500 dark:text-gray-400">{{ sale.date.strftime('%d/%m/%Y %H:%M:%S') }}</div>
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-black">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-200">
                             {{ sale.closed_date.strftime('%d/%m/%Y %H:%M:%S') if sale.closed_date else 'Not Closed' }}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
@@ -203,7 +203,7 @@
                                 {{ sale.order_type }}
                             </span>
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-black">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-200">
                             {{ sale.payment | round(2) }}/{{ (sale.payment + sale.balance) | round(2) }}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
@@ -323,27 +323,19 @@
             const date = new Date(dateString);
             
             if (period === 'day') {
-                // Format: "Monday, January 1, 2023"
                 return date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
             } else if (period === 'week') {
-                // Calculate week number
                 const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
                 const daysSinceYearStart = Math.floor((date - firstDayOfYear) / (1000 * 60 * 60 * 24));
                 const weekNumber = Math.ceil((daysSinceYearStart + firstDayOfYear.getDay() + 1) / 7);
-                
-                // Get start and end date of the week
                 const weekStart = new Date(date);
                 weekStart.setDate(date.getDate() - date.getDay());
                 const weekEnd = new Date(weekStart);
                 weekEnd.setDate(weekStart.getDate() + 6);
-                
-                // Format: "Week 5 (Jan 29 - Feb 4, 2023)"
                 return `Week ${weekNumber} (${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })})`;
             } else if (period === 'month') {
-                // Format: "January 2023"
                 return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
             } else if (period === 'year') {
-                // Format: "2023"        
                 return date.getFullYear().toString();
             } else {
                 return 'All Time';
@@ -352,7 +344,6 @@
 
         // Group sales or expenses by time period
         function groupByPeriod(items, period) {
-            // If period is 'all', return single group
             if (period === 'all') {
                 return { 'All Records': items };
             }
@@ -363,19 +354,15 @@
                 let key;
                 
                 if (period === 'day') {
-                    // Group by individual days
-                    key = date.toISOString().split('T')[0]; // YYYY-MM-DD
+                    key = date.toISOString().split('T')[0];
                 } else if (period === 'week') {
-                    // Group by week number within year
                     const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
                     const daysSinceYearStart = Math.floor((date - firstDayOfYear) / (1000 * 60 * 60 * 24));
                     const weekNumber = Math.ceil((daysSinceYearStart + firstDayOfYear.getDay() + 1) / 7);
                     key = `${date.getFullYear()}-W${weekNumber.toString().padStart(2, '0')}`;
                 } else if (period === 'month') {
-                    // Group by month and year
                     key = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
                 } else if (period === 'year') {
-                    // Group by year
                     key = date.getFullYear().toString();
                 }
                 
@@ -390,17 +377,10 @@
 
         // Sort group keys chronologically
         function sortGroupKeys(keys, period) {
-            // For 'all' period, no sorting needed
             if (period === 'all') {
                 return keys;
             }
-            
-            // Otherwise sort chronologically
-            return keys.sort((a, b) => {
-                // For day, week, month, and year, we can sort alphabetically
-                // because we've formatted the keys to be chronologically sortable
-                return a.localeCompare(b);
-            });
+            return keys.sort((a, b) => a.localeCompare(b));
         }
 
         // Render the grouped data with formatted headers
@@ -408,23 +388,17 @@
             const container = itemType === 'sales' ? salesHistoryBody : document.querySelector('#expenses-list tbody');
             container.innerHTML = '';
             
-            // Get keys and sort them chronologically
             const sortedKeys = sortGroupKeys(Object.keys(groupedItems), period);
             
             if (sortedKeys.length === 0) {
-                // Show empty state when no data
                 emptyState.classList.remove('hidden');
                 return;
             }
             
             emptyState.classList.add('hidden');
             
-            // Render each group
             sortedKeys.forEach(key => {
-                // Create a formatted header for the group
                 const formattedHeader = formatGroupDate(key, period);
-                
-                // Create a group header row
                 const groupHeader = document.createElement('tr');
                 groupHeader.className = 'bg-blue-50 dark:bg-blue-900/20';
                 groupHeader.innerHTML = `
@@ -435,7 +409,6 @@
                 `;
                 container.appendChild(groupHeader);
                 
-                // Add all items in this group
                 groupedItems[key].forEach(item => {
                     container.appendChild(item.cloneNode(true));
                 });
@@ -447,9 +420,15 @@
             if (status === 'all') {
                 return sales;
             } else if (status === 'pending') {
-                return sales.filter(sale => sale.querySelector('.text-red-800') || sale.querySelector('.text-red-200'));
+                return sales.filter(sale => {
+                    const statusSpan = sale.querySelector('td:nth-child(6) span');
+                    return statusSpan && statusSpan.textContent.trim() === 'Pending';
+                });
             } else if (status === 'completed') {
-                return sales.filter(sale => sale.querySelector('.text-green-800') || sale.querySelector('.text-green-200'));
+                return sales.filter(sale => {
+                    const statusSpan = sale.querySelector('td:nth-child(6) span');
+                    return statusSpan && statusSpan.textContent.trim() === 'Paid';
+                });
             }
             return sales;
         }
@@ -458,56 +437,40 @@
         function updateData(timePeriod, statusFilter) {
             showLoading();
             
-            // Hide empty state initially
             emptyState.classList.add('hidden');
             
-            // Set current filters
             currentFilter = timePeriod;
             currentStatusFilter = statusFilter;
             
-            // Fetch the latest data
             fetch(`/?time=${timePeriod}`)
                 .then(response => response.text())
                 .then(html => {
                     const parser = new DOMParser();
                     const doc = parser.parseFromString(html, 'text/html');
                     
-                    // If showing expenses, handle differently
                     if (statusFilter === 'expenses') {
-                        // Show expenses, hide sales
                         salesHistory.classList.add('hidden');
                         expensesList.classList.remove('hidden');
                         
-                        // Get all expense rows
                         const expenseRows = Array.from(doc.querySelectorAll('#expenses-list tbody tr[data-date]'));
                         
                         if (expenseRows.length === 0) {
                             emptyState.classList.remove('hidden');
                         } else {
-                            // Group expenses by time period
                             const groupedExpenses = groupByPeriod(expenseRows, timePeriod);
-                            
-                            // Render grouped expenses
                             renderGroupedItems(groupedExpenses, timePeriod, 'expenses');
                         }
                     } else {
-                        // Show sales, hide expenses
                         salesHistory.classList.remove('hidden');
                         expensesList.classList.add('hidden');
                         
-                        // Get all sales rows
                         const allSalesRows = Array.from(doc.querySelectorAll('#sales-history-body tr[data-date]'));
-                        
-                        // Apply status filter
                         const filteredSalesRows = filterSalesByStatus(allSalesRows, statusFilter);
                         
                         if (filteredSalesRows.length === 0) {
                             emptyState.classList.remove('hidden');
                         } else {
-                            // Group sales by time period
                             const groupedSales = groupByPeriod(filteredSalesRows, timePeriod);
-                            
-                            // Render grouped sales
                             renderGroupedItems(groupedSales, timePeriod, 'sales');
                         }
                     }
@@ -517,45 +480,24 @@
                 .catch(error => {
                     console.error('Error fetching data:', error);
                     hideLoading();
-                    
-                    // Show error in empty state
                     emptyState.classList.remove('hidden');
                     emptyState.querySelector('p').textContent = 'Error loading data. Please try again.';
                 });
         }
 
         // Event listeners for filter buttons
-        allBtn.addEventListener('click', () => {
-            updateData(currentFilter, 'all');
-        });
-
-        pendingBtn.addEventListener('click', () => {
-            updateData(currentFilter, 'pending');
-        });
-
-        completedBtn.addEventListener('click', () => {
-            updateData(currentFilter, 'completed');
-        });
-
-        expensesBtn.addEventListener('click', () => {
-            updateData(currentFilter, 'expenses');
-        });
-
-        timeFilter.addEventListener('change', (e) => {
-            updateData(e.target.value, currentStatusFilter);
-        });
+        allBtn.addEventListener('click', () => updateData(currentFilter, 'all'));
+        pendingBtn.addEventListener('click', () => updateData(currentFilter, 'pending'));
+        completedBtn.addEventListener('click', () => updateData(currentFilter, 'completed'));
+        expensesBtn.addEventListener('click', () => updateData(currentFilter, 'expenses'));
+        timeFilter.addEventListener('change', (e) => updateData(e.target.value, currentStatusFilter));
 
         // Toggle dropdown menu
         function toggleMenu(menuId) {
             const menu = document.getElementById(menuId);
-            
-            // Close all other menus first
             document.querySelectorAll('[id^="menu-"]').forEach(m => {
-                if (m.id !== menuId) {
-                    m.classList.add('hidden');
-                }
+                if (m.id !== menuId) m.classList.add('hidden');
             });
-            
             menu.classList.toggle('hidden');
         }
 
@@ -563,25 +505,16 @@
         function showLoadOptions(receiptId) {
             const options = document.getElementById(`load-options-${receiptId}`);
             options.classList.toggle('hidden');
-            
-            // Prevent event bubbling
             event.stopPropagation();
         }
 
         // Close menus when clicking outside
         document.addEventListener('click', (e) => {
-            // Close dropdown menus
             if (!e.target.closest('button[onclick^="toggleMenu"]')) {
-                document.querySelectorAll('[id^="menu-"]').forEach(menu => {
-                    menu.classList.add('hidden');
-                });
+                document.querySelectorAll('[id^="menu-"]').forEach(menu => menu.classList.add('hidden'));
             }
-            
-            // Close loading options submenus
             if (!e.target.closest('a[onclick^="showLoadOptions"]')) {
-                document.querySelectorAll('[id^="load-options-"]').forEach(option => {
-                    option.classList.add('hidden');
-                });
+                document.querySelectorAll('[id^="load-options-"]').forEach(option => option.classList.add('hidden'));
             }
         });
 
