@@ -72,14 +72,14 @@
             countdownEl.textContent = seconds;
             if (seconds <= 0) {
                 clearInterval(countdown);
-                window.location.href = "{{ url_for('auth_route') }}";
+                window.location.href = "{{ url_for('auth') }}";
             }
         }, 1000);
 
         // Button click handler
         document.getElementById("get-started").addEventListener("click", () => {
             clearInterval(countdown);
-            window.location.href = "{{ url_for('auth_route') }}";
+            window.location.href = "{{ url_for('auth') }}";
         });
     </script>
     
