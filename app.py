@@ -9,6 +9,7 @@ from reportlab.pdfgen import canvas
 from io import BytesIO
 import os
 from functools import wraps
+from firebase_admin.auth import UserNotFoundError
 
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY')
