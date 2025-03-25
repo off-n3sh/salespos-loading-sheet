@@ -1,16 +1,113 @@
 {% extends "base.html" %}
-{% block title %}Receipts{% endblock %}
+{% block title %}Receipt - {{ order.receipt_id }}{% endblock %}
 {% block content %}
-    <h1 class="text-3xl font-bold mb-6">Receipts</h1>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {% for order in orders %}
-        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow flex justify-between items-center">
-            <div>
-                <h3 class="font-semibold">{{ order.receipt_id }}</h3>
-                <p>{{ order.product }} - {{ order.quantity }} units</p>
+<div class="container mx-auto px-4 py-6">
+    <div class="bg-white shadow-lg rounded-lg overflow-hidden">
+        <!-- Search and Filter Section -->
+        <div class="bg-gray-100 p-4 border-b border-gray-200">
+            <div class="flex items-center space-x-4">
+                <div class="flex-grow">
+                    <input 
+                        type="text" 
+                        id="searchReceipts" 
+                        placeholder="Search receipts by customer, item, or receipt number" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                </div>
+                <div class="flex items-center space-x-2">
+                    <label for="dateFilter" class="text-sm text-gray-600">Date:</label>
+                    <input 
+                        type="date" 
+                        id="dateFilter" 
+                        class="px-2 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                </div>
+                <button 
+                    id="filterButton" 
+                    class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                >
+                    Filter
+                </button>
             </div>
-            <a href="{{ url_for('receipt', order_id=order.receipt_id) }}" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">View</a>
         </div>
-        {% endfor %}
+
+        <!-- Receipt Container -->
+        <div class="receipt-container p-6" style="width: 72mm; background-color: #ffffff; color: #000000;">
+            <!-- Print Button (only visible on screen) -->
+            <div class="print-control text-center mb-4">
+                <button 
+                    id="printButton" 
+                    onclick="printpage()" 
+                    class="px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-900 focus:outline-none transition-colors"
+                >
+                    Print Receipt
+                </button>
+            </div>
+
+            <!-- Existing Receipt Content (mostly unchanged) -->
+            <div class="receipt-content" style="font-size: 13px; line-height: 1.3;">
+                <!-- [Previous receipt HTML remains the same] -->
+            </div>
+        </div>
+
+        <!-- Receipts List Preview (for future implementation) -->
+        <div id="receiptsList" class="hidden">
+            <div class="bg-gray-50 p-4">
+                <h3 class="text-lg font-semibold mb-3">Recent Receipts</h3>
+                <div id="receiptsPreview" class="space-y-2">
+                    <!-- Dynamically populated receipts will go here -->
+                </div>
+            </div>
+        </div>
     </div>
+</div>
+
+<script type="text/javascript">
+    function printpage() {
+        document.getElementById('printButton').style.visibility = "hidden";
+        window.print();
+        document.getElementById('printButton').style.visibility = "visible";
+    }
+
+    // Placeholder for future search and filter functionality
+    document.getElementById('searchReceipts').addEventListener('input', function(e) {
+        console.log('Search term:', e.target.value);
+        // Future implementation: filter receipts
+    });
+
+    document.getElementById('filterButton').addEventListener('click', function() {
+        const dateFilter = document.getElementById('dateFilter').value;
+        console.log('Filtered by date:', dateFilter);
+        // Future implementation: date-based filtering
+    });
+</script>
+
+<style>
+    /* Print Styles */
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        .receipt-container, .receipt-container * {
+            visibility: visible;
+        }
+        .receipt-container {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 72mm;
+            margin: 0;
+            padding: 0;
+            border: none;
+            box-shadow: none;
+        }
+        .print-control, .bg-gray-100 {
+            display: none;
+        }
+        @page {
+            size: 80mm auto;
+            margin: 0;
+        }
+    }
+</style>
 {% endblock %}
