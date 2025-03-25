@@ -6,6 +6,21 @@
     <title>Dreamland Enterprises - Login / Signup</title>
     <link href="{{ url_for('static', filename='css/tailwind.min.css') }}" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Add Firebase JS SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script>
+        // Initialize Firebase with your config
+        const firebaseConfig = {
+            apiKey: "AIzaSyDJdcKy3q4gfi9xS61jtdgHBmkjCI0J0TM",
+            authDomain: "salespos-578ff.firebaseapp.com",
+            projectId: "salespos-578ff",
+            storageBucket: "salespos-578ff.firebasestorage.app",
+            messagingSenderId: "659593870090",
+            appId: "1:659593870090:web:a458c50bb66451cdeb98f3"
+        };
+        firebase.initializeApp(firebaseConfig);
+    </script>
 </head>
 <body class="bg-gray-900 min-h-screen flex items-center justify-center">
     <div class="fixed inset-0 overflow-hidden z-0">
@@ -47,22 +62,26 @@
                 </div>
             </div>
 
-            <form id="login-form" method="POST" action="{{ url_for('auth_route') }}" class="space-y-4 animate-fade-in">
+            <form id="login-form" class="space-y-4 animate-fade-in">
                 {% if error %}<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded animate-shake"><p class="text-sm">{{ error }}</p></div>{% endif %}
-                {% if signup_success %}<div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-3 rounded animate-slide-in"><p class="text-sm">Signup successful! Please log in.</p></div>{% endif %}
+                {% if signup_success %}<div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-3 rounded animate-slide-in"><p class="text-sm">Signup successful! Please verify your email and log in.</p></div>{% endif %}
                 <div class="form-group"><label for="login-email" class="block text-sm font-medium text-gray-700 mb-1">Email</label><div class="relative"><span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500"><i class="fas fa-envelope"></i></span><input type="email" id="login-email" name="email" class="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white" required></div></div>
                 <div class="form-group"><div class="flex justify-between items-center mb-1"><label for="login-password" class="block text-sm font-medium text-gray-700">Password</label><a href="#" class="text-xs text-orange-600 hover:text-orange-700 hover:underline">Forgot Password?</a></div><div class="relative"><span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500"><i class="fas fa-lock"></i></span><input type="password" id="login-password" name="password" class="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white" required><button type="button" id="toggle-login-password" class="absolute inset-y-0 right-0 px-3 text-gray-600"><i class="fas fa-eye"></i></button></div></div>
-                <button type="submit" name="form_type" value="login" class="w-full bg-gray-800 text-white py-3 rounded-lg hover:bg-gray-900 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center space-x-2"><span>Login</span><i class="fas fa-arrow-right text-sm"></i></button>
+                <button type="submit" class="w-full bg-gray-800 text-white py-3 rounded-lg hover:bg-gray-900 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center space-x-2"><span>Login</span><i class="fas fa-arrow-right text-sm"></i></button>
             </form>
 
-            <form id="signup-form" method="POST" action="{{ url_for('auth_route') }}" class="space-y-4 hidden animate-fade-in">
+            <form id="signup-form" class="space-y-4 hidden animate-fade-in">
                 {% if error %}<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded animate-shake"><p class="text-sm">{{ error }}</p></div>{% endif %}
-                <div class="grid grid-cols-2 gap-4"><div class="form-group"><label for="signup-firstname" class="block text-sm font-medium text-gray-700 mb-1">First Name</label><div class="relative"><span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500"><i class="fas fa-user"></i></span><input type="text" id="signup-firstname" name="firstName" class="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white" required></div></div><div class="form-group"><label for="signup-lastname" class="block text-sm font-medium text-gray-700 mb-1">Last Name</label><input type="text" id="signup-lastname" name="lastName" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white" required></div></div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="form-group"><label for="signup-firstname" class="block text-sm font-medium text-gray-700 mb-1">First Name</label><div class="relative"><span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500"><i class="fas fa-user"></i></span><input type="text" id="signup-firstname" name="firstName" class="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white" required></div></div>
+                    <div class="form-group"><label for="signup-lastname" class="block text-sm font-medium text-gray-700 mb-1">Last Name</label><input type="text" id="signup-lastname" name="lastName" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white" required></div>
+                </div>
                 <div class="form-group"><label for="signup-email" class="block text-sm font-medium text-gray-700 mb-1">Email</label><div class="relative"><span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500"><i class="fas fa-envelope"></i></span><input type="email" id="signup-email" name="email" class="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white" required></div></div>
                 <div class="form-group"><label for="signup-phone" class="block text-sm font-medium text-gray-700 mb-1">Phone</label><div class="relative"><span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500"><i class="fas fa-phone"></i></span><input type="tel" id="signup-phone" name="phone" class="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white" required></div></div>
                 <div class="form-group"><label for="signup-password" class="block text-sm font-medium text-gray-700 mb-1">Password</label><div class="relative"><span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500"><i class="fas fa-lock"></i></span><input type="password" id="signup-password" name="password" class="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white" required><button type="button" id="toggle-signup-password" class="absolute inset-y-0 right-0 px-3 text-gray-600"><i class="fas fa-eye"></i></button></div></div>
+                <div class="form-group"><label for="signup-confirm-password" class="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label><div class="relative"><span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500"><i class="fas fa-lock"></i></span><input type="password" id="signup-confirm-password" name="confirmPassword" class="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white" required><button type="button" id="toggle-signup-confirm-password" class="absolute inset-y-0 right-0 px-3 text-gray-600"><i class="fas fa-eye"></i></button></div></div>
                 <div class="form-group"><label for="signup-role" class="block text-sm font-medium text-gray-700 mb-1">Role Preference</label><div class="relative"><span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500"><i class="fas fa-briefcase"></i></span><select id="signup-role" name="role" class="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white appearance-none"><option value="team_member">Team Member</option><option value="manager">Manager</option></select><span class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 pointer-events-none"><i class="fas fa-chevron-down"></i></span></div></div>
-                <button type="submit" name="form_type" value="signup" class="w-full bg-gray-800 text-white py-3 rounded-lg hover:bg-gray-900 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center space-x-2"><span>Create Account</span><i class="fas fa-user-plus text-sm"></i></button>
+                <button type="submit" class="w-full bg-gray-800 text-white py-3 rounded-lg hover:bg-gray-900 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center space-x-2"><span>Create Account</span><i class="fas fa-user-plus text-sm"></i></button>
                 <p class="text-sm text-center mt-4">Already have an account? <a href="#" id="switch-to-login" class="text-orange-600 hover:text-orange-700 font-medium hover:underline">Login</a></p>
             </form>
         </div>
@@ -87,8 +106,8 @@
         const signupForm = document.getElementById("signup-form");
 
         {% if signup_success %}
-            loginTab.classList.add("bg-gray-800", "text-white");
-            signupTab.classList.remove("bg-gray-800", "text-white");
+            loginTab.classList.add("bg-gray-800", "text-white", "shadow-md");
+            signupTab.classList.remove("bg-gray-800", "text-white", "shadow-md");
             signupTab.classList.add("text-gray-600");
             loginForm.classList.remove("hidden");
             signupForm.classList.add("hidden");
@@ -128,6 +147,90 @@
 
         togglePassword("login-password", "toggle-login-password");
         togglePassword("signup-password", "toggle-signup-password");
+        togglePassword("signup-confirm-password", "toggle-signup-confirm-password");
+
+        // Handle Signup with Firebase
+        signupForm.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const email = document.getElementById("signup-email").value;
+            const password = document.getElementById("signup-password").value;
+            const confirmPassword = document.getElementById("signup-confirm-password").value;
+            const firstName = document.getElementById("signup-firstname").value;
+            const lastName = document.getElementById("signup-lastname").value;
+            const phone = document.getElementById("signup-phone").value;
+            const role = document.getElementById("signup-role").value;
+
+            // Password reconfirmation
+            if (password !== confirmPassword) {
+                showError(signupForm, "Passwords do not match.");
+                return;
+            }
+
+            // Create user with Firebase Auth
+            firebase.auth().createUserWithEmailAndPassword(email, password)
+                .then((userCredential) => {
+                    const user = userCredential.user;
+                    // Update display name
+                    return user.updateProfile({
+                        displayName: `${firstName} ${lastName}`
+                    }).then(() => {
+                        // Send email verification
+                        return user.sendEmailVerification();
+                    }).then(() => {
+                        // Send additional user data to server
+                        return fetch('/auth', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                            body: new URLSearchParams({
+                                'form_type': 'signup',
+                                'email': email,
+                                'firstName': firstName,
+                                'lastName': lastName,
+                                'phone': phone,
+                                'role': role
+                            })
+                        });
+                    });
+                })
+                .then((response) => {
+                    if (response.ok) {
+                        showSuccess(signupForm, "Signup successful! Please check your email to verify your account.");
+                        setTimeout(() => {
+                            loginTab.click();
+                        }, 2000);
+                    } else {
+                        throw new Error("Failed to save user data.");
+                    }
+                })
+                .catch((error) => {
+                    showError(signupForm, error.message);
+                });
+        });
+
+        // Helper functions to show error/success messages
+        function showError(form, message) {
+            let errorDiv = form.querySelector('.error-message');
+            if (!errorDiv) {
+                errorDiv = document.createElement('div');
+                errorDiv.className = 'bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded animate-shake error-message';
+                errorDiv.innerHTML = `<p class="text-sm">${message}</p>`;
+                form.insertBefore(errorDiv, form.firstChild);
+            } else {
+                errorDiv.innerHTML = `<p class="text-sm">${message}</p>`;
+            }
+        }
+
+        function showSuccess(form, message) {
+            let successDiv = form.querySelector('.success-message');
+            if (!successDiv) {
+                successDiv = document.createElement('div');
+                successDiv.className = 'bg-green-100 border-l-4 border-green-500 text-green-700 p-3 rounded animate-slide-in success-message';
+                successDiv.innerHTML = `<p class="text-sm">${message}</p>`;
+                form.insertBefore(successDiv, form.firstChild);
+            } else {
+                successDiv.innerHTML = `<p class="text-sm">${message}</p>`;
+            }
+        }
     </script>
     
     <style>
