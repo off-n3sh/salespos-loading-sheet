@@ -8,6 +8,26 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    <!-- Add Firebase JS SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script>
+        // Initialize Firebase with your config
+        const firebaseConfig = {
+            apiKey: "AIzaSyDJdcKy3q4gfi9xS61jtdgHBmkjCI0J0TM",
+            authDomain: "salespos-578ff.firebaseapp.com",
+            projectId: "salespos-578ff",
+            storageBucket: "salespos-578ff.firebasestorage.app",
+            messagingSenderId: "659593870090",
+            appId: "1:659593870090:web:a458c50bb66451cdeb98f3"
+        };
+        try {
+            firebase.initializeApp(firebaseConfig);
+            console.log("Firebase initialized successfully in base.html");
+        } catch (error) {
+            console.error("Firebase initialization failed in base.html:", error);
+        }
+    </script>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-white transition-colors duration-300 font-sans">
     <div class="flex h-screen">
@@ -54,7 +74,7 @@
                     <span class="dark:hidden">Dark Mode</span>
                     <span class="hidden dark:inline">Light Mode</span>
                 </button>
-                <a href="{{ url_for('logout') }}" id="logout" class="w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition-all duration-200 flex items-center justify-center hover:shadow-md">
+                <a href="#" onclick="handleLogout(event)" id="logout" class="w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition-all duration-200 flex items-center justify-center hover:shadow-md">
                     <i class="fas fa-sign-out-alt mr-2"></i> Logout
                 </a>
             </div>
@@ -116,6 +136,31 @@
             updateThemeIcon(isDark);
         });
 
+        // Handle logout with Firebase Auth sign-out
+        function handleLogout(event) {
+            event.preventDefault();
+            firebase.auth().signOut()
+                .then(() => {
+                    console.log("User signed out from Firebase Auth");
+                    window.location.href = "{{ url_for('logout') }}";
+                })
+                .catch((error) => {
+                    console.error("Error signing out from Firebase Auth:", error);
+                    // Proceed with server-side logout even if Firebase sign-out fails
+                    window.location.href = "{{ url_for('logout') }}";
+                });
+        }
+
+        // Client-side check to ensure user is authenticated
+        window.addEventListener('load', () => {
+            firebase.auth().onAuthStateChanged((user) => {
+                if (!user) {
+                    // If no user is signed in on the client-side, redirect to /auth
+                    window.location.href = "{{ url_for('auth_route') }}";
+                }
+            });
+        });
+
         const style = document.createElement('style');
         style.textContent = `
             .sales-card {
@@ -157,7 +202,7 @@
                 font-size: 1.5rem;
             }
             .dark .sales-card-value {
-                color: #63b3ed; /* Fixed: Added # to the color value */
+                color: #63b3ed;
             }
             
             input, select, textarea {
@@ -225,7 +270,7 @@
                 align-items: center;
                 justify-content: center;
                 transition: all 0.2s;
-                min-width: 100px; /* Equal width for sales history buttons */
+                min-width: 100px;
             }
             .btn-primary {
                 background-color: #2b6cb0;
@@ -242,21 +287,21 @@
             }
             .sales-history-btn-group {
                 display: flex;
-                flex-wrap: nowrap; /* Prevent wrapping to ensure horizontal layout */
+                flex-wrap: nowrap;
                 gap: 0.5rem;
                 margin-bottom: 1rem;
-                justify-content: flex-start; /* Align buttons to the left */
-                width: 100%; /* Ensure the button group takes full width */
-                align-items: center; /* Vertically center buttons and select */
+                justify-content: flex-start;
+                width: 100%;
+                align-items: center;
             }
             .sales-history-btn-group .btn {
-                flex: 1; /* Make buttons take equal space */
-                max-width: 150px; /* Cap the width for larger screens */
+                flex: 1;
+                max-width: 150px;
                 text-align: center;
             }
             .sales-history-btn-group select {
-                flex: 0 0 auto; /* Prevent the select from stretching */
-                max-width: 150px; /* Match button width */
+                flex: 0 0 auto;
+                max-width: 150px;
             }
             
             .card {

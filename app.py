@@ -38,6 +38,17 @@ def pluralize_filter(value, singular='', plural='s'):
 app.jinja_env.filters['pluralize'] = pluralize_filter
 
 # Helper Functions
+# Decorator to prevent caching of protected pages
+def no_cache(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        response = make_response(f(*args, **kwargs))
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
+    return decorated_function
+    
 def process_date(date_value):
     """Convert a date value to a datetime object in Kenyan timezone."""
     if isinstance(date_value, datetime):
@@ -209,6 +220,7 @@ def logout():
 
 # Routes
 @app.route('/dashboard', methods=['GET', 'POST'])
+@no_cache
 @login_required
 def dashboard():
     """Render the dashboard with stats cards and sales history."""
@@ -318,6 +330,7 @@ def dashboard():
     )
 
 @app.route('/orders', methods=['GET', 'POST'])
+@no_cache
 @login_required
 def orders():
     if request.method == 'POST':
@@ -411,6 +424,7 @@ def orders():
     return render_template('orders.html', orders=orders, recent_activity=recent_activity, stock_items=stock_items)
 
 @app.route('/stock', methods=['GET', 'POST'])
+@no_cache
 @login_required
 def stock():
     """Handle stock management (add, restock, update price) and display stock page."""
@@ -502,6 +516,7 @@ def stock():
     return render_template('stock.html', stock_items=stock_items, recent_activity=recent_activity)
 
 @app.route('/receipts')
+@no_cache
 @login_required
 def receipts():
     """Display all receipts."""
@@ -512,6 +527,7 @@ def receipts():
     return render_template('receipts.html', orders=orders, recent_activity=recent_activity)
 
 @app.route('/receipt/<order_id>')
+@no_cache
 @login_required
 def receipt(order_id):
     """Display a specific receipt."""
@@ -556,6 +572,7 @@ def receipt(order_id):
     return render_template('receipt.html', order=order, recent_activity=recent_activity)
 
 @app.route('/retail', methods=['GET', 'POST'])
+@no_cache
 @login_required
 def retail():
     """Handle retail sales and display the retail page."""
@@ -579,6 +596,7 @@ def retail():
     return render_template('retail.html', retail_sales=retail_sales, recent_activity=recent_activity)
 
 @app.route('/reports')
+@no_cache
 @login_required
 def reports():
     time_filter = request.args.get('time', 'month')
@@ -664,6 +682,7 @@ def reports():
                           recent_activity=recent_activity, chart_data=chart_data, time_filter=time_filter, total_debt=total_debt)
 
 @app.route('/mark_paid/<order_id>', methods=['POST'])
+@no_cache
 @login_required
 def mark_paid(order_id):
     orders_ref = db.collection('orders').where('receipt_id', '==', order_id).limit(1).stream()
@@ -708,6 +727,7 @@ def mark_paid(order_id):
         return f"Error updating order: {str(e)}", 500
 
 @app.route('/return_stock/<order_id>', methods=['POST'])
+@no_cache
 @login_required
 def return_stock(order_id):
     """Log stock returns for an order and update the order with new item quantities and balance."""
@@ -808,6 +828,7 @@ def return_stock(order_id):
         return f"Error processing stock returns: {str(e)}", 500
     
 @app.route('/expenses', methods=['GET', 'POST'])
+@no_cache
 @login_required
 def expenses():
     """Add a new expense and redirect to the dashboard."""
