@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, Response, session, jsonify, make_response
+from flask_wtf.csrf import CSRFProtect
 import firebase_admin
 from firebase_admin import credentials, firestore, auth
 from datetime import datetime, timedelta
