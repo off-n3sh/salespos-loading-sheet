@@ -93,7 +93,7 @@
                 </button>
             </form>
 
-            <form id="signup-form" class="space-y-4 hidden animate-fade-in" action="{{ url_for('auth') }}" method="POST">
+            <form id="signup-form" class="space-y-4 hidden animate-fade-in" action="{{ url_for('auth_route') }}" method="POST">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"> <!-- CSRF token -->
                 <input type="hidden" name="form_type" value="signup">
                 <div class="grid grid-cols-2 gap-4">
