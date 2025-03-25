@@ -13,7 +13,7 @@
         // Initialize Firebase with your config
         const firebaseConfig = {
             apiKey: "AIzaSyDJdcKy3q4gfi9xS61jtdgHBmkjCI0J0TM",
-            authDomain: "salespos-578ff.firebaseapp.com",
+            authDomain: "salespos-578ff.firebaseapp.com,
             projectId: "salespos-578ff",
             storageBucket: "salespos-578ff.firebasestorage.app",
             messagingSenderId: "659593870090",
@@ -63,15 +63,13 @@
             </div>
 
             <form id="login-form" class="space-y-4 animate-fade-in">
-                {% if error %}<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded animate-shake"><p class="text-sm">{{ error }}</p></div>{% endif %}
-                {% if signup_success %}<div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-3 rounded animate-slide-in"><p class="text-sm">Signup successful! Please verify your email and log in.</p></div>{% endif %}
+                {% if signup_success %}<div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-3 rounded animate-slide-in success-message"><p class="text-sm">Signup successful! Please verify your email and log in.</p></div>{% endif %}
                 <div class="form-group"><label for="login-email" class="block text-sm font-medium text-gray-700 mb-1">Email</label><div class="relative"><span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500"><i class="fas fa-envelope"></i></span><input type="email" id="login-email" name="email" class="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white" required></div></div>
-                <div class="form-group"><div class="flex justify-between items-center mb-1"><label for="login-password" class="block text-sm font-medium text-gray-700">Password</label><a href="#" class="text-xs text-orange-600 hover:text-orange-700 hover:underline">Forgot Password?</a></div><div class="relative"><span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500"><i class="fas fa-lock"></i></span><input type="password" id="login-password" name="password" class="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white" required><button type="button" id="toggle-login-password" class="absolute inset-y-0 right-0 px-3 text-gray-600"><i class="fas fa-eye"></i></button></div></div>
+                <div class="form-group"><div class="flex justify-between items-center mb-1"><label for="login-password" class="block text-sm font-medium text-gray-700">Password</label><a href="#" id="forgot-password" class="text-xs text-orange-600 hover:text-orange-700 hover:underline">Forgot Password?</a></div><div class="relative"><span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500"><i class="fas fa-lock"></i></span><input type="password" id="login-password" name="password" class="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white" required><button type="button" id="toggle-login-password" class="absolute inset-y-0 right-0 px-3 text-gray-600"><i class="fas fa-eye"></i></button></div></div>
                 <button type="submit" class="w-full bg-gray-800 text-white py-3 rounded-lg hover:bg-gray-900 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center space-x-2"><span>Login</span><i class="fas fa-arrow-right text-sm"></i></button>
             </form>
 
             <form id="signup-form" class="space-y-4 hidden animate-fade-in">
-                {% if error %}<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded animate-shake"><p class="text-sm">{{ error }}</p></div>{% endif %}
                 <div class="grid grid-cols-2 gap-4">
                     <div class="form-group"><label for="signup-firstname" class="block text-sm font-medium text-gray-700 mb-1">First Name</label><div class="relative"><span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500"><i class="fas fa-user"></i></span><input type="text" id="signup-firstname" name="firstName" class="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white" required></div></div>
                     <div class="form-group"><label for="signup-lastname" class="block text-sm font-medium text-gray-700 mb-1">Last Name</label><input type="text" id="signup-lastname" name="lastName" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white" required></div>
@@ -207,29 +205,92 @@
                 });
         });
 
+        // Handle Login with Firebase
+        loginForm.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const email = document.getElementById("login-email").value;
+            const password = document.getElementById("login-password").value;
+
+            firebase.auth().signInWithEmailAndPassword(email, password)
+                .then((userCredential) => {
+                    const user = userCredential.user;
+                    // Get ID token
+                    return user.getIdToken().then((idToken) => {
+                        // Send ID token to server to verify and set session
+                        return fetch('/login', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                            body: new URLSearchParams({
+                                'id_token': idToken
+                            })
+                        });
+                    });
+                })
+                .then((response) => response.json())
+                .then((data) => {
+                    if (data.status === 'success') {
+                        // Redirect to dashboard
+                        window.location.href = '/dashboard';
+                    } else {
+                        throw new Error(data.error || "Failed to authenticate with server.");
+                    }
+                })
+                .catch((error) => {
+                    showError(loginForm, error.message);
+                });
+        });
+
+        // Handle Forgot Password
+        document.getElementById("forgot-password").addEventListener("click", (e) => {
+            e.preventDefault();
+            const email = document.getElementById("login-email").value;
+            if (!email) {
+                showError(loginForm, "Please enter your email to reset your password.");
+                return;
+            }
+
+            firebase.auth().sendPasswordResetEmail(email)
+                .then(() => {
+                    showSuccess(loginForm, "Password reset email sent! Please check your inbox.");
+                })
+                .catch((error) => {
+                    showError(loginForm, error.message);
+                });
+        });
+
         // Helper functions to show error/success messages
         function showError(form, message) {
-            let errorDiv = form.querySelector('.error-message');
-            if (!errorDiv) {
-                errorDiv = document.createElement('div');
-                errorDiv.className = 'bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded animate-shake error-message';
-                errorDiv.innerHTML = `<p class="text-sm">${message}</p>`;
-                form.insertBefore(errorDiv, form.firstChild);
-            } else {
-                errorDiv.innerHTML = `<p class="text-sm">${message}</p>`;
-            }
+            // Clear previous messages
+            const existingError = form.querySelector('.error-message');
+            const existingSuccess = form.querySelector('.success-message');
+            if (existingError) existingError.remove();
+            if (existingSuccess) existingSuccess.remove();
+
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded animate-shake error-message';
+            errorDiv.innerHTML = `<p class="text-sm">${message}</p>`;
+            form.insertBefore(errorDiv, form.firstChild);
+            // Clear after 5 seconds
+            setTimeout(() => {
+                if (errorDiv) errorDiv.remove();
+            }, 5000);
         }
 
         function showSuccess(form, message) {
-            let successDiv = form.querySelector('.success-message');
-            if (!successDiv) {
-                successDiv = document.createElement('div');
-                successDiv.className = 'bg-green-100 border-l-4 border-green-500 text-green-700 p-3 rounded animate-slide-in success-message';
-                successDiv.innerHTML = `<p class="text-sm">${message}</p>`;
-                form.insertBefore(successDiv, form.firstChild);
-            } else {
-                successDiv.innerHTML = `<p class="text-sm">${message}</p>`;
-            }
+            // Clear previous messages
+            const existingError = form.querySelector('.error-message');
+            const existingSuccess = form.querySelector('.success-message');
+            if (existingError) existingError.remove();
+            if (existingSuccess) existingSuccess.remove();
+
+            const successDiv = document.createElement('div');
+            successDiv.className = 'bg-green-100 border-l-4 border-green-500 text-green-700 p-3 rounded animate-slide-in success-message';
+            successDiv.innerHTML = `<p class="text-sm">${message}</p>`;
+            form.insertBefore(successDiv, form.firstChild);
+            // Clear after 5 seconds
+            setTimeout(() => {
+                if (successDiv) successDiv.remove();
+            }, 5000);
         }
     </script>
     
