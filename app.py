@@ -1152,50 +1152,131 @@ def get_loading_sheet(sheet_id):
 @app.route('/edit_order/<receipt_id>', methods=['POST'])
 @login_required
 def edit_order(receipt_id):
+    # Fetch the order from Firestore
     order_ref = db.collection('orders').where('receipt_id', '==', receipt_id).limit(1).stream()
     order_doc = next(order_ref, None)
     if not order_doc:
-        return "Order not found", 404
-    
+        return jsonify({"status": "error", "error": "Order not found"}), 404
+
     order_dict = order_doc.to_dict()
+    
+    # Check if the order is unpaid (balance > 0)
+    balance = order_dict.get('balance', 0)
+    if balance <= 0:
+        return jsonify({"status": "error", "error": "Cannot edit a paid order"}), 403
+
+    # Parse the new items from the form
     items_raw = request.form.getlist('items[]')
     new_items = []
     i = 0
     while i < len(items_raw):
-        if items_raw[i] == 'product':
-            product_name = items_raw[i + 1]
-            quantity = int(items_raw[i + 3]) if i + 2 < len(items_raw) and items_raw[i + 2] == 'quantity' else 0
-            new_items.append({'name': product_name, 'quantity': quantity})
-            i += 6
+        if items_raw[i].startswith('product|'):
+            # Parse the item string (e.g., "product|ItemName|quantity|0|price|10|stock|0")
+            parts = items_raw[i].split('|')
+            product_name = parts[1]
+            price = float(parts[5]) if len(parts) > 5 and parts[5] else 0
+            # The quantity is in the next items[] entry
+            quantity = int(items_raw[i + 1]) if i + 1 < len(items_raw) else 0
+            if quantity > 0:  # Only add items with a valid quantity
+                new_items.append({'name': product_name, 'quantity': quantity, 'price': price})
+            i += 2  # Skip the quantity entry
         else:
             i += 1
 
-    # Append new items to existing items
+    # Append new items to the existing items_list, adding quantities for duplicates
     existing_items = order_dict.get('items_list', [])
     for new_item in new_items:
         found = False
         for existing_item in existing_items:
             if existing_item['name'] == new_item['name']:
                 existing_item['quantity'] += new_item['quantity']
+                # Update the price if the new item has a price (in case it changed)
+                if 'price' in new_item and new_item['price'] > 0:
+                    existing_item['price'] = new_item['price']
                 found = True
                 break
         if not found:
             existing_items.append(new_item)
-    
+
+    # Remove items with quantity <= 0
+    existing_items = [item for item in existing_items if item['quantity'] > 0]
+
+    # Update the order dictionary
     order_dict['items_list'] = existing_items
     order_dict['total_items'] = sum(item['quantity'] for item in existing_items)
-    db.collection('orders').document(order_doc.id).update(order_dict)
-    flash('Order updated successfully', 'success')
-    return '', 200
+    
+    # Recalculate the total payment (sum of price * quantity for all items)
+    total_payment = sum(item['quantity'] * item['price'] for item in existing_items)
+    order_dict['payment'] = total_payment
+    # Update the balance (amount_paid remains the same, so recalculate balance)
+    amount_paid = order_dict.get('amount_paid', 0)
+    order_dict['balance'] = max(total_payment - amount_paid, 0)
 
+    # Update the order in Firestore
+    try:
+        db.collection('orders').document(order_doc.id).update(order_dict)
+
+        # Add a notification for salespeople
+        notification_message = (
+            f"Order #{receipt_id} updated: {order_dict['total_items']} item"
+            f"{'s' if order_dict['total_items'] != 1 else ''} total, "
+            f"new balance: KSh {order_dict['balance']} on "
+            f"{datetime.now(KENYA_TZ).strftime('%d/%m/%Y %H:%M')}"
+        )
+        db.collection('notifications').add({
+            'user_id': order_dict['user_id'],  # Notify the salesperson who created the order
+            'message': notification_message,
+            'timestamp': datetime.now(KENYA_TZ),
+            'read': False
+        })
+
+        return jsonify({"status": "success", "message": "Order updated successfully"}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "error": f"Failed to update order: {str(e)}"}), 500
+        
 @app.route('/delete_order/<receipt_id>', methods=['POST'])
 @login_required
 def delete_order(receipt_id):
-    order_ref = db.collection('orders').where('receipt_id', '==', receipt_id).limit(1).stream()
-    order_doc = next(order_ref, None)
-    if not order_doc:
-        return "Order not found", 404
-    
-    db.collection('orders').document(order_doc.id).delete()
-    flash('Order deleted successfully', 'success')
-    return '', 200
+    try:
+        # Try querying receipt_id as a string first
+        order_ref = db.collection('orders').where('receipt_id', '==', receipt_id).limit(1).stream()
+        order_doc = next(order_ref, None)
+
+        # If not found as a string, try as an integer
+        if not order_doc:
+            try:
+                receipt_id_int = int(receipt_id)
+                order_ref = db.collection('orders').where('receipt_id', '==', receipt_id_int).limit(1).stream()
+                order_doc = next(order_ref, None)
+            except ValueError:
+                return jsonify({"status": "error", "error": "Invalid receipt ID format"}), 400
+
+        if not order_doc:
+            return jsonify({"status": "error", "error": "Order not found"}), 404
+
+        order_dict = order_doc.to_dict()
+        
+        # Check if the order is unpaid (balance > 0)
+        balance = order_dict.get('balance', 0)
+        if balance <= 0:
+            return jsonify({"status": "error", "error": "Cannot delete a paid order"}), 403
+
+        # Delete the order from Firestore
+        db.collection('orders').document(order_doc.id).delete()
+
+        # Add a notification for salespeople
+        notification_message = (
+            f"Order #{receipt_id} deleted on "
+            f"{datetime.now(KENYA_TZ).strftime('%d/%m/%Y %H:%M')}"
+        )
+        db.collection('notifications').add({
+            'user_id': order_dict['user_id'],  # Notify the salesperson who created the order
+            'message': notification_message,
+            'timestamp': datetime.now(KENYA_TZ),
+            'read': False
+        })
+
+        return jsonify({"status": "success", "message": "Order deleted successfully"}), 200
+
+    except Exception as e:
+        return jsonify({"status": "error", "error": f"Failed to delete order: {str(e)}"}), 500
