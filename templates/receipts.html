@@ -20,6 +20,11 @@
                         id="dateFilter" 
                         class="px-2 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
+                    <select id="filterType" class="px-2 py-2 border border-gray-300 rounded-md">
+                        <option value="day">Day</option>
+                        <option value="week">Week</option>
+                        <option value="month">Month</option>
+                    </select>
                 </div>
                 <button 
                     id="filterButton" 
@@ -31,32 +36,34 @@
         </div>
         <div class="p-6">
             <h2 class="text-xl font-bold mb-4">Stored Receipts</h2>
-            {% if orders %}
-            <table class="w-full border-collapse">
-                <thead>
-                    <tr class="bg-gray-200">
-                        <th class="p-2 text-left">Receipt ID</th>
-                        <th class="p-2 text-left">Shop</th>
-                        <th class="p-2 text-left">Salesperson</th>
-                        <th class="p-2 text-left">Date</th>
-                        <th class="p-2 text-right">Payment</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for order in orders %}
-                    <tr class="border-b">
-                        <td class="p-2"><a href="{{ url_for('receipt', order_id=order.receipt_id) }}" class="text-blue-600 hover:underline">{{ order.receipt_id }}</a></td>
-                        <td class="p-2">{{ order.shop_name | default('Unknown Shop') }}</td>
-                        <td class="p-2">{{ order.salesperson_name | default('N/A') }}</td>
-                        <td class="p-2">{{ order.date.strftime('%d/%m/%Y') }}</td>
-                        <td class="p-2 text-right">{{ order.payment | default(0) }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% else %}
-            <p class="text-center">No receipts stored yet.</p>
-            {% endif %}
+            <div id="receiptsTable">
+                {% if orders %}
+                <table class="w-full border-collapse">
+                    <thead>
+                        <tr class="bg-gray-200">
+                            <th class="p-2 text-left">Receipt ID</th>
+                            <th class="p-2 text-left">Shop</th>
+                            <th class="p-2 text-left">Salesperson</th>
+                            <th class="p-2 text-left">Date</th>
+                            <th class="p-2 text-right">Payment</th>
+                        </tr>
+                    </thead>
+                    <tbody id="receiptsBody">
+                        {% for order in orders %}
+                        <tr class="border-b">
+                            <td class="p-2"><a href="{{ url_for('receipt', order_id=order.receipt_id) }}" class="text-blue-600 hover:underline">{{ order.receipt_id }}</a></td>
+                            <td class="p-2">{{ order.shop_name | default('Unknown Shop') }}</td>
+                            <td class="p-2">{{ order.salesperson_name | default('N/A') }}</td>
+                            <td class="p-2">{{ order.date.strftime('%d/%m/%Y') }}</td>
+                            <td class="p-2 text-right">{{ order.payment | default(0) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="text-center">No receipts stored yet.</p>
+                {% endif %}
+            </div>
         </div>
         <div class="bg-gray-50 p-4">
             <h3 class="text-lg font-semibold mb-3">Recent Activity</h3>
@@ -68,18 +75,114 @@
 </div>
 
 <script type="text/javascript">
-    function printpage() {
-        document.getElementById('printButton').style.visibility = "hidden";
-        window.print();
-        document.getElementById('printButton').style.visibility = "visible";
-    }
+    // Pass orders data to JS
+    const orders = {{ orders | tojson }};
+
+    // Search functionality
     document.getElementById('searchReceipts').addEventListener('input', function(e) {
-        console.log('Search term:', e.target.value);
+        const searchTerm = e.target.value.toLowerCase();
+        const tbody = document.getElementById('receiptsBody');
+        tbody.innerHTML = '';
+        orders.filter(order => 
+            order.receipt_id.toLowerCase().includes(searchTerm) ||
+            (order.shop_name || 'Unknown Shop').toLowerCase().includes(searchTerm) ||
+            (order.salesperson_name || 'N/A').toLowerCase().includes(searchTerm)
+        ).forEach(order => {
+            const row = `
+                <tr class="border-b">
+                    <td class="p-2"><a href="/receipt/${order.receipt_id}" class="text-blue-600 hover:underline">${order.receipt_id}</a></td>
+                    <td class="p-2">${order.shop_name || 'Unknown Shop'}</td>
+                    <td class="p-2">${order.salesperson_name || 'N/A'}</td>
+                    <td class="p-2">${new Date(order.date).toLocaleDateString('en-GB')}</td>
+                    <td class="p-2 text-right">${order.payment || 0}</td>
+                </tr>`;
+            tbody.insertAdjacentHTML('beforeend', row);
+        });
     });
+
+    // Filter functionality
     document.getElementById('filterButton').addEventListener('click', function() {
         const dateFilter = document.getElementById('dateFilter').value;
-        console.log('Filtered by date:', dateFilter);
+        const filterType = document.getElementById('filterType').value;
+        const tbody = document.getElementById('receiptsBody');
+        tbody.innerHTML = '';
+
+        if (!dateFilter) {
+            orders.forEach(order => renderRow(order, tbody));
+            return;
+        }
+
+        const selectedDate = new Date(dateFilter);
+        let filteredOrders = [];
+
+        if (filterType === 'day') {
+            filteredOrders = orders.filter(order => {
+                const orderDate = new Date(order.date);
+                return orderDate.toDateString() === selectedDate.toDateString();
+            });
+            filteredOrders.forEach(order => renderRow(order, tbody));
+        } else if (filterType === 'week') {
+            const weekGroups = groupByWeek(orders, selectedDate);
+            Object.keys(weekGroups).sort().forEach(week => {
+                tbody.insertAdjacentHTML('beforeend', `<tr><td colspan="5" class="p-2 font-bold">Week ${week}: ${weekGroups[week].range}</td></tr>`);
+                weekGroups[week].orders.forEach(order => renderRow(order, tbody));
+            });
+        } else if (filterType === 'month') {
+            const monthGroups = groupByMonth(orders, selectedDate);
+            Object.keys(monthGroups).sort().forEach(month => {
+                tbody.insertAdjacentHTML('beforeend', `<tr><td colspan="5" class="p-2 font-bold">${month}: ${monthGroups[month].range}</td></tr>`);
+                monthGroups[month].orders.forEach(order => renderRow(order, tbody));
+            });
+        }
     });
+
+    // Helper to render a row
+    function renderRow(order, tbody) {
+        const row = `
+            <tr class="border-b">
+                <td class="p-2"><a href="/receipt/${order.receipt_id}" class="text-blue-600 hover:underline">${order.receipt_id}</a></td>
+                <td class="p-2">${order.shop_name || 'Unknown Shop'}</td>
+                <td class="p-2">${order.salesperson_name || 'N/A'}</td>
+                <td class="p-2">${new Date(order.date).toLocaleDateString('en-GB')}</td>
+                <td class="p-2 text-right">${order.payment || 0}</td>
+            </tr>`;
+        tbody.insertAdjacentHTML('beforeend', row);
+    }
+
+    // Group by week
+    function groupByWeek(orders, baseDate) {
+        const groups = {};
+        orders.forEach(order => {
+            const orderDate = new Date(order.date);
+            const diffDays = Math.floor((orderDate - baseDate) / (1000 * 60 * 60 * 24));
+            const weekNum = Math.floor(diffDays / 7) + 1;
+            const weekStart = new Date(baseDate);
+            weekStart.setDate(baseDate.getDate() + (weekNum - 1) * 7);
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekStart.getDate() + 6);
+            const key = weekNum;
+            if (!groups[key]) {
+                groups[key] = { orders: [], range: `${weekStart.toLocaleDateString('en-GB')} - ${weekEnd.toLocaleDateString('en-GB')}` };
+            }
+            groups[key].orders.push(order);
+        });
+        return groups;
+    }
+
+    // Group by month
+    function groupByMonth(orders, baseDate) {
+        const groups = {};
+        orders.forEach(order => {
+            const orderDate = new Date(order.date);
+            const monthKey = `${orderDate.getFullYear()}-${String(orderDate.getMonth() + 1).padStart(2, '0')}`;
+            const monthName = orderDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+            if (!groups[monthKey]) {
+                groups[monthKey] = { orders: [], range: monthName };
+            }
+            groups[monthKey].orders.push(order);
+        });
+        return groups;
+    }
 </script>
 
 <style>
