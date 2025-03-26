@@ -517,22 +517,24 @@ def stock():
 
     return render_template('stock.html', stock_items=stock_items, recent_activity=recent_activity)
 
-@app.route('/receipts')
+@app.route('/receipts', methods=['GET', 'POST'])
 @no_cache
 @login_required
 def receipts():
-    """Display all receipts."""
     try:
-        orders = [doc.to_dict() for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).get()]
-        # Process dates for all orders
+        search = request.form.get('search', '').strip().lower() if request.method == 'POST' else ''
+        orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).get()
+        orders = [doc.to_dict() for doc in orders_ref]
         for order in orders:
             order['date'] = process_date(order.get('date'))
-        recent_activity = [{'receipt_id': doc.to_dict().get('receipt_id', doc.id), 
-                           'salesperson_name': doc.to_dict().get('salesperson_name', 'N/A'), 
-                           'shop_name': doc.to_dict().get('shop_name', 'Unknown Shop'), 
-                           'date': process_date(doc.to_dict().get('date'))} 
-                          for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).limit(3).get()]
-        return render_template('receipts.html', orders=orders, recent_activity=recent_activity)
+        
+        # Filter by search term
+        if search:
+            orders = [order for order in orders if 
+                      search in (order.get('shop_name', 'Unknown Shop') or '').lower() or 
+                      search in (order.get('salesperson_name', 'N/A') or '').lower()]
+        
+        return render_template('receipts.html', orders=orders, search=search)
     except Exception as e:
         return f"Error loading receipts: {str(e)}", 500
 
