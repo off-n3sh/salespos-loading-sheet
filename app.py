@@ -517,24 +517,15 @@ def stock():
 
     return render_template('stock.html', stock_items=stock_items, recent_activity=recent_activity)
 
-@app.route('/receipts', methods=['GET', 'POST'])
+@app.route('/receipts')
 @no_cache
 @login_required
 def receipts():
     try:
-        search = request.form.get('search', '').strip().lower() if request.method == 'POST' else ''
-        orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).get()
-        orders = [doc.to_dict() for doc in orders_ref]
+        orders = [doc.to_dict() for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).get()]
         for order in orders:
             order['date'] = process_date(order.get('date'))
-        
-        # Filter by search term
-        if search:
-            orders = [order for order in orders if 
-                      search in (order.get('shop_name', 'Unknown Shop') or '').lower() or 
-                      search in (order.get('salesperson_name', 'N/A') or '').lower()]
-        
-        return render_template('receipts.html', orders=orders, search=search)
+        return render_template('receipts.html', orders=orders)
     except Exception as e:
         return f"Error loading receipts: {str(e)}", 500
 
