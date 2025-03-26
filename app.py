@@ -522,11 +522,19 @@ def stock():
 @login_required
 def receipts():
     """Display all receipts."""
-    orders = [doc.to_dict() for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).get()]
-    recent_activity = [{'receipt_id': doc.to_dict().get('receipt_id', doc.id), 'salesperson_name': doc.to_dict().get('salesperson_name', 'N/A'), 
-                        'shop_name': doc.to_dict().get('shop_name', 'Unknown Shop'), 'date': process_date(doc.to_dict().get('date'))} 
-                       for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).limit(3).get()]
-    return render_template('receipts.html', orders=orders, recent_activity=recent_activity)
+    try:
+        orders = [doc.to_dict() for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).get()]
+        # Process dates for all orders
+        for order in orders:
+            order['date'] = process_date(order.get('date'))
+        recent_activity = [{'receipt_id': doc.to_dict().get('receipt_id', doc.id), 
+                           'salesperson_name': doc.to_dict().get('salesperson_name', 'N/A'), 
+                           'shop_name': doc.to_dict().get('shop_name', 'Unknown Shop'), 
+                           'date': process_date(doc.to_dict().get('date'))} 
+                          for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).limit(3).get()]
+        return render_template('receipts.html', orders=orders, recent_activity=recent_activity)
+    except Exception as e:
+        return f"Error loading receipts: {str(e)}", 500
 
 @app.route('/receipt/<order_id>')
 @no_cache

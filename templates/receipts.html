@@ -48,7 +48,7 @@
                         <td class="p-2"><a href="{{ url_for('receipt', order_id=order.receipt_id) }}" class="text-blue-600 hover:underline">{{ order.receipt_id }}</a></td>
                         <td class="p-2">{{ order.shop_name | default('Unknown Shop') }}</td>
                         <td class="p-2">{{ order.salesperson_name | default('N/A') }}</td>
-                        <td class="p-2">{{ process_date(order.date).strftime('%d/%m/%Y') }}</td>
+                        <td class="p-2">{{ order.date.strftime('%d/%m/%Y') }}</td>
                         <td class="p-2 text-right">{{ order.payment | default(0) }}</td>
                     </tr>
                     {% endfor %}
