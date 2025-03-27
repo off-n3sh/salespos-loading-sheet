@@ -12,14 +12,67 @@
             </div>
             <div class="mt-4 md:mt-0 flex flex-col sm:flex-row items-center space-y-3 sm:space-y-0 sm:space-x-4">
                 <div id="time-display" class="bg-blue-50 dark:bg-gray-700 px-4 py-2 rounded-lg text-blue-600 dark:text-blue-300 font-medium"></div>
-                <div class="flex w-full sm:w-auto">
-                    <input type="text" id="search-input" placeholder="Search loaded orders..." class="p-2 border rounded-l-lg w-full dark:bg-gray-800 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500" value="">
-                    <button type="button" class="p-2 bg-blue-600 text-white rounded-r-lg hover:bg-blue-700 focus:outline-none">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                <form method="GET" action="{{ url_for('dashboard') }}" class="flex w-full sm:w-auto">
+                    <input type="hidden" name="time" value="{{ time_filter }}">
+                    <input type="hidden" name="page" value="1">
+                    <input type="hidden" name="per_page" value="{{ per_page }}">
+                    <div class="flex">
+                        <input type="text" name="search" id="search-input" placeholder="Search all orders..." class="p-2 border rounded-l-lg w-full dark:bg-gray-800 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500" value="{{ search }}">
+                        <button type="submit" class="p-2 bg-blue-600 text-white rounded-r-lg hover:bg-blue-700 focus:outline-none">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </button>
+                        {% if search %}
+                        <a href="{{ url_for('dashboard', time=time_filter, page=1, per_page=per_page) }}" class="ml-2 p-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 focus:outline-none">
+                            Clear
+                        </a>
+                        {% endif %}
+                    </div>
+                </form>
+                <!-- Notification Bell Icon -->
+                <div class="relative">
+                    <button id="notification-bell" class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 focus:outline-none">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                         </svg>
+                        {% if unread_count > 0 %}
+                        <span class="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full">{{ unread_count }}</span>
+                        {% endif %}
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Modal -->
+    <div id="notification-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-medium text-gray-900 dark:text-white">Notifications</h3>
+                <button id="close-notification-modal" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="mt-4 max-h-96 overflow-y-auto">
+                {% if notifications %}
+                {% for notification in notifications %}
+                <div class="p-4 mb-2 border-b border-gray-200 dark:border-gray-700 {% if not notification.read %}bg-blue-50 dark:bg-blue-900{% endif %}">
+                    <p class="text-sm text-gray-700 dark:text-gray-300">{{ notification.message }}</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ notification.timestamp.strftime('%d/%m/%Y %H:%M:%S') }}</p>
+                    <div class="mt-2 flex justify-between items-center">
+                        <a href="{{ url_for('receipt', order_id=notification.order_id) }}" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">View Order</a>
+                        {% if not notification.read %}
+                        <button onclick="markNotificationRead('{{ notification.id }}')" class="text-sm text-green-600 dark:text-green-400 hover:underline">Mark as Read</button>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <p class="text-sm text-gray-500 dark:text-gray-400">No notifications found.</p>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -238,12 +291,21 @@
             <div class="text-sm text-gray-600 dark:text-gray-400">
                 Showing {{ (page - 1) * per_page + 1 }} to {{ (page - 1) * per_page + sales_history | length }} of {{ total_orders }} orders
             </div>
-            <div class="flex space-x-2">
+            <div class="flex items-center space-x-2">
                 {% if page > 1 %}
-                <a href="{{ url_for('dashboard', page=page-1, per_page=per_page, time=time_filter) }}" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Previous</a>
+                <a href="{{ url_for('dashboard', page=page-1, per_page=per_page, time=time_filter, search=search) }}" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Previous</a>
                 {% endif %}
+                <form method="GET" action="{{ url_for('dashboard') }}" class="flex items-center">
+                    <input type="hidden" name="time" value="{{ time_filter }}">
+                    <input type="hidden" name="per_page" value="{{ per_page }}">
+                    <input type="hidden" name="search" value="{{ search }}">
+                    <label for="jump-to-page" class="text-sm text-gray-600 dark:text-gray-400 mr-2">Page:</label>
+                    <input type="number" id="jump-to-page" name="page" value="{{ page }}" min="1" max="{{ total_pages }}" class="w-16 p-2 border rounded-md dark:bg-gray-800 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                    <span class="text-sm text-gray-600 dark:text-gray-400 mx-2">of {{ total_pages }}</span>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Go</button>
+                </form>
                 {% if page < total_pages %}
-                <a href="{{ url_for('dashboard', page=page+1, per_page=per_page, time=time_filter) }}" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Next</a>
+                <a href="{{ url_for('dashboard', page=page+1, per_page=per_page, time=time_filter, search=search) }}" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Next</a>
                 {% endif %}
             </div>
         </div>
@@ -317,6 +379,9 @@
         const timeFilter = document.getElementById('time-filter');
         const loadingSpinner = document.getElementById('loading-spinner');
         const emptyState = document.getElementById('empty-state');
+        const notificationBell = document.getElementById('notification-bell');
+        const notificationModal = document.getElementById('notification-modal');
+        const closeNotificationModal = document.getElementById('close-notification-modal');
         
         let currentFilter = '{{ time_filter }}';
         let currentStatusFilter = 'all';
@@ -448,17 +513,8 @@
             return sales;
         }
 
-        // Client-side search filter
-        function applySearchFilter(items, searchTerm, itemType) {
-            const searchLower = searchTerm.toLowerCase().trim();
-            return items.filter(item => {
-                const searchData = item.dataset.search || '';
-                return searchData.includes(searchLower);
-            });
-        }
-
-        // Update the data based on the selected time period, status filter, and search term
-        function updateData(timePeriod, statusFilter, searchTerm = '') {
+        // Update the data based on the selected time period and status filter
+        function updateData(timePeriod, statusFilter) {
             showLoading();
             
             emptyState.classList.add('hidden');
@@ -470,6 +526,9 @@
             url.searchParams.set('time', timePeriod);
             url.searchParams.set('page', '{{ page }}');
             url.searchParams.set('per_page', '{{ per_page }}');
+            if (searchInput.value) {
+                url.searchParams.set('search', searchInput.value);
+            }
             fetch(url, {
                 method: 'GET'
             })
@@ -483,12 +542,10 @@
                         expensesList.classList.remove('hidden');
                         
                         originalExpenseRows = Array.from(doc.querySelectorAll('#expenses-list tbody tr[data-date]'));
-                        const filteredExpenses = applySearchFilter(originalExpenseRows, searchTerm, 'expenses');
-                        
-                        if (filteredExpenses.length === 0) {
+                        if (originalExpenseRows.length === 0) {
                             emptyState.classList.remove('hidden');
                         } else {
-                            const groupedExpenses = groupByPeriod(filteredExpenses, timePeriod);
+                            const groupedExpenses = groupByPeriod(originalExpenseRows, timePeriod);
                             renderGroupedItems(groupedExpenses, timePeriod, 'expenses');
                         }
                     } else {
@@ -497,12 +554,11 @@
                         
                         originalSalesRows = Array.from(doc.querySelectorAll('#sales-history-body tr[data-date]'));
                         const filteredSales = filterSalesByStatus(originalSalesRows, statusFilter);
-                        const searchedSales = applySearchFilter(filteredSales, searchTerm, 'sales');
                         
-                        if (searchedSales.length === 0) {
+                        if (filteredSales.length === 0) {
                             emptyState.classList.remove('hidden');
                         } else {
-                            const groupedSales = groupByPeriod(searchedSales, timePeriod);
+                            const groupedSales = groupByPeriod(filteredSales, timePeriod);
                             renderGroupedItems(groupedSales, timePeriod, 'sales');
                         }
                     }
@@ -518,40 +574,59 @@
         }
 
         // Event listeners for filter buttons
-        allBtn.addEventListener('click', () => updateData(currentFilter, 'all', searchInput.value));
-        pendingBtn.addEventListener('click', () => updateData(currentFilter, 'pending', searchInput.value));
-        completedBtn.addEventListener('click', () => updateData(currentFilter, 'completed', searchInput.value));
-        expensesBtn.addEventListener('click', () => updateData(currentFilter, 'expenses', searchInput.value));
-        timeFilter.addEventListener('change', (e) => updateData(e.target.value, currentStatusFilter, searchInput.value));
+        allBtn.addEventListener('click', () => updateData(currentFilter, 'all'));
+        pendingBtn.addEventListener('click', () => updateData(currentFilter, 'pending'));
+        completedBtn.addEventListener('click', () => updateData(currentFilter, 'completed'));
+        expensesBtn.addEventListener('click', () => updateData(currentFilter, 'expenses'));
+        timeFilter.addEventListener('change', (e) => updateData(e.target.value, currentStatusFilter));
 
-        // Search input event listener for real-time filtering
-        searchInput.addEventListener('input', () => {
-            const searchTerm = searchInput.value;
-            if (currentStatusFilter === 'expenses') {
-                const filteredExpenses = applySearchFilter(originalExpenseRows, searchTerm, 'expenses');
-                if (filteredExpenses.length === 0) {
-                    emptyState.classList.remove('hidden');
-                    expensesList.classList.add('hidden');
-                } else {
-                    emptyState.classList.add('hidden');
-                    expensesList.classList.remove('hidden');
-                    const groupedExpenses = groupByPeriod(filteredExpenses, currentFilter);
-                    renderGroupedItems(groupedExpenses, currentFilter, 'expenses');
-                }
-            } else {
-                const filteredSales = filterSalesByStatus(originalSalesRows, currentStatusFilter);
-                const searchedSales = applySearchFilter(filteredSales, searchTerm, 'sales');
-                if (searchedSales.length === 0) {
-                    emptyState.classList.remove('hidden');
-                    salesHistory.classList.add('hidden');
-                } else {
-                    emptyState.classList.add('hidden');
-                    salesHistory.classList.remove('hidden');
-                    const groupedSales = groupByPeriod(searchedSales, currentFilter);
-                    renderGroupedItems(groupedSales, currentFilter, 'sales');
-                }
+        // Notification modal toggle
+        notificationBell.addEventListener('click', () => {
+            notificationModal.classList.remove('hidden');
+        });
+
+        closeNotificationModal.addEventListener('click', () => {
+            notificationModal.classList.add('hidden');
+        });
+
+        // Close modal when clicking outside
+        notificationModal.addEventListener('click', (e) => {
+            if (e.target === notificationModal) {
+                notificationModal.classList.add('hidden');
             }
         });
+
+        // Mark notification as read
+        function markNotificationRead(notificationId) {
+            fetch(`/mark_notification_read/${notificationId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                if (response.ok) {
+                    // Update the UI: remove the "Mark as Read" button and background highlight
+                    const notificationDiv = document.querySelector(`[onclick="markNotificationRead('${notificationId}')"]`).parentElement.parentElement;
+                    notificationDiv.classList.remove('bg-blue-50', 'dark:bg-blue-900');
+                    notificationDiv.querySelector('button').remove();
+                    // Update the unread count
+                    const badge = document.querySelector('#notification-bell span');
+                    let count = parseInt(badge.textContent) - 1;
+                    if (count <= 0) {
+                        badge.remove();
+                    } else {
+                        badge.textContent = count;
+                    }
+                } else {
+                    alert('Error marking notification as read');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error marking notification as read');
+            });
+        }
 
         // Toggle main dropdown menu
         function toggleMenu(menuId) {
@@ -571,6 +646,6 @@
         });
 
         // Initialize with default filters
-        updateData(currentFilter, 'all', searchInput.value);
+        updateData(currentFilter, 'all');
     </script>
 {% endblock %}
