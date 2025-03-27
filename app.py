@@ -17,6 +17,7 @@ app.secret_key = os.getenv('FLASK_SECRET_KEY')
 if not app.secret_key:
     raise ValueError("FLASK_SECRET_KEY environment variable must be set")
 csrf = CSRFProtect(app)
+app.jinja_env.globals['csrf_token'] = lambda: session.get('_csrf_token', '')
 
 # Initialize Firebase
 cred_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
@@ -555,6 +556,10 @@ def orders():
 def stock():
     """Handle stock management (add, restock, update price) and display stock page."""
     if request.method == 'POST':
+        # Restrict POST actions to managers only
+        if session['user']['role'] != 'manager':
+            return "Unauthorized: Only managers can modify stock", 403
+
         action = request.form.get('action')
         if action == 'add_stock':
             stock_id = request.form.get('stock_id')
