@@ -141,7 +141,7 @@
     {% endif %}
 </div>
 
-<!-- Print Styles - Modified to handle entire page print -->
+<!-- Print Styles -->
 <style type="text/css" media="print">
     @page {
         size: A4;
@@ -206,9 +206,12 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         // Print current sheet
-        document.getElementById('print-button')?.addEventListener('click', function() {
-            window.print();
-        });
+        const printButton = document.getElementById('print-button');
+        if (printButton) {
+            printButton.addEventListener('click', function() {
+                window.print();
+            });
+        }
     });
 
     // Print specific loading sheet by ID

@@ -1125,39 +1125,48 @@ def view_loading_sheet():
     sheet_id = request.args.get('sheet_id')
     print_mode = request.args.get('print') == 'true'
     
-    if sheet_id:
-        # Fetch loading sheet from Firestore
-        try:
-            sheet_ref = db.collection('loading_sheets').document(sheet_id).get()
-            if not sheet_ref.exists:
-                flash('Loading sheet not found', 'error')
-                return redirect(url_for('loading_sheets'))
-            
-            sheet_data = sheet_ref.to_dict()
-            sheet_data['id'] = sheet_id
-            
-            # Handle date conversion
-            if isinstance(sheet_data.get('created_at'), (firestore.SERVER_TIMESTAMP, datetime)):
-                created_at = sheet_data['created_at']
-            else:
-                created_at = datetime.now(KENYA_TZ)
-            
-            aggregated_items = sheet_data.get('items', [])
-            total_items = sheet_data.get('total_items', 0)
-            
-            return render_template('view_loading_sheet.html',
-                                aggregated_items=aggregated_items,
-                                total_items=total_items,
-                                created_at=created_at,
-                                current_date=datetime.now(KENYA_TZ),
-                                sheet_id=sheet_id,
-                                print_mode=print_mode)
-        except Exception as e:
-            flash(f'Error loading sheet: {str(e)}', 'error')
-            return redirect(url_for('loading_sheets'))
-    else:
+    if not sheet_id:
         flash('Sheet ID is required', 'error')
         return redirect(url_for('loading_sheets'))
+
+    # Fetch loading sheet from Firestore
+    try:
+        sheet_ref = db.collection('loading_sheets').document(sheet_id).get()
+        if not sheet_ref.exists:
+            flash('Loading sheet not found', 'error')
+            return redirect(url_for('loading_sheets'))
+        
+        sheet_data = sheet_ref.to_dict()
+        sheet_data['id'] = sheet_id
+        
+        # Handle date conversion
+        created_at_field = sheet_data.get('created_at')
+        if isinstance(created_at_field, datetime):
+            created_at = created_at_field
+        elif isinstance(created_at_field, str):
+            try:
+                created_at = datetime.fromisoformat(created_at_field)
+            except ValueError:
+                created_at = datetime.now(KENYA_TZ)
+        else:
+            created_at = datetime.now(KENYA_TZ)
+        
+        aggregated_items = sheet_data.get('items', [])
+        total_items = sheet_data.get('total_items', 0)
+        
+        return render_template('view_loading_sheet.html',
+                              aggregated_items=aggregated_items,
+                              total_items=total_items,
+                              created_at=created_at,
+                              current_date=datetime.now(KENYA_TZ),
+                              sheet_id=sheet_id,
+                              print_mode=print_mode)
+    except Exception as e:
+        print(f"Error in view-loading-sheet: {str(e)}")
+        flash(f'Error loading sheet: {str(e)}', 'error')
+        return redirect(url_for('loading_sheets'))
+        
+
 
 @app.route('/download-loading-sheet')
 @login_required
@@ -1176,11 +1185,18 @@ def download_loading_sheet():
             total_items = sheet_data.get('total_items', 0)
             
             # Handle created_at timestamp conversion
-            if isinstance(sheet_data.get('created_at'), (firestore.SERVER_TIMESTAMP, datetime)):
-                created_at = sheet_data['created_at']
+            created_at_field = sheet_data.get('created_at')
+            if isinstance(created_at_field, datetime):
+                created_at = created_at_field
+            elif isinstance(created_at_field, str):
+                try:
+                    created_at = datetime.fromisoformat(created_at_field)
+                except ValueError:
+                    created_at = datetime.now(KENYA_TZ)
             else:
                 created_at = datetime.now(KENYA_TZ)
         except Exception as e:
+            print(f"Error fetching loading sheet: {str(e)}")
             return f"Error fetching loading sheet: {str(e)}", 500
     # Handle current sheet in session
     else:
@@ -1272,6 +1288,7 @@ def download_loading_sheet():
             headers={"Content-Disposition": f"attachment;filename={filename}"}
         )
     except Exception as e:
+        print(f"Error generating PDF: {str(e)}")
         return f"Error generating PDF: {str(e)}", 500
         
 # ... existing imports and setup ...
