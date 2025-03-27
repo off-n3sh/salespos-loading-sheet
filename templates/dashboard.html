@@ -13,23 +13,13 @@
             <div class="mt-4 md:mt-0 flex flex-col sm:flex-row items-center space-y-3 sm:space-y-0 sm:space-x-4">
                 <div id="time-display" class="bg-blue-50 dark:bg-gray-700 px-4 py-2 rounded-lg text-blue-600 dark:text-blue-300 font-medium"></div>
                 <div class="flex w-full sm:w-auto">
-                    <input type="text" id="search-input" placeholder="Search loaded orders..." class="p-2 border rounded-l-lg w-full dark:bg-gray-800 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500" value="{{ search | default('') }}">
+                    <input type="text" id="search-input" placeholder="Search loaded orders..." class="p-2 border rounded-l-lg w-full dark:bg-gray-800 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500" value="">
                     <button type="button" class="p-2 bg-blue-600 text-white rounded-r-lg hover:bg-blue-700 focus:outline-none">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>
                     </button>
                 </div>
-                <!-- Server-side search form using GET -->
-                <form method="GET" action="{{ url_for('dashboard') }}" class="flex w-full sm:w-auto">
-                    <input type="hidden" name="time" value="{{ time_filter }}">
-                    <input type="text" name="search" placeholder="Search all orders..." class="p-2 border rounded-l-lg w-full dark:bg-gray-800 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <button type="submit" class="p-2 bg-blue-600 text-white rounded-r-lg hover:bg-blue-700 focus:outline-none">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
-                    </button>
-                </form>
             </div>
         </div>
     </div>
@@ -44,7 +34,7 @@
                 <div class="flex items-center justify-between relative z-10">
                     <div>
                         <h3 class="text-lg font-medium text-blue-100">Total Sales</h3>
-                        <p class="text-4xl font-bold mt-2">{{ (retail_sales + wholesale_sales_today) | round(2) | default(0) }}</p>
+                        <p class="text-4xl font-bold mt-2">{{ net_sales | round(2) | default(0) }}</p>
                         <p class="text-blue-100 mt-2 text-sm">Today's business performance</p>
                     </div>
                     <div class="bg-white bg-opacity-20 p-4 rounded-full">
@@ -250,10 +240,10 @@
             </div>
             <div class="flex space-x-2">
                 {% if page > 1 %}
-                <a href="{{ url_for('dashboard', page=page-1, per_page=per_page, time=time_filter, search=search) }}" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Previous</a>
+                <a href="{{ url_for('dashboard', page=page-1, per_page=per_page, time=time_filter) }}" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Previous</a>
                 {% endif %}
                 {% if page < total_pages %}
-                <a href="{{ url_for('dashboard', page=page+1, per_page=per_page, time=time_filter, search=search) }}" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Next</a>
+                <a href="{{ url_for('dashboard', page=page+1, per_page=per_page, time=time_filter) }}" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Next</a>
                 {% endif %}
             </div>
         </div>

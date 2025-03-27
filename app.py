@@ -230,27 +230,13 @@ def dashboard():
     page = int(request.args.get('page', 1))
     per_page = int(request.args.get('per_page', 50))  # Load 50 orders per page
     time_filter = request.args.get('time', 'all')
-    search_query = request.args.get('search', '')
 
     orders = []
     now = datetime.now(KENYA_TZ)
     start = (page - 1) * per_page
 
-    # Base query for orders
+    # Base query for orders (no server-side search)
     orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING)
-
-    # Apply server-side search if a query is provided
-    if search_query:
-        search_lower = search_query.lower().strip()
-        # Search by salesperson_name_lower or shop_name_lower
-        salesperson_orders = db.collection('orders').where('salesperson_name_lower', '>=', search_lower).where('salesperson_name_lower', '<=', search_lower + '\uf8ff').order_by('salesperson_name_lower').order_by('date', direction=firestore.Query.DESCENDING).stream()
-        shop_orders = db.collection('orders').where('shop_name_lower', '>=', search_lower).where('shop_name_lower', '<=', search_lower + '\uf8ff').order_by('shop_name_lower').order_by('date', direction=firestore.Query.DESCENDING).stream()
-        orders_set = set()
-        for doc in salesperson_orders:
-            orders_set.add(doc.id)
-        for doc in shop_orders:
-            orders_set.add(doc.id)
-        orders_ref = db.collection('orders').where(firestore.firestore.DocumentReference, 'in', list(orders_set)).order_by('date', direction=firestore.Query.DESCENDING)
 
     # Fetch total count for pagination
     total_orders = sum(1 for _ in orders_ref.stream())
@@ -301,23 +287,69 @@ def dashboard():
         filtered_orders = [o for o in orders if o['date'] >= start]
 
     # Calculate stats for the dashboard cards
-    all_orders = db.collection('orders').stream()  # Fetch all orders for stats (optimize this if needed)
-    wholesale_sales = sum(o.to_dict().get('payment', 0) for o in all_orders if o.to_dict().get('order_type') == 'wholesale')
-    retail_sales_all = sum(o.to_dict().get('payment', 0) for o in all_orders if o.to_dict().get('order_type') == 'retail') + sum(
-        r.to_dict().get('amount', 0) for r in db.collection('retail').get()
-    )
-    net_sales = wholesale_sales + retail_sales_all
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_end = today_start + timedelta(days=1)
 
-    total_debts = sum(o.to_dict().get('balance', 0) for o in all_orders if o.to_dict().get('balance', 0) > 0)
+    # Fetch all orders for stats
+    all_orders = db.collection('orders').stream()
 
-    retail_today_orders = db.collection('orders').where('order_type', '==', 'retail').where('date', '>=', now.replace(hour=0, minute=0, second=0, microsecond=0)).get()
-    retail_sales = sum(o.to_dict().get('payment', 0) for o in retail_today_orders) + sum(
+    # Retail Sales: Include orders booked today + orders closed today
+    retail_sales = 0
+    for order in all_orders:
+        order_dict = order.to_dict()
+        order_date = process_date(order_dict.get('date'))
+        closed_date = process_date(order_dict.get('closed_date', None)) if order_dict.get('closed_date') else None
+        order_type = order_dict.get('order_type', 'wholesale')
+        payment = order_dict.get('payment', 0)
+        balance = order_dict.get('balance', 0)
+
+        if order_type != 'retail':
+            continue
+
+        # Order booked today
+        if order_date >= today_start and order_date < today_end:
+            retail_sales += payment
+        # Order closed today (previously pending)
+        elif closed_date and closed_date >= today_start and closed_date < today_end and balance == 0:
+            # When closed, the balance is paid off, so add the original balance as the final payment
+            # We assume the balance was paid today to close the order
+            retail_sales += (payment + balance) - payment  # This is the balance paid to close
+
+    # Add retail collection (non-order retail sales)
+    retail_sales += sum(
         r.to_dict().get('amount', 0) for r in db.collection('retail').where('date', '==', now.strftime('%Y-%m-%d')).get()
     )
 
-    wholesale_today_orders = db.collection('orders').where('order_type', '==', 'wholesale').where('date', '>=', now.replace(hour=0, minute=0, second=0, microsecond=0)).get()
-    wholesale_sales_today = sum(o.to_dict().get('payment', 0) for o in wholesale_today_orders)
+    # Wholesale Sales: Include orders booked today + orders closed today
+    all_orders = db.collection('orders').stream()  # Reset iterator
+    wholesale_sales_today = 0
+    for order in all_orders:
+        order_dict = order.to_dict()
+        order_date = process_date(order_dict.get('date'))
+        closed_date = process_date(order_dict.get('closed_date', None)) if order_dict.get('closed_date') else None
+        order_type = order_dict.get('order_type', 'wholesale')
+        payment = order_dict.get('payment', 0)
+        balance = order_dict.get('balance', 0)
 
+        if order_type != 'wholesale':
+            continue
+
+        # Order booked today
+        if order_date >= today_start and order_date < today_end:
+            wholesale_sales_today += payment
+        # Order closed today (previously pending)
+        elif closed_date and closed_date >= today_start and closed_date < today_end and balance == 0:
+            # When closed, the balance is paid off, so add the original balance as the final payment
+            wholesale_sales_today += (payment + balance) - payment  # This is the balance paid to close
+
+    # Total Sales: Sum of retail and wholesale for today
+    net_sales = retail_sales + wholesale_sales_today
+
+    # Outstanding Debt: Sum all debts (not limited to today)
+    all_orders = db.collection('orders').stream()  # Reset iterator
+    total_debts = sum(o.to_dict().get('balance', 0) for o in all_orders if o.to_dict().get('balance', 0) > 0)
+
+    # Expenses
     expenses = [doc.to_dict() for doc in db.collection('expenses').order_by('date', direction=firestore.Query.DESCENDING).get()]
     total_expenses = sum(e['amount'] for e in expenses)
 
@@ -337,7 +369,6 @@ def dashboard():
         total_expenses=total_expenses,
         sales_history=sales_history,
         expenses=expenses,
-        search=search_query,
         recent_activity=recent_activity,
         time_filter=time_filter,
         page=page,
@@ -345,7 +376,7 @@ def dashboard():
         total_pages=total_pages,
         total_orders=total_orders
     )
-    
+        
 @app.route('/orders', methods=['GET', 'POST'])
 @no_cache
 @login_required
