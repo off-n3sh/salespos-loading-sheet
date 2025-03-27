@@ -12,9 +12,18 @@
             </div>
             <div class="mt-4 md:mt-0 flex flex-col sm:flex-row items-center space-y-3 sm:space-y-0 sm:space-x-4">
                 <div id="time-display" class="bg-blue-50 dark:bg-gray-700 px-4 py-2 rounded-lg text-blue-600 dark:text-blue-300 font-medium"></div>
-                <form method="POST" class="flex w-full sm:w-auto">
-                    {{ csrf_token() }}
-                    <input type="text" name="search" value="{{ search | default('') }}" placeholder="Search..." class="p-2 border rounded-l-lg w-full dark:bg-gray-800 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <div class="flex w-full sm:w-auto">
+                    <input type="text" id="search-input" placeholder="Search loaded orders..." class="p-2 border rounded-l-lg w-full dark:bg-gray-800 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500" value="{{ search | default('') }}">
+                    <button type="button" class="p-2 bg-blue-600 text-white rounded-r-lg hover:bg-blue-700 focus:outline-none">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </button>
+                </div>
+                <!-- Server-side search form using GET -->
+                <form method="GET" action="{{ url_for('dashboard') }}" class="flex w-full sm:w-auto">
+                    <input type="hidden" name="time" value="{{ time_filter }}">
+                    <input type="text" name="search" placeholder="Search all orders..." class="p-2 border rounded-l-lg w-full dark:bg-gray-800 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <button type="submit" class="p-2 bg-blue-600 text-white rounded-r-lg hover:bg-blue-700 focus:outline-none">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -132,7 +141,7 @@
         <div class="p-4 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex flex-wrap gap-3 items-center">
             <div class="flex space-x-2">
                 <button id="all-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
-                    All <span class="ml-2 bg-white bg-opacity-20 px-2 py-0.5 rounded-full text-xs">{{ sales_history | length }}</span>
+                    All <span class="ml-2 bg-white bg-opacity-20 px-2 py-0.5 rounded-full text-xs">{{ total_orders }}</span>
                 </button>
                 <button id="pending-btn" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
                     Pending <span class="ml-2 bg-white bg-opacity-20 px-2 py-0.5 rounded-full text-xs">{{ sales_history | selectattr('balance', '>', 0) | list | length }}</span>
@@ -179,7 +188,7 @@
                 </thead>
                 <tbody id="sales-history-body" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     {% for sale in sales_history %}
-                    <tr data-date="{{ sale.date.strftime('%Y-%m-%d') }}" class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                    <tr data-date="{{ sale.date.strftime('%Y-%m-%d') }}" data-search="{{ sale.shop_name | lower }} {{ sale.salesperson_name | lower }}" class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="w-10 h-10 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
                                 {% if sale.photoUrl %}
@@ -234,6 +243,21 @@
             </table>
         </div>
 
+        <!-- Pagination Controls -->
+        <div class="p-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center">
+            <div class="text-sm text-gray-600 dark:text-gray-400">
+                Showing {{ (page - 1) * per_page + 1 }} to {{ (page - 1) * per_page + sales_history | length }} of {{ total_orders }} orders
+            </div>
+            <div class="flex space-x-2">
+                {% if page > 1 %}
+                <a href="{{ url_for('dashboard', page=page-1, per_page=per_page, time=time_filter, search=search) }}" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Previous</a>
+                {% endif %}
+                {% if page < total_pages %}
+                <a href="{{ url_for('dashboard', page=page+1, per_page=per_page, time=time_filter, search=search) }}" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Next</a>
+                {% endif %}
+            </div>
+        </div>
+
         <!-- Expenses List (Hidden by Default) -->
         <div id="expenses-list" class="hidden overflow-x-auto">
             <table class="w-full">
@@ -247,7 +271,7 @@
                 </thead>
                 <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     {% for expense in expenses %}
-                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" data-date="{{ expense.date.strftime('%Y-%m-%d') }}">
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" data-date="{{ expense.date.strftime('%Y-%m-%d') }}" data-search="{{ expense.description | lower }} {{ expense.category | lower }}">
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-200">{{ expense.description }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600 dark:text-red-300">{{ expense.amount | round(2) }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-200">{{ expense.date.strftime('%d/%m/%Y %H:%M:%S') }}</td>
@@ -292,6 +316,7 @@
         setInterval(updateTime, 1000);
 
         // Get DOM elements
+        const searchInput = document.getElementById('search-input');
         const allBtn = document.getElementById('all-btn');
         const pendingBtn = document.getElementById('pending-btn');
         const completedBtn = document.getElementById('completed-btn');
@@ -305,6 +330,8 @@
         
         let currentFilter = '{{ time_filter }}';
         let currentStatusFilter = 'all';
+        let originalSalesRows = Array.from(salesHistoryBody.querySelectorAll('tr[data-date]'));
+        let originalExpenseRows = Array.from(expensesList.querySelectorAll('tr[data-date]'));
 
         // Show loading spinner
         function showLoading() {
@@ -340,7 +367,7 @@
             }
         }
 
-        // Group sales or expenses by time period (UPDATED to reverse sort)
+        // Group sales or expenses by time period (reverse sort)
         function groupByPeriod(items, period) {
             if (period === 'all') {
                 return { 'All Records': items };
@@ -431,8 +458,17 @@
             return sales;
         }
 
-        // Update the data based on the selected time period and status filter
-        function updateData(timePeriod, statusFilter) {
+        // Client-side search filter
+        function applySearchFilter(items, searchTerm, itemType) {
+            const searchLower = searchTerm.toLowerCase().trim();
+            return items.filter(item => {
+                const searchData = item.dataset.search || '';
+                return searchData.includes(searchLower);
+            });
+        }
+
+        // Update the data based on the selected time period, status filter, and search term
+        function updateData(timePeriod, statusFilter, searchTerm = '') {
             showLoading();
             
             emptyState.classList.add('hidden');
@@ -440,8 +476,12 @@
             currentFilter = timePeriod;
             currentStatusFilter = statusFilter;
             
-            fetch(`/?time=${timePeriod}`, {
-                method: 'GET'  // Ensure this matches the route's expected method
+            const url = new URL(window.location);
+            url.searchParams.set('time', timePeriod);
+            url.searchParams.set('page', '{{ page }}');
+            url.searchParams.set('per_page', '{{ per_page }}');
+            fetch(url, {
+                method: 'GET'
             })
                 .then(response => response.text())
                 .then(html => {
@@ -452,25 +492,27 @@
                         salesHistory.classList.add('hidden');
                         expensesList.classList.remove('hidden');
                         
-                        const expenseRows = Array.from(doc.querySelectorAll('#expenses-list tbody tr[data-date]'));
+                        originalExpenseRows = Array.from(doc.querySelectorAll('#expenses-list tbody tr[data-date]'));
+                        const filteredExpenses = applySearchFilter(originalExpenseRows, searchTerm, 'expenses');
                         
-                        if (expenseRows.length === 0) {
+                        if (filteredExpenses.length === 0) {
                             emptyState.classList.remove('hidden');
                         } else {
-                            const groupedExpenses = groupByPeriod(expenseRows, timePeriod);
+                            const groupedExpenses = groupByPeriod(filteredExpenses, timePeriod);
                             renderGroupedItems(groupedExpenses, timePeriod, 'expenses');
                         }
                     } else {
                         salesHistory.classList.remove('hidden');
                         expensesList.classList.add('hidden');
                         
-                        const allSalesRows = Array.from(doc.querySelectorAll('#sales-history-body tr[data-date]'));
-                        const filteredSalesRows = filterSalesByStatus(allSalesRows, statusFilter);
+                        originalSalesRows = Array.from(doc.querySelectorAll('#sales-history-body tr[data-date]'));
+                        const filteredSales = filterSalesByStatus(originalSalesRows, statusFilter);
+                        const searchedSales = applySearchFilter(filteredSales, searchTerm, 'sales');
                         
-                        if (filteredSalesRows.length === 0) {
+                        if (searchedSales.length === 0) {
                             emptyState.classList.remove('hidden');
                         } else {
-                            const groupedSales = groupByPeriod(filteredSalesRows, timePeriod);
+                            const groupedSales = groupByPeriod(searchedSales, timePeriod);
                             renderGroupedItems(groupedSales, timePeriod, 'sales');
                         }
                     }
@@ -486,11 +528,40 @@
         }
 
         // Event listeners for filter buttons
-        allBtn.addEventListener('click', () => updateData(currentFilter, 'all'));
-        pendingBtn.addEventListener('click', () => updateData(currentFilter, 'pending'));
-        completedBtn.addEventListener('click', () => updateData(currentFilter, 'completed'));
-        expensesBtn.addEventListener('click', () => updateData(currentFilter, 'expenses'));
-        timeFilter.addEventListener('change', (e) => updateData(e.target.value, currentStatusFilter));
+        allBtn.addEventListener('click', () => updateData(currentFilter, 'all', searchInput.value));
+        pendingBtn.addEventListener('click', () => updateData(currentFilter, 'pending', searchInput.value));
+        completedBtn.addEventListener('click', () => updateData(currentFilter, 'completed', searchInput.value));
+        expensesBtn.addEventListener('click', () => updateData(currentFilter, 'expenses', searchInput.value));
+        timeFilter.addEventListener('change', (e) => updateData(e.target.value, currentStatusFilter, searchInput.value));
+
+        // Search input event listener for real-time filtering
+        searchInput.addEventListener('input', () => {
+            const searchTerm = searchInput.value;
+            if (currentStatusFilter === 'expenses') {
+                const filteredExpenses = applySearchFilter(originalExpenseRows, searchTerm, 'expenses');
+                if (filteredExpenses.length === 0) {
+                    emptyState.classList.remove('hidden');
+                    expensesList.classList.add('hidden');
+                } else {
+                    emptyState.classList.add('hidden');
+                    expensesList.classList.remove('hidden');
+                    const groupedExpenses = groupByPeriod(filteredExpenses, currentFilter);
+                    renderGroupedItems(groupedExpenses, currentFilter, 'expenses');
+                }
+            } else {
+                const filteredSales = filterSalesByStatus(originalSalesRows, currentStatusFilter);
+                const searchedSales = applySearchFilter(filteredSales, searchTerm, 'sales');
+                if (searchedSales.length === 0) {
+                    emptyState.classList.remove('hidden');
+                    salesHistory.classList.add('hidden');
+                } else {
+                    emptyState.classList.add('hidden');
+                    salesHistory.classList.remove('hidden');
+                    const groupedSales = groupByPeriod(searchedSales, currentFilter);
+                    renderGroupedItems(groupedSales, currentFilter, 'sales');
+                }
+            }
+        });
 
         // Toggle main dropdown menu
         function toggleMenu(menuId) {
@@ -510,6 +581,6 @@
         });
 
         // Initialize with default filters
-        updateData(currentFilter, 'all');
+        updateData(currentFilter, 'all', searchInput.value);
     </script>
 {% endblock %}

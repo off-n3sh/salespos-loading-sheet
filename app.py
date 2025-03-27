@@ -221,19 +221,28 @@ def logout():
     return redirect(url_for('splash'))
 
 # Routes
-@app.route('/dashboard', methods=['GET', 'POST'])
+@app.route('/dashboard', methods=['GET'])
 @no_cache
 @login_required
 def dashboard():
     """Render the dashboard with stats cards and sales history."""
-    search_query = request.form.get('search', '') if request.method == 'POST' else request.args.get('search', '')
+    # Pagination parameters
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 50))  # Load 50 orders per page
     time_filter = request.args.get('time', 'all')
+    search_query = request.args.get('search', '')
+
     orders = []
     now = datetime.now(KENYA_TZ)
-    
-    # Fetch orders based on search query
+    start = (page - 1) * per_page
+
+    # Base query for orders
+    orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING)
+
+    # Apply server-side search if a query is provided
     if search_query:
         search_lower = search_query.lower().strip()
+        # Search by salesperson_name_lower or shop_name_lower
         salesperson_orders = db.collection('orders').where('salesperson_name_lower', '>=', search_lower).where('salesperson_name_lower', '<=', search_lower + '\uf8ff').order_by('salesperson_name_lower').order_by('date', direction=firestore.Query.DESCENDING).stream()
         shop_orders = db.collection('orders').where('shop_name_lower', '>=', search_lower).where('shop_name_lower', '<=', search_lower + '\uf8ff').order_by('shop_name_lower').order_by('date', direction=firestore.Query.DESCENDING).stream()
         orders_set = set()
@@ -241,41 +250,41 @@ def dashboard():
             orders_set.add(doc.id)
         for doc in shop_orders:
             orders_set.add(doc.id)
-        for doc_id in orders_set:
-            doc = db.collection('orders').document(doc_id).get()
-            if doc.exists:
-                order_dict = doc.to_dict()
-                orders.append({
-                    'receipt_id': order_dict.get('receipt_id', doc.id),
-                    'salesperson_name': order_dict.get('salesperson_name', 'N/A'),
-                    'shop_name': order_dict.get('shop_name', 'Unknown Shop'),
-                    'items': process_items(order_dict.get('items')),
-                    'photoUrl': order_dict.get('photoUrl', ''),
-                    'payment': order_dict.get('payment', 0),
-                    'balance': order_dict.get('balance', 0),
-                    'date': process_date(order_dict.get('date')),
-                    'closed_date': process_date(order_dict.get('closed_date', None)) if order_dict.get('closed_date') else None,
-                    'order_type': order_dict.get('order_type', 'wholesale')
-                })
-        orders.sort(key=lambda x: x['date'], reverse=True)
-    else:
-        orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).stream()
-        for doc in orders_ref:
-            order_dict = doc.to_dict()
-            orders.append({
-                'receipt_id': order_dict.get('receipt_id', doc.id),
-                'salesperson_name': order_dict.get('salesperson_name', 'N/A'),
-                'shop_name': order_dict.get('shop_name', 'Unknown Shop'),
-                'items': process_items(order_dict.get('items')),
-                'photoUrl': order_dict.get('photoUrl', ''),
-                'payment': order_dict.get('payment', 0),
-                'balance': order_dict.get('balance', 0),
-                'date': process_date(order_dict.get('date')),
-                'closed_date': process_date(order_dict.get('closed_date', None)) if order_dict.get('closed_date') else None,
-                'order_type': order_dict.get('order_type', 'wholesale')
-            })
+        orders_ref = db.collection('orders').where(firestore.firestore.DocumentReference, 'in', list(orders_set)).order_by('date', direction=firestore.Query.DESCENDING)
 
-    # Apply time filter to sales history
+    # Fetch total count for pagination
+    total_orders = sum(1 for _ in orders_ref.stream())
+
+    # Apply pagination
+    if page > 1:
+        # Get the last document from the previous page to start after
+        last_page_start = (page - 2) * per_page
+        last_doc = None
+        for i, doc in enumerate(orders_ref.stream()):
+            if i == last_page_start + per_page - 1:
+                last_doc = doc
+                break
+        if last_doc:
+            orders_ref = orders_ref.start_after(last_doc)
+
+    # Fetch the current page of orders
+    orders_query = orders_ref.limit(per_page).stream()
+    for doc in orders_query:
+        order_dict = doc.to_dict()
+        orders.append({
+            'receipt_id': order_dict.get('receipt_id', doc.id),
+            'salesperson_name': order_dict.get('salesperson_name', 'N/A'),
+            'shop_name': order_dict.get('shop_name', 'Unknown Shop'),
+            'items': process_items(order_dict.get('items')),
+            'photoUrl': order_dict.get('photoUrl', ''),
+            'payment': order_dict.get('payment', 0),
+            'balance': order_dict.get('balance', 0),
+            'date': process_date(order_dict.get('date')),
+            'closed_date': process_date(order_dict.get('closed_date', None)) if order_dict.get('closed_date') else None,
+            'order_type': order_dict.get('order_type', 'wholesale')
+        })
+
+    # Apply time filter to the fetched orders
     filtered_orders = orders.copy()
     if time_filter == 'day':
         start = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -292,14 +301,14 @@ def dashboard():
         filtered_orders = [o for o in orders if o['date'] >= start]
 
     # Calculate stats for the dashboard cards
-    wholesale_sales = sum(o['payment'] for o in orders if o['order_type'] == 'wholesale')
-    retail_sales_all = sum(o['payment'] for o in orders if o['order_type'] == 'retail') + sum(
+    all_orders = db.collection('orders').stream()  # Fetch all orders for stats (optimize this if needed)
+    wholesale_sales = sum(o.to_dict().get('payment', 0) for o in all_orders if o.to_dict().get('order_type') == 'wholesale')
+    retail_sales_all = sum(o.to_dict().get('payment', 0) for o in all_orders if o.to_dict().get('order_type') == 'retail') + sum(
         r.to_dict().get('amount', 0) for r in db.collection('retail').get()
     )
     net_sales = wholesale_sales + retail_sales_all
 
-    total_debts = sum(o['balance'] for o in orders if o['balance'] > 0)
-    applications = len(orders)
+    total_debts = sum(o.to_dict().get('balance', 0) for o in all_orders if o.to_dict().get('balance', 0) > 0)
 
     retail_today_orders = db.collection('orders').where('order_type', '==', 'retail').where('date', '>=', now.replace(hour=0, minute=0, second=0, microsecond=0)).get()
     retail_sales = sum(o.to_dict().get('payment', 0) for o in retail_today_orders) + sum(
@@ -315,11 +324,13 @@ def dashboard():
     sales_history = filtered_orders
     recent_activity = orders[:3]
 
+    # Calculate pagination metadata
+    total_pages = (total_orders + per_page - 1) // per_page
+
     return render_template(
         'dashboard.html',
-        user=session['user'],  # Pass the logged-in user object
+        user=session['user'],
         net_sales=net_sales,
-        applications=applications,
         retail_sales=retail_sales,
         wholesale_sales_today=wholesale_sales_today,
         total_debts=total_debts,
@@ -328,9 +339,13 @@ def dashboard():
         expenses=expenses,
         search=search_query,
         recent_activity=recent_activity,
-        time_filter=time_filter
+        time_filter=time_filter,
+        page=page,
+        per_page=per_page,
+        total_pages=total_pages,
+        total_orders=total_orders
     )
-
+    
 @app.route('/orders', methods=['GET', 'POST'])
 @no_cache
 @login_required
