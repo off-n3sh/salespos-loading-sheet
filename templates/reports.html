@@ -1,18 +1,67 @@
 {% extends "base.html" %}
-{% block title %}Reports{% endblock %}
+{% block title %}Financial Reports{% endblock %}
 {% block content %}
-<div class="container mx-auto px-4">
-    <h2 class="text-3xl font-bold mb-6 text-gray-900 dark:text-white">Financial Reports</h2>
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-8">
+        <h2 class="text-4xl font-extrabold text-gray-900 dark:text-white">Financial Dashboard</h2>
+        <div class="flex space-x-4">
+            <!-- Export Dropdown -->
+            <div class="relative">
+                <button id="export-dropdown-btn" class="flex items-center bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Export
+                </button>
+                <div id="export-dropdown" class="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-lg z-20 hidden">
+                    <div class="py-2">
+                        <h4 class="px-4 py-2 font-semibold text-gray-700 dark:text-gray-300">Export Reports</h4>
+                        <hr class="dark:border-gray-700">
+                        <div class="space-y-1 p-2">
+                            <button onclick="exportReport('sales')" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                                </svg>
+                                Sales Report
+                            </button>
+                            <button onclick="exportReport('debt')" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Debt Report
+                            </button>
+                            <button onclick="exportReport('stock')" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                </svg>
+                                Stock Movement
+                            </button>
+                            <button onclick="exportReport('user')" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a8 8 0 00-8 8h16a8 8 0 00-8-8z" />
+                                </svg>
+                                User Sales
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-    <!-- Time Filter -->
-    <div class="mb-6 flex items-center space-x-4">
-        <label for="time-filter" class="text-gray-700 dark:text-gray-300 font-semibold">Filter by Time:</label>
-        <select id="time-filter" class="p-2 border rounded dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500" onchange="updateFilter()">
-            <option value="day" {% if time_filter == 'day' %}selected{% endif %}>Daily</option>
-            <option value="week" {% if time_filter == 'week' %}selected{% endif %}>Weekly</option>
-            <option value="month" {% if time_filter == 'month' %}selected{% endif %}>Monthly</option>
-            <option value="year" {% if time_filter == 'year' %}selected{% endif %}>Yearly</option>
-        </select>
+            <!-- Time Filter Dropdown -->
+            <div class="relative">
+                <select id="time-filter" class="appearance-none bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 pr-8" onchange="updateFilter()">
+                    <option value="day" {% if time_filter == 'day' %}selected{% endif %}>Daily</option>
+                    <option value="week" {% if time_filter == 'week' %}selected{% endif %}>Weekly</option>
+                    <option value="month" {% if time_filter == 'month' %}selected{% endif %}>Monthly</option>
+                    <option value="year" {% if time_filter == 'year' %}selected{% endif %}>Yearly</option>
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700 dark:text-gray-300">
+                    <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                        <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+                    </svg>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Financial Metrics Cards -->
@@ -134,6 +183,7 @@
         window.location.href = `{{ url_for('reports') }}?time=${timeFilter}`;
     }
 
+    // Chart.js initialization
     const salesVsDebtsCtx = document.getElementById('sales-vs-debts-chart').getContext('2d');
     new Chart(salesVsDebtsCtx, {
         type: 'bar',
@@ -194,6 +244,7 @@
         }
     });
 
+    // Tab functionality
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.tab-btn').forEach(b => {
@@ -208,6 +259,33 @@
             document.querySelectorAll('.tab-content').forEach(content => content.classList.add('hidden'));
             document.getElementById(`${btn.getAttribute('data-tab')}-tab`).classList.remove('hidden');
         });
+    });
+
+    // Export functionality
+    function exportReport(type) {
+        const timeFilter = document.getElementById('time-filter').value;
+        window.location.href = `{{ url_for('export_report') }}?type=${type}&time=${timeFilter}`;
+    }
+
+    // Export Dropdown Toggle
+    document.getElementById('export-dropdown-btn').addEventListener('click', function() {
+        const dropdown = document.getElementById('export-dropdown');
+        dropdown.classList.toggle('hidden');
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(event) {
+        const dropdown = document.getElementById('export-dropdown');
+        const dropdownBtn = document.getElementById('export-dropdown-btn');
+        
+        if (!dropdownBtn.contains(event.target) && !dropdown.contains(event.target)) {
+            dropdown.classList.add('hidden');
+        }
+    });
+
+    // Prevent dropdown from closing when clicking inside
+    document.getElementById('export-dropdown').addEventListener('click', function(event) {
+        event.stopPropagation();
     });
 </script>
 

@@ -1353,90 +1353,109 @@ def get_loading_sheet(sheet_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/edit_order/<receipt_id>', methods=['POST'])
+@app.route('/edit_order/<order_id>', methods=['POST'])
 @login_required
-def edit_order(receipt_id):
-    # Fetch the order from Firestore
-    order_ref = db.collection('orders').where('receipt_id', '==', receipt_id).limit(1).stream()
-    order_doc = next(order_ref, None)
-    if not order_doc:
-        return jsonify({"status": "error", "error": "Order not found"}), 404
-
-    order_dict = order_doc.to_dict()
-    
-    # Check if the order is unpaid (balance > 0)
-    balance = order_dict.get('balance', 0)
-    if balance <= 0:
-        return jsonify({"status": "error", "error": "Cannot edit a paid order"}), 403
-
-    # Parse the new items from the form
-    items_raw = request.form.getlist('items[]')
-    new_items = []
-    i = 0
-    while i < len(items_raw):
-        if items_raw[i].startswith('product|'):
-            # Parse the item string (e.g., "product|ItemName|quantity|0|price|10|stock|0")
-            parts = items_raw[i].split('|')
-            product_name = parts[1]
-            price = float(parts[5]) if len(parts) > 5 and parts[5] else 0
-            # The quantity is in the next items[] entry
-            quantity = int(items_raw[i + 1]) if i + 1 < len(items_raw) else 0
-            if quantity > 0:  # Only add items with a valid quantity
-                new_items.append({'name': product_name, 'quantity': quantity, 'price': price})
-            i += 2  # Skip the quantity entry
-        else:
-            i += 1
-
-    # Append new items to the existing items_list, adding quantities for duplicates
-    existing_items = order_dict.get('items_list', [])
-    for new_item in new_items:
-        found = False
-        for existing_item in existing_items:
-            if existing_item['name'] == new_item['name']:
-                existing_item['quantity'] += new_item['quantity']
-                # Update the price if the new item has a price (in case it changed)
-                if 'price' in new_item and new_item['price'] > 0:
-                    existing_item['price'] = new_item['price']
-                found = True
-                break
-        if not found:
-            existing_items.append(new_item)
-
-    # Remove items with quantity <= 0
-    existing_items = [item for item in existing_items if item['quantity'] > 0]
-
-    # Update the order dictionary
-    order_dict['items_list'] = existing_items
-    order_dict['total_items'] = sum(item['quantity'] for item in existing_items)
-    
-    # Recalculate the total payment (sum of price * quantity for all items)
-    total_payment = sum(item['quantity'] * item['price'] for item in existing_items)
-    order_dict['payment'] = total_payment
-    # Update the balance (amount_paid remains the same, so recalculate balance)
-    amount_paid = order_dict.get('amount_paid', 0)
-    order_dict['balance'] = max(total_payment - amount_paid, 0)
-
-    # Update the order in Firestore
+def edit_order(order_id):
     try:
-        db.collection('orders').document(order_doc.id).update(order_dict)
+        # Fetch the existing order
+        order_ref = db.collection('orders').document(order_id)
+        order = order_ref.get()
+        if not order.exists:
+            return jsonify({"error": "Order not found"}), 404
 
-        # Add a notification for salespeople
-        notification_message = (
-            f"Order #{receipt_id} updated: {order_dict['total_items']} item"
-            f"{'s' if order_dict['total_items'] != 1 else ''} total, "
-            f"new balance: KSh {order_dict['balance']} on "
-            f"{datetime.now(KENYA_TZ).strftime('%d/%m/%Y %H:%M')}"
-        )
-        db.collection('notifications').add({
-            'user_id': order_dict['user_id'],  # Notify the salesperson who created the order
-            'message': notification_message,
-            'timestamp': datetime.now(KENYA_TZ),
-            'read': False
-        })
+        order_data = order.to_dict()
+        order_type = order_data.get('order_type', 'wholesale')
+        old_items = order_data.get('items', [])
+        old_items_list = []
+        i = 0
+        while i < len(old_items):
+            if old_items[i] == 'product':
+                product_name = old_items[i + 1]
+                quantity = int(old_items[i + 3]) if i + 3 < len(old_items) and old_items[i + 2] == 'quantity' else 0
+                price = float(old_items[i + 5]) if i + 5 < len(old_items) and old_items[i + 4] == 'price' else 0.0
+                old_items_list.append({'name': product_name, 'quantity': quantity, 'price': price})
+                i += 6
+            else:
+                i += 1
 
-        return jsonify({"status": "success", "message": "Order updated successfully"}), 200
+        # Get new items from the form
+        items = request.form.getlist('items[]')
+        shop_name = request.form.get('shop_name', order_data.get('shop_name', ''))
+        salesperson_name = request.form.get('salesperson_name', order_data.get('salesperson_name', ''))
+        amount_paid = float(request.form.get('amount_paid', order_data.get('payment', 0.0)))
+
+        # Parse new items
+        new_items_list = []
+        total_items = 0
+        subtotal = 0.0
+        i = 0
+        while i < len(items):
+            if items[i] == 'product':
+                product_name = items[i + 1]
+                quantity = int(items[i + 3]) if i + 3 < len(items) and items[i + 2] == 'quantity' else 0
+                price = float(items[i + 5]) if i + 5 < len(items) and items[i + 4] == 'price' else 0.0
+                new_items_list.append({'name': product_name, 'quantity': quantity, 'price': price})
+                total_items += quantity
+                subtotal += quantity * price
+                i += 6
+            else:
+                i += 1
+
+        # Adjust stock for wholesale orders
+        if order_type == 'wholesale':
+            # Restock items that were removed or reduced
+            for old_item in old_items_list:
+                old_qty = old_item['quantity']
+                new_item = next((item for item in new_items_list if item['name'] == old_item['name']), None)
+                new_qty = new_item['quantity'] if new_item else 0
+                qty_to_restock = old_qty - new_qty
+                if qty_to_restock > 0:
+                    stock_ref = db.collection('stock').where('stock_name', '==', old_item['name']).limit(1).stream()
+                    stock_doc = next(stock_ref, None)
+                    if stock_doc:
+                        current_qty = stock_doc.to_dict().get('stock_quantity', 0)
+                        stock_doc.reference.update({'stock_quantity': current_qty + qty_to_restock})
+
+            # Deduct stock for new or increased items
+            for new_item in new_items_list:
+                old_item = next((item for item in old_items_list if item['name'] == new_item['name']), None)
+                old_qty = old_item['quantity'] if old_item else 0
+                qty_to_deduct = new_item['quantity'] - old_qty
+                if qty_to_deduct > 0:
+                    stock_ref = db.collection('stock').where('stock_name', '==', new_item['name']).limit(1).stream()
+                    stock_doc = next(stock_ref, None)
+                    if stock_doc:
+                        current_qty = stock_doc.to_dict().get('stock_quantity', 0)
+                        if current_qty >= qty_to_deduct:
+                            stock_doc.reference.update({'stock_quantity': current_qty - qty_to_deduct})
+                        else:
+                            return jsonify({"error": f"Insufficient stock for {new_item['name']}. Available: {current_qty}, Requested: {qty_to_deduct}"}), 400
+
+        # Update the order
+        balance = subtotal - amount_paid
+        updated_order = {
+            'items': items,
+            'total_items': total_items,
+            'subtotal': subtotal,
+            'payment': amount_paid,
+            'balance': balance if balance > 0 else 0,
+            'shop_name': shop_name,
+            'salesperson_name': salesperson_name,
+            'order_type': order_type,
+            'date': order_data.get('date', datetime.now(KENYA_TZ).isoformat())
+        }
+        order_ref.set(updated_order)
+
+        log_user_action('Updated Order', f'Updated order {order_id} with {total_items} items')
+        return jsonify({"status": "success"}), 200
     except Exception as e:
-        return jsonify({"status": "error", "error": f"Failed to update order: {str(e)}"}), 500
+        error_msg = f"Failed to update order {order_id}: {str(e)}"
+        print(error_msg)
+        return jsonify({
+            "error": error_msg,
+            "user_id": session.get('user', {}).get('id', 'unknown'),
+            "status": "error"
+        }), 500
         
 @app.route('/delete_order/<receipt_id>', methods=['POST'])
 @login_required
@@ -1484,3 +1503,235 @@ def delete_order(receipt_id):
 
     except Exception as e:
         return jsonify({"status": "error", "error": f"Failed to delete order: {str(e)}"}), 500
+
+@app.route('/export_report')
+@no_cache
+@login_required
+def export_report():
+    """Generate and export a PDF report based on the type and time filter."""
+    report_type = request.args.get('type')
+    time_filter = request.args.get('time', 'month')
+    now = datetime.now(KENYA_TZ)
+
+    # Determine the time range based on filter
+    if time_filter == 'day':
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif time_filter == 'week':
+        start = now - timedelta(days=now.weekday())
+        start = start.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif time_filter == 'month':
+        start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    elif time_filter == 'year':
+        start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    else:
+        start = None
+
+    # Generate PDF
+    buffer = BytesIO()
+    p = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+
+    # Header
+    p.setFont("Helvetica-Bold", 14)
+    p.drawCentredString(width / 2, height - 50, "Dreamland Distributors")
+    p.setFont("Helvetica", 10)
+    p.drawCentredString(width / 2, height - 70, "P.O Box 123-00200 Nairobi | Phone: 0725 530632")
+    p.line(50, height - 80, width - 50, height - 80)
+    p.setFont("Helvetica-Bold", 12)
+    report_title = f"{report_type.capitalize()} Report - {time_filter.capitalize()}"
+    p.drawCentredString(width / 2, height - 100, report_title)
+    p.setFont("Helvetica", 10)
+    p.drawString(50, height - 120, f"Generated on: {now.strftime('%d/%m/%Y %H:%M')}")
+
+    y = height - 160
+
+    if report_type == 'stock':
+        # Stock Movement Report
+        p.setFont("Helvetica-Bold", 10)
+        p.drawString(50, y, "Product")
+        p.drawString(200, y, "Category")
+        p.drawString(350, y, "Change Type")
+        p.drawString(450, y, "Quantity")
+        p.line(50, y - 5, width - 50, y - 5)
+        y -= 20
+
+        stock_logs = db.collection('stock_logs').order_by('timestamp', direction=firestore.Query.DESCENDING).stream()
+        p.setFont("Helvetica", 10)
+        total_movement = 0
+        for log in stock_logs:
+            log_dict = log.to_dict()
+            timestamp = process_date(log_dict.get('timestamp'))
+            if start and timestamp < start:
+                continue
+            if y < 100:
+                p.showPage()
+                p.setFont("Helvetica", 10)
+                y = height - 50
+            p.drawString(50, y, log_dict.get('subtype', 'Unknown'))
+            p.drawString(200, y, log_dict.get('product_type', 'Unknown'))
+            p.drawString(350, y, log_dict.get('change_type', 'N/A'))
+            qty = log_dict.get('quantity', 0)
+            total_movement += qty
+            p.drawString(450, y, str(qty))
+            y -= 20
+
+        y -= 20
+        p.line(50, y, width - 50, y)
+        y -= 20
+        p.setFont("Helvetica-Bold", 10)
+        p.drawString(50, y, f"Total Items Moved: {total_movement}")
+
+    elif report_type == 'user':
+        # User Sales Report
+        p.setFont("Helvetica-Bold", 10)
+        p.drawString(50, y, "User")
+        p.drawString(150, y, "Order ID")
+        p.drawString(250, y, "Shop")
+        p.drawString(350, y, "Items Sold")
+        p.drawString(450, y, "Debt")
+        p.drawString(500, y, "Total Sales")
+        p.line(50, y - 5, width - 50, y - 5)
+        y -= 20
+
+        orders = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).stream()
+        p.setFont("Helvetica", 10)
+        user_data = {}
+        for order in orders:
+            order_dict = order.to_dict()
+            order_date = process_date(order_dict.get('date'))
+            if start and order_date < start:
+                continue
+            salesperson = order_dict.get('salesperson_name', 'Unknown')
+            if salesperson not in user_data:
+                user_data[salesperson] = {'orders': 0, 'debt': 0, 'sales': 0, 'items': 0}
+            user_data[salesperson]['orders'] += 1
+            user_data[salesperson]['debt'] += order_dict.get('balance', 0)
+            user_data[salesperson]['sales'] += order_dict.get('payment', 0)
+            user_data[salesperson]['items'] += process_items(order_dict.get('items', []))
+
+            if y < 100:
+                p.showPage()
+                p.setFont("Helvetica", 10)
+                y = height - 50
+            p.drawString(50, y, salesperson)
+            p.drawString(150, y, order_dict.get('receipt_id', order.id))
+            p.drawString(250, y, order_dict.get('shop_name', 'Unknown'))
+            p.drawString(350, y, str(process_items(order_dict.get('items', []))))
+            p.drawString(450, y, f"{order_dict.get('balance', 0):.2f}")
+            p.drawString(500, y, f"{order_dict.get('payment', 0):.2f}")
+            y -= 20
+
+        y -= 20
+        p.line(50, y, width - 50, y)
+        y -= 20
+        p.setFont("Helvetica-Bold", 10)
+        for user, data in user_data.items():
+            if y < 100:
+                p.showPage()
+                p.setFont("Helvetica-Bold", 10)
+                y = height - 50
+            p.drawString(50, y, f"Summary for {user}:")
+            p.drawString(150, y, f"Orders: {data['orders']}")
+            p.drawString(250, y, f"Items: {data['items']}")
+            p.drawString(350, y, f"Debt: {data['debt']:.2f} KES")
+            p.drawString(450, y, f"Sales: {data['sales']:.2f} KES")
+            y -= 20
+
+    elif report_type == 'debt':
+        # Debt Report
+        p.setFont("Helvetica-Bold", 10)
+        p.drawString(50, y, "Order ID")
+        p.drawString(150, y, "Shop")
+        p.drawString(250, y, "Salesperson")
+        p.drawString(350, y, "Debt Amount")
+        p.drawString(450, y, "Date")
+        p.line(50, y - 5, width - 50, y - 5)
+        y -= 20
+
+        orders = db.collection('orders').where('balance', '>', 0).order_by('date', direction=firestore.Query.DESCENDING).stream()
+        p.setFont("Helvetica", 10)
+        total_debt = 0
+        for order in orders:
+            order_dict = order.to_dict()
+            order_date = process_date(order_dict.get('date'))
+            if start and order_date < start:
+                continue
+            debt = order_dict.get('balance', 0)
+            total_debt += debt
+            if y < 100:
+                p.showPage()
+                p.setFont("Helvetica", 10)
+                y = height - 50
+            p.drawString(50, y, order_dict.get('receipt_id', order.id))
+            p.drawString(150, y, order_dict.get('shop_name', 'Unknown'))
+            p.drawString(250, y, order_dict.get('salesperson_name', 'Unknown'))
+            p.drawString(350, y, f"{debt:.2f} KES")
+            p.drawString(450, y, order_date.strftime('%d/%m/%Y'))
+            y -= 20
+
+        y -= 20
+        p.line(50, y, width - 50, y)
+        y -= 20
+        p.setFont("Helvetica-Bold", 10)
+        p.drawString(50, y, f"Total Outstanding Debt: {total_debt:.2f} KES")
+
+    elif report_type == 'sales':
+        # Sales Report
+        p.setFont("Helvetica-Bold", 10)
+        p.drawString(50, y, "Order ID")
+        p.drawString(150, y, "Shop")
+        p.drawString(250, y, "Salesperson")
+        p.drawString(350, y, "Items")
+        p.drawString(400, y, "Payment")
+        p.drawString(450, y, "Date")
+        p.line(50, y - 5, width - 50, y - 5)
+        y -= 20
+
+        orders = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).stream()
+        p.setFont("Helvetica", 10)
+        total_sales = 0
+        for order in orders:
+            order_dict = order.to_dict()
+            order_date = process_date(order_dict.get('date'))
+            if start and order_date < start:
+                continue
+            payment = order_dict.get('payment', 0)
+            total_sales += payment
+            if y < 100:
+                p.showPage()
+                p.setFont("Helvetica", 10)
+                y = height - 50
+            p.drawString(50, y, order_dict.get('receipt_id', order.id))
+            p.drawString(150, y, order_dict.get('shop_name', 'Unknown'))
+            p.drawString(250, y, order_dict.get('salesperson_name', 'Unknown'))
+            p.drawString(350, y, str(process_items(order_dict.get('items', []))))
+            p.drawString(400, y, f"{payment:.2f} KES")
+            p.drawString(450, y, order_date.strftime('%d/%m/%Y'))
+            y -= 20
+
+        y -= 20
+        p.line(50, y, width - 50, y)
+        y -= 20
+        p.setFont("Helvetica-Bold", 10)
+        p.drawString(50, y, f"Total Sales: {total_sales:.2f} KES")
+
+    else:
+        p.setFont("Helvetica", 12)
+        p.drawString(50, y, "Invalid report type selected.")
+        y -= 20
+
+    # Footer
+    y -= 30
+    p.setFont("Helvetica", 10)
+    p.drawString(50, y, "Generated by: Dreamland Distributors System")
+
+    p.showPage()
+    p.save()
+    buffer.seek(0)
+
+    filename = f"{report_type}_report_{now.strftime('%Y%m%d_%H%M')}.pdf"
+    return Response(
+        buffer,
+        mimetype='application/pdf',
+        headers={"Content-Disposition": f"attachment;filename={filename}"}
+    )
