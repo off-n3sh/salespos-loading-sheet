@@ -1005,8 +1005,39 @@ def load_to_loading_sheet(receipt_id, action):
         else:
             i += 1
 
-    loading_sheet_id = f"LOAD_{datetime.now(KENYA_TZ).strftime('%Y%m%d_%H%M%S')}"
-    
+    # If action is 'new', save the current sheet to Firestore before creating a new one
+    if action == 'new' and 'current_loading_sheet' in session:
+        current_sheet = session['current_loading_sheet']
+        items = current_sheet.get('items', [])
+        total_items = current_sheet.get('total_items', 0)
+        
+        # Parse created_at from session
+        created_at_str = current_sheet.get('created_at')
+        if isinstance(created_at_str, str):
+            try:
+                created_at = datetime.fromisoformat(created_at_str)
+            except ValueError:
+                created_at = datetime.now(KENYA_TZ)
+        else:
+            created_at = datetime.now(KENYA_TZ)
+
+        # Generate a unique loading sheet ID
+        loading_sheet_id = f"LOAD_{datetime.now(KENYA_TZ).strftime('%Y%m%d_%H%M%S')}"
+        
+        # Save the current sheet to Firestore
+        db.collection('loading_sheets').document(loading_sheet_id).set({
+            'items': items,
+            'total_items': total_items,
+            'created_at': created_at
+        })
+        
+        # Log the action
+        log_user_action('Saved Loading Sheet', f"Saved loading sheet {loading_sheet_id} with {total_items} items")
+        
+        # Clear the current sheet from session
+        session.pop('current_loading_sheet')
+
+    # Now handle the new items
     if action == 'current' and 'current_loading_sheet' in session:
         current_items = session.get('current_loading_sheet', {}).get('items', [])
         for item in items_list:
@@ -1024,18 +1055,15 @@ def load_to_loading_sheet(receipt_id, action):
             'created_at': session.get('current_loading_sheet', {}).get('created_at', datetime.now(KENYA_TZ).isoformat())
         }
     else:
+        # Create a new loading sheet in session
         session['current_loading_sheet'] = {
             'items': items_list,
             'total_items': sum(item['quantity'] for item in items_list),
             'created_at': datetime.now(KENYA_TZ).isoformat()
         }
-        db.collection('loading_sheets').document(loading_sheet_id).set({
-            'items': items_list,
-            'total_items': sum(item['quantity'] for item in items_list),
-            'created_at': datetime.now(KENYA_TZ)
-        })
 
     return redirect(url_for('loading_sheets'))
+
 
 @app.route('/loading-sheets')
 @login_required
@@ -1066,39 +1094,30 @@ def loading_sheets():
             sheet_data = doc.to_dict()
             sheet_data['id'] = doc.id
             # Convert Firestore timestamp to datetime if needed
-            if isinstance(sheet_data.get('created_at'), (firestore.SERVER_TIMESTAMP, datetime)):
-                sheet_data['created_at'] = sheet_data['created_at']
+            created_at_field = sheet_data.get('created_at')
+            if isinstance(created_at_field, datetime):
+                sheet_data['created_at'] = created_at_field
+            elif isinstance(created_at_field, str):
+                try:
+                    sheet_data['created_at'] = datetime.fromisoformat(created_at_field)
+                except ValueError:
+                    sheet_data['created_at'] = datetime.now(KENYA_TZ)
+            else:
+                sheet_data['created_at'] = datetime.now(KENYA_TZ)
             recent_sheets.append(sheet_data)
     except Exception as e:
-        # Handle any database errors gracefully
         print(f"Error fetching recent sheets: {e}")
         recent_sheets = []
 
     now = datetime.now(KENYA_TZ)
     
-    # Get recent activity
-    try:
-        recent_activity = [
-            {
-                'receipt_id': doc.to_dict().get('receipt_id', doc.id),
-                'salesperson_name': doc.to_dict().get('salesperson_name', 'N/A'),
-                'shop_name': doc.to_dict().get('shop_name', 'Unknown Shop'),
-                'date': process_date(doc.to_dict().get('date', now))
-            }
-            for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).limit(3).get()
-        ]
-    except Exception as e:
-        print(f"Error fetching recent activity: {e}")
-        recent_activity = []
-
     return render_template('loading_sheets.html', 
                           aggregated_items=aggregated_items, 
                           current_date=now, 
                           total_items=total_items, 
                           created_at=created_at, 
-                          recent_sheets=recent_sheets, 
-                          recent_activity=recent_activity)
-
+                          recent_sheets=recent_sheets)
+                          
 @app.route('/view-loading-sheet')
 @login_required
 def view_loading_sheet():
@@ -1260,8 +1279,37 @@ def download_loading_sheet():
 @app.route('/create-loading-sheet')
 @login_required
 def create_loading_sheet():
-    """Create a new loading sheet by clearing the current one in session."""
+    """Create a new loading sheet by saving the current one to Firestore and clearing the session."""
+    # Check if there's a current loading sheet in session
     if 'current_loading_sheet' in session:
+        current_sheet = session['current_loading_sheet']
+        items = current_sheet.get('items', [])
+        total_items = current_sheet.get('total_items', 0)
+        
+        # Parse created_at from session
+        created_at_str = current_sheet.get('created_at')
+        if isinstance(created_at_str, str):
+            try:
+                created_at = datetime.fromisoformat(created_at_str)
+            except ValueError:
+                created_at = datetime.now(KENYA_TZ)
+        else:
+            created_at = datetime.now(KENYA_TZ)
+
+        # Generate a unique loading sheet ID
+        loading_sheet_id = f"LOAD_{datetime.now(KENYA_TZ).strftime('%Y%m%d_%H%M%S')}"
+        
+        # Save the current sheet to Firestore
+        db.collection('loading_sheets').document(loading_sheet_id).set({
+            'items': items,
+            'total_items': total_items,
+            'created_at': created_at
+        })
+        
+        # Log the action
+        log_user_action('Saved Loading Sheet', f"Saved loading sheet {loading_sheet_id} with {total_items} items")
+        
+        # Clear the current sheet from session
         session.pop('current_loading_sheet')
     
     log_user_action('Created New Loading Sheet', 'Started a fresh loading sheet')

@@ -18,6 +18,7 @@
     </div>
 
     <!-- Current Loading Sheet Card -->
+    {% if aggregated_items %}
     <div id="current-loading-sheet" class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-8">
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b pb-4">
             <h2 class="text-xl font-bold text-gray-900 dark:text-white">Current Loading Sheet</h2>
@@ -92,6 +93,11 @@
             </div>
         </div>
     </div>
+    {% else %}
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-8 text-center">
+        <p class="text-gray-600 dark:text-gray-400">No current loading sheet. Click "New Sheet" to create one.</p>
+    </div>
+    {% endif %}
 
     <!-- Recent Loading Sheets Section -->
     {% if recent_sheets %}
@@ -127,30 +133,6 @@
                             Download
                         </a>
                     </div>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Recent Activity Section -->
-    {% if recent_activity %}
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-        <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Recent Activity
-        </h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {% for activity in recent_activity %}
-            <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 shadow">
-                <p class="text-gray-900 dark:text-white font-medium">Receipt #{{ activity.receipt_id }}</p>
-                <div class="mt-2 space-y-1 text-sm text-gray-600 dark:text-gray-400">
-                    <p>Salesperson: {{ activity.salesperson_name }}</p>
-                    <p>Shop: {{ activity.shop_name }}</p>
-                    <p>Date: {{ activity.date.strftime('%d/%m/%Y %H:%M') }}</p>
                 </div>
             </div>
             {% endfor %}
@@ -224,7 +206,7 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         // Print current sheet
-        document.getElementById('print-button').addEventListener('click', function() {
+        document.getElementById('print-button')?.addEventListener('click', function() {
             window.print();
         });
     });
