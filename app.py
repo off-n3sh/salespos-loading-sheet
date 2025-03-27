@@ -242,6 +242,7 @@ def dashboard():
     # Apply server-side search if a query is provided
     if search_query:
         search_lower = search_query.lower()
+        # Search by salesperson_name_lower or shop_name_lower
         salesperson_orders = db.collection('orders').where('salesperson_name_lower', '>=', search_lower).where('salesperson_name_lower', '<=', search_lower + '\uf8ff').order_by('salesperson_name_lower').order_by('date', direction=firestore.Query.DESCENDING).stream()
         shop_orders = db.collection('orders').where('shop_name_lower', '>=', search_lower).where('shop_name_lower', '<=', search_lower + '\uf8ff').order_by('shop_name_lower').order_by('date', direction=firestore.Query.DESCENDING).stream()
         matching_order_ids = set()
@@ -249,42 +250,78 @@ def dashboard():
             matching_order_ids.add(doc.id)
         for doc in shop_orders:
             matching_order_ids.add(doc.id)
+
         if matching_order_ids:
-            orders_ref = db.collection('orders').where(firestore.firestore.DocumentReference, 'in', list(matching_order_ids)).order_by('date', direction=firestore.Query.DESCENDING)
+            # Fetch the matching orders directly by their document IDs
+            matching_orders = []
+            for doc_id in matching_order_ids:
+                doc = db.collection('orders').document(doc_id).get()
+                if doc.exists:
+                    matching_orders.append((doc, process_date(doc.to_dict().get('date'))))
+            # Sort by date in descending order
+            matching_orders.sort(key=lambda x: x[1], reverse=True)
+            orders_ref = matching_orders  # Use the sorted list directly
         else:
-            orders_ref = db.collection('orders').where('salesperson_name_lower', '==', 'no_match')  # Force no results
+            orders_ref = []  # No matches, return an empty list
+    else:
+        orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).stream()
 
     # Fetch total count for pagination
-    total_orders = sum(1 for _ in orders_ref.stream())
+    if search_query and matching_order_ids:
+        total_orders = len(matching_order_ids)
+    else:
+        total_orders = sum(1 for _ in db.collection('orders').stream())
 
     # Apply pagination
-    if page > 1:
-        last_page_start = (page - 2) * per_page
-        last_doc = None
-        for i, doc in enumerate(orders_ref.stream()):
-            if i == last_page_start + per_page - 1:
-                last_doc = doc
-                break
-        if last_doc:
-            orders_ref = orders_ref.start_after(last_doc)
+    if search_query:
+        # For search results, paginate the in-memory list
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        paginated_orders = orders_ref[start_idx:end_idx]
+        for doc, _ in paginated_orders:
+            order_dict = doc.to_dict()
+            orders.append({
+                'receipt_id': order_dict.get('receipt_id', doc.id),
+                'salesperson_name': order_dict.get('salesperson_name', 'N/A'),
+                'shop_name': order_dict.get('shop_name', 'Unknown Shop'),
+                'items': process_items(order_dict.get('items')),
+                'photoUrl': order_dict.get('photoUrl', ''),
+                'payment': order_dict.get('payment', 0),
+                'balance': order_dict.get('balance', 0),
+                'date': process_date(order_dict.get('date')),
+                'closed_date': process_date(order_dict.get('closed_date', None)) if order_dict.get('closed_date') else None,
+                'order_type': order_dict.get('order_type', 'wholesale'),
+                'final_payment': order_dict.get('final_payment', 0)
+            })
+    else:
+        # For non-search results, paginate using Firestore
+        if page > 1:
+            last_page_start = (page - 2) * per_page
+            last_doc = None
+            for i, doc in enumerate(orders_ref):
+                if i == last_page_start + per_page - 1:
+                    last_doc = doc
+                    break
+            if last_doc:
+                orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).start_after(last_doc).stream()
 
-    # Fetch the current page of orders
-    orders_query = orders_ref.limit(per_page).stream()
-    for doc in orders_query:
-        order_dict = doc.to_dict()
-        orders.append({
-            'receipt_id': order_dict.get('receipt_id', doc.id),
-            'salesperson_name': order_dict.get('salesperson_name', 'N/A'),
-            'shop_name': order_dict.get('shop_name', 'Unknown Shop'),
-            'items': process_items(order_dict.get('items')),
-            'photoUrl': order_dict.get('photoUrl', ''),
-            'payment': order_dict.get('payment', 0),
-            'balance': order_dict.get('balance', 0),
-            'date': process_date(order_dict.get('date')),
-            'closed_date': process_date(order_dict.get('closed_date', None)) if order_dict.get('closed_date') else None,
-            'order_type': order_dict.get('order_type', 'wholesale'),
-            'final_payment': order_dict.get('final_payment', 0)
-        })
+        # Fetch the current page of orders
+        orders_query = orders_ref if search_query else db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).limit(per_page).stream()
+        for doc in orders_query:
+            order_dict = doc.to_dict()
+            orders.append({
+                'receipt_id': order_dict.get('receipt_id', doc.id),
+                'salesperson_name': order_dict.get('salesperson_name', 'N/A'),
+                'shop_name': order_dict.get('shop_name', 'Unknown Shop'),
+                'items': process_items(order_dict.get('items')),
+                'photoUrl': order_dict.get('photoUrl', ''),
+                'payment': order_dict.get('payment', 0),
+                'balance': order_dict.get('balance', 0),
+                'date': process_date(order_dict.get('date')),
+                'closed_date': process_date(order_dict.get('closed_date', None)) if order_dict.get('closed_date') else None,
+                'order_type': order_dict.get('order_type', 'wholesale'),
+                'final_payment': order_dict.get('final_payment', 0)
+            })
 
     # Apply time filter to the fetched orders
     filtered_orders = orders.copy()
@@ -355,7 +392,7 @@ def dashboard():
     total_expenses = sum(e['amount'] for e in expenses)
 
     # Fetch notifications for the current user
-    user_id = session['user'].get('id', '')  # Adjust based on how user ID is stored in session
+    user_id = session['user'].get('id', '')
     notifications_ref = db.collection('notifications').where('recipient', '==', user_id).order_by('timestamp', direction=firestore.Query.DESCENDING).limit(10).stream()
     notifications = []
     unread_count = 0
@@ -402,11 +439,22 @@ def dashboard():
 def mark_notification_read(notification_id):
     try:
         notification_ref = db.collection('notifications').document(notification_id)
+        notification_doc = notification_ref.get()
+        if not notification_doc.exists:
+            return "Notification not found", 404
+
+        # Verify the user has permission to update this notification
+        user_id = session['user'].get('id', '')
+        notification_dict = notification_doc.to_dict()
+        if notification_dict.get('recipient') != user_id:
+            return "Unauthorized: You can only mark your own notifications as read", 403
+
         notification_ref.update({'read': True})
         return '', 200
     except Exception as e:
+        print(f"Error marking notification as read: {str(e)}")  # Log the error for debugging
         return f"Error marking notification as read: {str(e)}", 500
-        
+               
 @app.route('/orders', methods=['GET', 'POST'])
 @no_cache
 @login_required

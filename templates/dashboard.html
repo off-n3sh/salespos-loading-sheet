@@ -30,7 +30,7 @@
                         {% endif %}
                     </div>
                 </form>
-                <!-- Notification Bell Icon -->
+                <!-- Dynamic Notification Bell Icon -->
                 <div class="relative">
                     <button id="notification-bell" class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 focus:outline-none">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -318,334 +318,316 @@
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Description</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Amount</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Category</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"></th>
                     </tr>
                 </thead>
                 <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     {% for expense in expenses %}
-                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" data-date="{{ expense.date.strftime('%Y-%m-%d') }}" data-search="{{ expense.description | lower }} {{ expense.category | lower }}">
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-200">{{ expense.description }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600 dark:text-red-300">{{ expense.amount | round(2) }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-200">{{ expense.date.strftime('%d/%m/%Y %H:%M:%S') }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-                                {{ expense.category }}
-                            </span>
+                    <tr data-date="{{ expense.date }}" class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">{{ expense.description }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">{{ expense.amount | round(2) }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{{ expense.date }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <!-- Add actions if needed -->
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-        
-        <!-- Empty State for Filtered Data -->
-        <div id="empty-state" class="hidden p-8 text-center">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <p class="mt-4 text-gray-600 dark:text-gray-400 text-lg">No data found for the selected filter</p>
-            <p class="text-gray-500 dark:text-gray-500 text-sm mt-2">Try changing your filter criteria</p>
-        </div>
     </div>
 
-    <!-- JavaScript -->
-    <script>
-        // Time display function
-        function updateTime() {
-            const nairobiTime = new Date().toLocaleString('en-US', { 
-                timeZone: 'Africa/Nairobi', 
-                day: '2-digit', 
-                month: '2-digit', 
-                year: 'numeric', 
-                hour: '2-digit', 
-                minute: '2-digit', 
-                second: '2-digit', 
-                hour12: false 
-            });
-            document.getElementById('time-display').textContent = nairobiTime.replace(',', '');
-        }
-        updateTime();
-        setInterval(updateTime, 1000);
+    <!-- Empty State -->
+    <div id="empty-state" class="hidden text-center py-10">
+        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+        </svg>
+        <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">No records found</h3>
+        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Try adjusting your filters or search terms.</p>
+    </div>
+{% endblock %}
 
-        // Get DOM elements
-        const searchInput = document.getElementById('search-input');
-        const allBtn = document.getElementById('all-btn');
-        const pendingBtn = document.getElementById('pending-btn');
-        const completedBtn = document.getElementById('completed-btn');
-        const expensesBtn = document.getElementById('expenses-btn');
-        const salesHistory = document.getElementById('sales-history');
-        const salesHistoryBody = document.getElementById('sales-history-body');
-        const expensesList = document.getElementById('expenses-list');
-        const timeFilter = document.getElementById('time-filter');
-        const loadingSpinner = document.getElementById('loading-spinner');
-        const emptyState = document.getElementById('empty-state');
-        const notificationBell = document.getElementById('notification-bell');
-        const notificationModal = document.getElementById('notification-modal');
-        const closeNotificationModal = document.getElementById('close-notification-modal');
+{% block scripts %}
+<script>
+    // Function to mark a notification as read
+    function markNotificationRead(notificationId) {
+        fetch(`/mark_notification_read/${notificationId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                // Remove the "Mark as Read" button and update styling
+                const notificationDiv = document.querySelector(`button[onclick="markNotificationRead('${notificationId}')"]`).parentElement.parentElement;
+                notificationDiv.classList.remove('bg-blue-50', 'dark:bg-blue-900');
+                notificationDiv.querySelector('button[onclick^="markNotificationRead"]').remove();
+            } else {
+                response.text().then(text => {
+                    console.error('Error marking notification as read:', text);
+                    alert('Failed to mark notification as read: ' + text);
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to mark notification as read.');
+        });
+    }
+
+    // Notification modal toggle
+    const notificationBell = document.getElementById('notification-bell');
+    const notificationModal = document.getElementById('notification-modal');
+    const closeNotificationModal = document.getElementById('close-notification-modal');
+
+    notificationBell.addEventListener('click', () => {
+        notificationModal.classList.remove('hidden');
+    });
+
+    closeNotificationModal.addEventListener('click', () => {
+        notificationModal.classList.add('hidden');
+    });
+
+    // Close modal when clicking outside
+    notificationModal.addEventListener('click', (e) => {
+        if (e.target === notificationModal) {
+            notificationModal.classList.add('hidden');
+        }
+    });
+
+    // Existing JavaScript for time display, filters, etc.
+    function updateTime() {
+        const nairobiTime = new Date().toLocaleString('en-US', { 
+            timeZone: 'Africa/Nairobi', 
+            day: '2-digit', 
+            month: '2-digit', 
+            year: 'numeric', 
+            hour: '2-digit', 
+            minute: '2-digit', 
+            second: '2-digit', 
+            hour12: false 
+        });
+        document.getElementById('time-display').textContent = nairobiTime.replace(',', '');
+    }
+    updateTime();
+    setInterval(updateTime, 1000);
+
+    const searchInput = document.getElementById('search-input');
+    const allBtn = document.getElementById('all-btn');
+    const pendingBtn = document.getElementById('pending-btn');
+    const completedBtn = document.getElementById('completed-btn');
+    const expensesBtn = document.getElementById('expenses-btn');
+    const salesHistory = document.getElementById('sales-history');
+    const salesHistoryBody = document.getElementById('sales-history-body');
+    const expensesList = document.getElementById('expenses-list');
+    const timeFilter = document.getElementById('time-filter');
+    const loadingSpinner = document.getElementById('loading-spinner');
+    const emptyState = document.getElementById('empty-state');
+    
+    let currentFilter = '{{ time_filter }}';
+    let currentStatusFilter = 'all';
+    let originalSalesRows = Array.from(salesHistoryBody.querySelectorAll('tr[data-date]'));
+    let originalExpenseRows = Array.from(expensesList.querySelectorAll('tr[data-date]'));
+
+    function showLoading() {
+        loadingSpinner.classList.remove('hidden');
+    }
+
+    function hideLoading() {
+        loadingSpinner.classList.add('hidden');
+    }
+
+    function formatGroupDate(dateString, period) {
+        const date = new Date(dateString);
         
-        let currentFilter = '{{ time_filter }}';
-        let currentStatusFilter = 'all';
-        let originalSalesRows = Array.from(salesHistoryBody.querySelectorAll('tr[data-date]'));
-        let originalExpenseRows = Array.from(expensesList.querySelectorAll('tr[data-date]'));
-
-        // Show loading spinner
-        function showLoading() {
-            loadingSpinner.classList.remove('hidden');
+        if (period === 'day') {
+            return date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        } else if (period === 'week') {
+            const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
+            const daysSinceYearStart = Math.floor((date - firstDayOfYear) / (1000 * 60 * 60 * 24));
+            const weekNumber = Math.ceil((daysSinceYearStart + firstDayOfYear.getDay() + 1) / 7);
+            const weekStart = new Date(date);
+            weekStart.setDate(date.getDate() - date.getDay());
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekStart.getDate() + 6);
+            return `Week ${weekNumber} (${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })})`;
+        } else if (period === 'month') {
+            return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        } else if (period === 'year') {
+            return date.getFullYear().toString();
+        } else {
+            return 'All Time';
         }
+    }
 
-        // Hide loading spinner
-        function hideLoading() {
-            loadingSpinner.classList.add('hidden');
+    function groupByPeriod(items, period) {
+        if (period === 'all') {
+            return { 'All Records': items };
         }
-
-        // Format date for display in group headers
-        function formatGroupDate(dateString, period) {
-            const date = new Date(dateString);
+        
+        const grouped = {};
+        items.forEach(item => {
+            const date = new Date(item.dataset.date);
+            let key;
             
             if (period === 'day') {
-                return date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                key = date.toISOString().split('T')[0];
             } else if (period === 'week') {
                 const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
                 const daysSinceYearStart = Math.floor((date - firstDayOfYear) / (1000 * 60 * 60 * 24));
                 const weekNumber = Math.ceil((daysSinceYearStart + firstDayOfYear.getDay() + 1) / 7);
-                const weekStart = new Date(date);
-                weekStart.setDate(date.getDate() - date.getDay());
-                const weekEnd = new Date(weekStart);
-                weekEnd.setDate(weekStart.getDate() + 6);
-                return `Week ${weekNumber} (${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })})`;
+                key = `${date.getFullYear()}-W${weekNumber.toString().padStart(2, '0')}`;
             } else if (period === 'month') {
-                return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                key = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
             } else if (period === 'year') {
-                return date.getFullYear().toString();
-            } else {
-                return 'All Time';
-            }
-        }
-
-        // Group sales or expenses by time period (reverse sort)
-        function groupByPeriod(items, period) {
-            if (period === 'all') {
-                return { 'All Records': items };
+                key = date.getFullYear().toString();
             }
             
-            const grouped = {};
-            items.forEach(item => {
-                const date = new Date(item.dataset.date);
-                let key;
-                
-                if (period === 'day') {
-                    key = date.toISOString().split('T')[0];
-                } else if (period === 'week') {
-                    const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
-                    const daysSinceYearStart = Math.floor((date - firstDayOfYear) / (1000 * 60 * 60 * 24));
-                    const weekNumber = Math.ceil((daysSinceYearStart + firstDayOfYear.getDay() + 1) / 7);
-                    key = `${date.getFullYear()}-W${weekNumber.toString().padStart(2, '0')}`;
-                } else if (period === 'month') {
-                    key = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
-                } else if (period === 'year') {
-                    key = date.getFullYear().toString();
-                }
-                
-                if (!grouped[key]) {
-                    grouped[key] = [];
-                }
-                grouped[key].push(item);
+            if (!grouped[key]) {
+                grouped[key] = [];
+            }
+            grouped[key].push(item);
+        });
+        
+        return grouped;
+    }
+
+    function sortGroupKeys(keys, period) {
+        if (period === 'all') {
+            return keys;
+        }
+        return keys.sort((a, b) => b.localeCompare(a));
+    }
+
+    function renderGroupedItems(groupedItems, period, itemType) {
+        const container = itemType === 'sales' ? salesHistoryBody : document.querySelector('#expenses-list tbody');
+        container.innerHTML = '';
+        
+        const sortedKeys = sortGroupKeys(Object.keys(groupedItems), period);
+        
+        if (sortedKeys.length === 0) {
+            emptyState.classList.remove('hidden');
+            return;
+        }
+        
+        emptyState.classList.add('hidden');
+        
+        sortedKeys.forEach(key => {
+            const formattedHeader = formatGroupDate(key, period);
+            const groupHeader = document.createElement('tr');
+            groupHeader.className = 'bg-blue-50 dark:bg-blue-900/20';
+            groupHeader.innerHTML = `
+                <td colspan="7" class="px-6 py-3 text-sm font-semibold text-blue-800 dark:text-blue-200">
+                    ${formattedHeader}
+                    <span class="ml-2 text-gray-500 dark:text-blue-300">(${groupedItems[key].length} ${groupedItems[key].length === 1 ? 'record' : 'records'})</span>
+                </td>
+            `;
+            container.appendChild(groupHeader);
+            
+            groupedItems[key].forEach(item => {
+                container.appendChild(item.cloneNode(true));
             });
-            
-            return grouped;
-        }
+        });
+    }
 
-        // Sort group keys in DESCENDING order (newest first)
-        function sortGroupKeys(keys, period) {
-            if (period === 'all') {
-                return keys;
-            }
-            return keys.sort((a, b) => b.localeCompare(a));
-        }
-
-        // Render the grouped data with formatted headers
-        function renderGroupedItems(groupedItems, period, itemType) {
-            const container = itemType === 'sales' ? salesHistoryBody : document.querySelector('#expenses-list tbody');
-            container.innerHTML = '';
-            
-            const sortedKeys = sortGroupKeys(Object.keys(groupedItems), period);
-            
-            if (sortedKeys.length === 0) {
-                emptyState.classList.remove('hidden');
-                return;
-            }
-            
-            emptyState.classList.add('hidden');
-            
-            sortedKeys.forEach(key => {
-                const formattedHeader = formatGroupDate(key, period);
-                const groupHeader = document.createElement('tr');
-                groupHeader.className = 'bg-blue-50 dark:bg-blue-900/20';
-                groupHeader.innerHTML = `
-                    <td colspan="7" class="px-6 py-3 text-sm font-semibold text-blue-800 dark:text-blue-200">
-                        ${formattedHeader}
-                        <span class="ml-2 text-gray-500 dark:text-blue-300">(${groupedItems[key].length} ${groupedItems[key].length === 1 ? 'record' : 'records'})</span>
-                    </td>
-                `;
-                container.appendChild(groupHeader);
-                
-                groupedItems[key].forEach(item => {
-                    container.appendChild(item.cloneNode(true));
-                });
-            });
-        }
-
-        // Filter sales by status (all, pending, completed)
-        function filterSalesByStatus(sales, status) {
-            if (status === 'all') {
-                return sales;
-            } else if (status === 'pending') {
-                return sales.filter(sale => {
-                    const statusSpan = sale.querySelector('td:nth-child(6) span');
-                    return statusSpan && statusSpan.textContent.trim() === 'Pending';
-                });
-            } else if (status === 'completed') {
-                return sales.filter(sale => {
-                    const statusSpan = sale.querySelector('td:nth-child(6) span');
-                    return statusSpan && statusSpan.textContent.trim() === 'Paid';
-                });
-            }
+    function filterSalesByStatus(sales, status) {
+        if (status === 'all') {
             return sales;
+        } else if (status === 'pending') {
+            return sales.filter(sale => {
+                const statusSpan = sale.querySelector('td:nth-child(6) span');
+                return statusSpan && statusSpan.textContent.trim() === 'Pending';
+            });
+        } else if (status === 'completed') {
+            return sales.filter(sale => {
+                const statusSpan = sale.querySelector('td:nth-child(6) span');
+                return statusSpan && statusSpan.textContent.trim() === 'Paid';
+            });
         }
+        return sales;
+    }
 
-        // Update the data based on the selected time period and status filter
-        function updateData(timePeriod, statusFilter) {
-            showLoading();
-            
-            emptyState.classList.add('hidden');
-            
-            currentFilter = timePeriod;
-            currentStatusFilter = statusFilter;
-            
-            const url = new URL(window.location);
-            url.searchParams.set('time', timePeriod);
-            url.searchParams.set('page', '{{ page }}');
-            url.searchParams.set('per_page', '{{ per_page }}');
-            if (searchInput.value) {
-                url.searchParams.set('search', searchInput.value);
-            }
-            fetch(url, {
-                method: 'GET'
-            })
-                .then(response => response.text())
-                .then(html => {
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(html, 'text/html');
-                    
-                    if (statusFilter === 'expenses') {
-                        salesHistory.classList.add('hidden');
-                        expensesList.classList.remove('hidden');
-                        
-                        originalExpenseRows = Array.from(doc.querySelectorAll('#expenses-list tbody tr[data-date]'));
-                        if (originalExpenseRows.length === 0) {
-                            emptyState.classList.remove('hidden');
-                        } else {
-                            const groupedExpenses = groupByPeriod(originalExpenseRows, timePeriod);
-                            renderGroupedItems(groupedExpenses, timePeriod, 'expenses');
-                        }
-                    } else {
-                        salesHistory.classList.remove('hidden');
-                        expensesList.classList.add('hidden');
-                        
-                        originalSalesRows = Array.from(doc.querySelectorAll('#sales-history-body tr[data-date]'));
-                        const filteredSales = filterSalesByStatus(originalSalesRows, statusFilter);
-                        
-                        if (filteredSales.length === 0) {
-                            emptyState.classList.remove('hidden');
-                        } else {
-                            const groupedSales = groupByPeriod(filteredSales, timePeriod);
-                            renderGroupedItems(groupedSales, timePeriod, 'sales');
-                        }
-                    }
-                    
-                    hideLoading();
-                })
-                .catch(error => {
-                    console.error('Error fetching data:', error);
-                    hideLoading();
-                    emptyState.classList.remove('hidden');
-                    emptyState.querySelector('p').textContent = 'Error loading data. Please try again.';
-                });
+    function updateData(timePeriod, statusFilter) {
+        showLoading();
+        
+        emptyState.classList.add('hidden');
+        
+        currentFilter = timePeriod;
+        currentStatusFilter = statusFilter;
+        
+        const url = new URL(window.location);
+        url.searchParams.set('time', timePeriod);
+        url.searchParams.set('page', '{{ page }}');
+        url.searchParams.set('per_page', '{{ per_page }}');
+        if (searchInput.value) {
+            url.searchParams.set('search', searchInput.value);
         }
-
-        // Event listeners for filter buttons
-        allBtn.addEventListener('click', () => updateData(currentFilter, 'all'));
-        pendingBtn.addEventListener('click', () => updateData(currentFilter, 'pending'));
-        completedBtn.addEventListener('click', () => updateData(currentFilter, 'completed'));
-        expensesBtn.addEventListener('click', () => updateData(currentFilter, 'expenses'));
-        timeFilter.addEventListener('change', (e) => updateData(e.target.value, currentStatusFilter));
-
-        // Notification modal toggle
-        notificationBell.addEventListener('click', () => {
-            notificationModal.classList.remove('hidden');
-        });
-
-        closeNotificationModal.addEventListener('click', () => {
-            notificationModal.classList.add('hidden');
-        });
-
-        // Close modal when clicking outside
-        notificationModal.addEventListener('click', (e) => {
-            if (e.target === notificationModal) {
-                notificationModal.classList.add('hidden');
-            }
-        });
-
-        // Mark notification as read
-        function markNotificationRead(notificationId) {
-            fetch(`/mark_notification_read/${notificationId}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            })
-            .then(response => {
-                if (response.ok) {
-                    // Update the UI: remove the "Mark as Read" button and background highlight
-                    const notificationDiv = document.querySelector(`[onclick="markNotificationRead('${notificationId}')"]`).parentElement.parentElement;
-                    notificationDiv.classList.remove('bg-blue-50', 'dark:bg-blue-900');
-                    notificationDiv.querySelector('button').remove();
-                    // Update the unread count
-                    const badge = document.querySelector('#notification-bell span');
-                    let count = parseInt(badge.textContent) - 1;
-                    if (count <= 0) {
-                        badge.remove();
+        fetch(url, {
+            method: 'GET'
+        })
+            .then(response => response.text())
+            .then(html => {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                
+                if (statusFilter === 'expenses') {
+                    salesHistory.classList.add('hidden');
+                    expensesList.classList.remove('hidden');
+                    
+                    originalExpenseRows = Array.from(doc.querySelectorAll('#expenses-list tbody tr[data-date]'));
+                    if (originalExpenseRows.length === 0) {
+                        emptyState.classList.remove('hidden');
                     } else {
-                        badge.textContent = count;
+                        const groupedExpenses = groupByPeriod(originalExpenseRows, timePeriod);
+                        renderGroupedItems(groupedExpenses, timePeriod, 'expenses');
                     }
                 } else {
-                    alert('Error marking notification as read');
+                    salesHistory.classList.remove('hidden');
+                    expensesList.classList.add('hidden');
+                    
+                    originalSalesRows = Array.from(doc.querySelectorAll('#sales-history-body tr[data-date]'));
+                    const filteredSales = filterSalesByStatus(originalSalesRows, statusFilter);
+                    
+                    if (filteredSales.length === 0) {
+                        emptyState.classList.remove('hidden');
+                    } else {
+                        const groupedSales = groupByPeriod(filteredSales, timePeriod);
+                        renderGroupedItems(groupedSales, timePeriod, 'sales');
+                    }
                 }
+                
+                hideLoading();
             })
             .catch(error => {
-                console.error('Error:', error);
-                alert('Error marking notification as read');
+                console.error('Error fetching data:', error);
+                hideLoading();
+                emptyState.classList.remove('hidden');
+                emptyState.querySelector('p').textContent = 'Error loading data. Please try again.';
             });
-        }
+    }
 
-        // Toggle main dropdown menu
-        function toggleMenu(menuId) {
-            const menu = document.getElementById(menuId);
-            const allMenus = document.querySelectorAll('[id^="menu-"]');
-            allMenus.forEach(m => {
-                if (m.id !== menuId) m.classList.add('hidden');
-            });
-            menu.classList.toggle('hidden');
-        }
+    allBtn.addEventListener('click', () => updateData(currentFilter, 'all'));
+    pendingBtn.addEventListener('click', () => updateData(currentFilter, 'pending'));
+    completedBtn.addEventListener('click', () => updateData(currentFilter, 'completed'));
+    expensesBtn.addEventListener('click', () => updateData(currentFilter, 'expenses'));
+    timeFilter.addEventListener('change', (e) => updateData(e.target.value, currentStatusFilter));
 
-        // Close menus when clicking outside
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('button[onclick^="toggleMenu"]')) {
-                document.querySelectorAll('[id^="menu-"]').forEach(menu => menu.classList.add('hidden'));
-            }
+    function toggleMenu(menuId) {
+        const menu = document.getElementById(menuId);
+        const allMenus = document.querySelectorAll('[id^="menu-"]');
+        allMenus.forEach(m => {
+            if (m.id !== menuId) m.classList.add('hidden');
         });
+        menu.classList.toggle('hidden');
+    }
 
-        // Initialize with default filters
-        updateData(currentFilter, 'all');
-    </script>
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('button[onclick^="toggleMenu"]')) {
+            document.querySelectorAll('[id^="menu-"]').forEach(menu => menu.classList.add('hidden'));
+        }
+    });
+
+    updateData(currentFilter, 'all');
+</script>
 {% endblock %}
