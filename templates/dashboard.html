@@ -7,7 +7,9 @@
             <div class="flex items-center space-x-4">
                 <div>
                     <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Dashboard Overview</h2>
-                    <p class="text-gray-600 dark:text-gray-300 mt-1">Welcome back, {{ user.firstName | default('User') }}!</p>
+                    <p class="text-gray-600 dark:text-gray-300 mt-1">
+                        Welcome back, {{ user.firstName | default('User') }}!
+                    </p>
                 </div>
                 <!-- Notification Bell -->
                 <div class="relative">
@@ -35,7 +37,9 @@
                             </svg>
                         </button>
                         {% if search %}
-                        <a href="{{ url_for('dashboard', time=time_filter, page=1, per_page=per_page) }}" class="ml-2 p-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 focus:outline-none">Clear</a>
+                        <a href="{{ url_for('dashboard', time=time_filter, page=1, per_page=per_page) }}" class="ml-2 p-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 focus:outline-none">
+                            Clear
+                        </a>
                         {% endif %}
                     </div>
                 </form>
@@ -84,8 +88,11 @@
                 <div class="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-10 -mt-10"></div>
                 <div class="flex items-center justify-between relative z-10">
                     <div>
-                        <h3 class="text-lg font-medium text-blue-100">Total Sales Today</h3>
-                        <p class="text-4xl font-bold mt-2">KSh <span class="total-sales-amount">{{ "%.2f" % total_sales_today }}</span></p>
+                        <h3 class="text-lg font-medium text-blue-100">Total Sales</h3>
+                        <p class="text-4xl font-bold mt-2 total-sales-amount">{{ total_sales_today | round(2) | default(0) }}</p>
+                        <p class="text-blue-100 mt-2 text-sm">
+                            Today's performance ({{ open_orders_count }} open, {{ closed_orders_count }} closed)
+                        </p>
                     </div>
                     <div class="bg-white bg-opacity-20 p-4 rounded-full">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -101,8 +108,11 @@
                 <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 transition-shadow duration-300 hover:shadow-lg">
                     <div class="flex justify-between items-start">
                         <div>
-                            <h3 class="text-gray-500 dark:text-gray-400 text-sm font-medium">Retail Sales Today</h3>
-                            <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">KSh <span class="retail-sales-amount">{{ "%.2f" % retail_sales_today }}</span></p>
+                            <h3 class="text-gray-500 dark:text-gray-400 text-sm font-medium">Retail Sales</h3>
+                            <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1 retail-sales-amount">{{ retail_sales_today | round(2) | default(0) }}</p>
+                            <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                {{ retail_open_orders }} open, {{ retail_closed_orders }} closed
+                            </div>
                         </div>
                         <div class="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -116,8 +126,11 @@
                 <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 transition-shadow duration-300 hover:shadow-lg">
                     <div class="flex justify-between items-start">
                         <div>
-                            <h3 class="text-gray-500 dark:text-gray-400 text-sm font-medium">Wholesale Sales Today</h3>
-                            <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">KSh <span class="wholesale-sales-amount">{{ "%.2f" % wholesale_sales_today }}</span></p>
+                            <h3 class="text-gray-500 dark:text-gray-400 text-sm font-medium">Wholesale Sales</h3>
+                            <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1 wholesale-sales-amount">{{ wholesale_sales_today | round(2) | default(0) }}</p>
+                            <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                {{ wholesale_open_orders }} open, {{ wholesale_closed_orders }} closed
+                            </div>
                         </div>
                         <div class="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -141,8 +154,10 @@
                         </svg>
                     </div>
                 </div>
-                <p class="text-2xl font-bold text-red-600 dark:text-red-400 mt-3">KSh <span class="debt-amount">{{ "%.2f" % total_debts }}</span></p>
-                <div class="mt-4 text-xs text-gray-500 dark:text-gray-400">Total retail & wholesale pending</div>
+                <p class="text-2xl font-bold text-red-600 dark:text-red-400 mt-3">{{ total_debts | round(2) | default(0) }}</p>
+                <div class="mt-4 text-xs text-gray-500 dark:text-gray-400">
+                    Total pending collections
+                </div>
             </div>
 
             <!-- Expenses Card -->
@@ -155,8 +170,10 @@
                         </svg>
                     </div>
                 </div>
-                <p class="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-3">KSh {{ "%.2f" % total_expenses }}</p>
-                <div class="mt-4 text-xs text-gray-500 dark:text-gray-400">Business costs and expenses</div>
+                <p class="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-3">{{ total_expenses | round(2) | default(0) }}</p>
+                <div class="mt-4 text-xs text-gray-500 dark:text-gray-400">
+                    Business costs and expenses
+                </div>
             </div>
         </div>
     </div>
@@ -207,64 +224,65 @@
             <table class="w-full">
                 <thead class="bg-gray-50 dark:bg-gray-900">
                     <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Receipt ID</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Salesperson</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Shop</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Items</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Payment</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Balance</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"></th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Booked</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Closed</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Type</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Total Amount</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"></th>
                     </tr>
                 </thead>
                 <tbody id="sales-history-body" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     {% for sale in sales_history %}
-                    <tr data-date="{{ sale.date.strftime('%Y-%m-%d') }}"
-                        data-last-payment-date="{{ sale.last_payment_date.strftime('%Y-%m-%d') if sale.last_payment_date else '' }}"
-                        data-closed-date="{{ sale.closed_date.strftime('%Y-%m-%d') if sale.closed_date else '' }}"
-                        data-search="{{ sale.shop_name | lower }} {{ sale.salesperson_name | lower }}"
-                        class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                            <a href="{{ url_for('receipt', order_id=sale.receipt_id) }}" class="text-blue-600 dark:text-blue-400 hover:underline">{{ sale.receipt_id }}</a>
+                    <tr data-date="{{ sale.date.strftime('%Y-%m-%d') }}" data-search="{{ sale.shop_name | lower }} {{ sale.salesperson_name | lower }}" class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="w-10 h-10 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
+                                {% if sale.photoUrl %}
+                                    <img src="{{ sale.photoUrl }}" alt="Salesperson Photo" class="w-full h-full object-cover">
+                                {% else %}
+                                    <div class="text-gray-700 dark:text-white font-bold text-lg">
+                                        {{ sale.salesperson_name[0] | default('N') | upper }}
+                                    </div>
+                                {% endif %}
+                            </div>
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{{ sale.salesperson_name }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{{ sale.shop_name }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{{ sale.items }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">KSh {{ "%.2f" % sale.payment }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">KSh {{ "%.2f" % sale.balance }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-200">{{ sale.date.strftime('%d/%m/%Y') }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="font-medium text-gray-900 dark:text-white">{{ sale.shop_name }}</div>
+                            <div class="text-sm text-gray-500 dark:text-gray-400">{{ sale.salesperson_name | default('N/A') }}</div>
+                            <div class="text-sm text-gray-500 dark:text-gray-400">{{ sale.date.strftime('%d/%m/%Y %H:%M:%S') }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-200">
+                            {{ sale.closed_date.strftime('%d/%m/%Y %H:%M:%S') if sale.closed_date else 'Not Closed' }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
+                            <span class="px-2 py-1 rounded-full text-xs font-medium {% if sale.order_type == 'retail' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% else %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200{% endif %}">
+                                {{ sale.order_type }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                            {{ sale.payment | round(2) }}/{{ (sale.payment + sale.balance) | round(2) }}
+                        </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <span class="px-2 py-1 rounded-full text-xs font-medium {% if sale.balance > 0 %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200{% else %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% endif %}">
                                 {% if sale.balance > 0 %}Pending{% else %}Paid{% endif %}
                             </span>
                         </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Expenses List (Hidden by Default) -->
-        <div id="expenses-list" class="hidden overflow-x-auto">
-            <table class="w-full">
-                <thead class="bg-gray-50 dark:bg-gray-900">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Description</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Amount</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Category</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    {% for expense in expenses %}
-                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" data-date="{{ expense.date.strftime('%Y-%m-%d') }}" data-search="{{ expense.description | lower }} {{ expense.category | lower }}">
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-200">{{ expense.description }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600 dark:text-red-300">KSh {{ "%.2f" % expense.amount }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-200">{{ expense.date.strftime('%d/%m/%Y') }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-                                {{ expense.category }}
-                            </span>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
+                            <button class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none" onclick="toggleMenu('menu-{{ sale.receipt_id }}')">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                                </svg>
+                            </button>
+                            <div id="menu-{{ sale.receipt_id }}" class="hidden absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 border rounded-lg shadow-lg z-20">
+                                <a href="{{ url_for('receipt', order_id=sale.receipt_id) }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">View Receipt</a>
+                                {% if sale.order_type != 'retail' %}
+                                <div class="relative">
+                                    <a href="{{ url_for('load_to_loading_sheet', receipt_id=sale.receipt_id, action='current') }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Add to Current Loading Sheet</a>
+                                    <a href="{{ url_for('load_to_loading_sheet', receipt_id=sale.receipt_id, action='new') }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Start New Loading Sheet</a>
+                                </div>
+                                {% endif %}
+                            </div>
                         </td>
                     </tr>
                     {% endfor %}
@@ -296,6 +314,34 @@
             </div>
         </div>
 
+        <!-- Expenses List (Hidden by Default) -->
+        <div id="expenses-list" class="hidden overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50 dark:bg-gray-900">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Description</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Amount</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Category</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for expense in expenses %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" data-date="{{ expense.date.strftime('%Y-%m-%d') }}" data-search="{{ expense.description | lower }} {{ expense.category | lower }}">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-200">{{ expense.description }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600 dark:text-red-300">{{ expense.amount | round(2) }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-200">{{ expense.date.strftime('%d/%m/%Y %H:%M:%S') }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                                {{ expense.category }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
         <!-- Empty State for Filtered Data -->
         <div id="empty-state" class="hidden p-8 text-center">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -310,16 +356,22 @@
     <script>
         // Time display function
         function updateTime() {
-            const now = new Date().toLocaleString('en-US', { timeZone: 'Africa/Nairobi' });
-            document.getElementById('time-display').textContent = now;
+            const nairobiTime = new Date().toLocaleString('en-US', { 
+                timeZone: 'Africa/Nairobi', 
+                day: '2-digit', 
+                month: '2-digit', 
+                year: 'numeric', 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit', 
+                hour12: false 
+            });
+            document.getElementById('time-display').textContent = nairobiTime.replace(',', '');
         }
-        setInterval(updateTime, 1000);
         updateTime();
+        setInterval(updateTime, 1000);
 
-        // DOM Elements
-        const notificationBell = document.getElementById('notification-bell');
-        const notificationModal = document.getElementById('notification-modal');
-        const closeNotificationModal = document.getElementById('close-notification-modal');
+        // Get DOM elements
         const searchInput = document.getElementById('search-input');
         const allBtn = document.getElementById('all-btn');
         const pendingBtn = document.getElementById('pending-btn');
@@ -331,138 +383,281 @@
         const timeFilter = document.getElementById('time-filter');
         const loadingSpinner = document.getElementById('loading-spinner');
         const emptyState = document.getElementById('empty-state');
-        let originalSalesRows = Array.from(salesHistoryBody.querySelectorAll('tr[data-date]'));
+        const notificationBell = document.getElementById('notification-bell');
+        const notificationModal = document.getElementById('notification-modal');
+        const closeNotificationModal = document.getElementById('close-notification-modal');
+        
         let currentFilter = '{{ time_filter }}';
         let currentStatusFilter = 'all';
+        let originalSalesRows = Array.from(salesHistoryBody.querySelectorAll('tr[data-date]'));
+        let originalExpenseRows = Array.from(expensesList.querySelectorAll('tr[data-date]'));
 
-        // Loading State
-        function showLoading() { loadingSpinner.classList.remove('hidden'); }
-        function hideLoading() { loadingSpinner.classList.add('hidden'); }
+        // Show loading spinner
+        function showLoading() {
+            loadingSpinner.classList.remove('hidden');
+        }
 
-        // Filter Sales by Status
-        function filterSalesByStatus(rows, status) {
-            if (status === 'all') return rows;
-            return rows.filter(row => {
-                const balance = parseFloat(row.querySelector('td:nth-child(6)').textContent.replace('KSh ', '')) || 0;
-                return status === 'pending' ? balance > 0 : balance === 0;
+        // Hide loading spinner
+        function hideLoading() {
+            loadingSpinner.classList.add('hidden');
+        }
+
+        // Calculate today's sales, including partially paid orders
+        function calculateTodaySales(salesRows) {
+            const today = new Date().toISOString().split('T')[0];
+            return salesRows.filter(row => {
+                const saleDate = row.dataset.date;
+                const closedDateText = row.querySelector('td:nth-child(3)').textContent.trim();
+                const closedDate = closedDateText !== 'Not Closed' ? new Date(closedDateText.split(' ')[0].split('/').reverse().join('-')).toISOString().split('T')[0] : null;
+                const paymentText = row.querySelector('td:nth-child(5)').textContent.trim();
+                const payment = parseFloat(paymentText.split('/')[0]);
+                const total = parseFloat(paymentText.split('/')[1]);
+                const balance = total - payment;
+                
+                return saleDate === today || 
+                       (closedDate === today && balance > 0);
             });
         }
 
-        // Group by Period
-        function groupByPeriod(rows, period) {
-            const grouped = {};
-            rows.forEach(row => {
-                const dateStr = row.dataset.date;
-                const date = new Date(dateStr);
-                let key;
-                if (period === 'day') key = dateStr;
-                else if (period === 'week') key = `${date.getFullYear()}-W${Math.ceil((date.getDate() + (date.getDay() === 0 ? 6 : date.getDay() - 1)) / 7)}`;
-                else if (period === 'month') key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-                else if (period === 'year') key = date.getFullYear().toString();
-                else key = 'all';
-                if (!grouped[key]) grouped[key] = [];
-                grouped[key].push(row);
-            });
-            return grouped;
+        // Calculate total sales amount from rows
+        function calculateTotalSales(salesRows) {
+            return salesRows.reduce((total, row) => {
+                const paymentText = row.querySelector('td:nth-child(5)').textContent.trim();
+                const payment = parseFloat(paymentText.split('/')[0]);
+                return total + payment;
+            }, 0).toFixed(2);
         }
 
-        // Render Grouped Items
-        function renderGroupedItems(grouped, period, type) {
-            const tbody = type === 'sales' ? salesHistoryBody : expensesList.querySelector('tbody');
-            tbody.innerHTML = '';
-            if (type === 'sales') {
-                Object.keys(grouped).sort((a, b) => b.localeCompare(a)).forEach(key => {
-                    grouped[key].forEach(row => tbody.appendChild(row.cloneNode(true)));
-                });
+        // Format date for display in group headers
+        function formatGroupDate(dateString, period) {
+            const date = new Date(dateString);
+            
+            if (period === 'day') {
+                return date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            } else if (period === 'week') {
+                const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
+                const daysSinceYearStart = Math.floor((date - firstDayOfYear) / (1000 * 60 * 60 * 24));
+                const weekNumber = Math.ceil((daysSinceYearStart + firstDayOfYear.getDay() + 1) / 7);
+                const weekStart = new Date(date);
+                weekStart.setDate(date.getDate() - date.getDay());
+                const weekEnd = new Date(weekStart);
+                weekEnd.setDate(weekStart.getDate() + 6);
+                return `Week ${weekNumber} (${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })})`;
+            } else if (period === 'month') {
+                return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            } else if (period === 'year') {
+                return date.getFullYear().toString();
+            } else {
+                return 'All Time';
             }
         }
 
-        // Calculate Today's Sales Including Payments/Closures
-        function calculateTodaySales(salesRows) {
-            const today = new Date().toISOString().split('T')[0];
-            return salesRows.filter(row => 
-                row.dataset.date === today || 
-                row.dataset.lastPaymentDate === today || 
-                row.dataset.closedDate === today
-            );
+        // Group sales or expenses by time period (reverse sort)
+        function groupByPeriod(items, period) {
+            if (period === 'all') {
+                return { 'All Records': items };
+            }
+            
+            const grouped = {};
+            items.forEach(item => {
+                const date = new Date(item.dataset.date);
+                let key;
+                
+                if (period === 'day') {
+                    key = date.toISOString().split('T')[0];
+                } else if (period === 'week') {
+                    const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
+                    const daysSinceYearStart = Math.floor((date - firstDayOfYear) / (1000 * 60 * 60 * 24));
+                    const weekNumber = Math.ceil((daysSinceYearStart + firstDayOfYear.getDay() + 1) / 7);
+                    key = `${date.getFullYear()}-W${weekNumber.toString().padStart(2, '0')}`;
+                } else if (period === 'month') {
+                    key = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+                } else if (period === 'year') {
+                    key = date.getFullYear().toString();
+                }
+                
+                if (!grouped[key]) {
+                    grouped[key] = [];
+                }
+                grouped[key].push(item);
+            });
+            
+            return grouped;
         }
 
-        // Fetch Real-Time Stats
-        function fetchRealtimeStats(salesRows) {
-            const todaySales = calculateTodaySales(salesRows);
-            const totalSales = todaySales.reduce((sum, row) => sum + parseFloat(row.querySelector('td:nth-child(5)').textContent.replace('KSh ', '')), 0);
-            const retailSales = todaySales.filter(row => row.querySelector('td:nth-child(4)').textContent.includes('retail')).reduce((sum, row) => sum + parseFloat(row.querySelector('td:nth-child(5)').textContent.replace('KSh ', '')), 0);
-            const wholesaleSales = todaySales.filter(row => row.querySelector('td:nth-child(4)').textContent.includes('wholesale')).reduce((sum, row) => sum + parseFloat(row.querySelector('td:nth-child(5)').textContent.replace('KSh ', '')), 0);
-            const totalDebts = salesRows.reduce((sum, row) => sum + parseFloat(row.querySelector('td:nth-child(6)').textContent.replace('KSh ', '')), 0);
-
-            document.querySelector('.total-sales-amount').textContent = totalSales.toFixed(2);
-            document.querySelector('.retail-sales-amount').textContent = retailSales.toFixed(2);
-            document.querySelector('.wholesale-sales-amount').textContent = wholesaleSales.toFixed(2);
-            document.querySelector('.debt-amount').textContent = totalDebts.toFixed(2);
+        // Sort group keys in DESCENDING order (newest first)
+        function sortGroupKeys(keys, period) {
+            if (period === 'all') {
+                return keys;
+            }
+            return keys.sort((a, b) => b.localeCompare(a));
         }
 
-        // Update Data
+        // Render the grouped data with formatted headers
+        function renderGroupedItems(groupedItems, period, itemType) {
+            const container = itemType === 'sales' ? salesHistoryBody : document.querySelector('#expenses-list tbody');
+            container.innerHTML = '';
+            
+            const sortedKeys = sortGroupKeys(Object.keys(groupedItems), period);
+            
+            if (sortedKeys.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            }
+            
+            emptyState.classList.add('hidden');
+            
+            sortedKeys.forEach(key => {
+                const formattedHeader = formatGroupDate(key, period);
+                const groupHeader = document.createElement('tr');
+                groupHeader.className = 'bg-blue-50 dark:bg-blue-900/20';
+                groupHeader.innerHTML = `
+                    <td colspan="7" class="px-6 py-3 text-sm font-semibold text-blue-800 dark:text-blue-200">
+                        ${formattedHeader}
+                        <span class="ml-2 text-gray-500 dark:text-blue-300">(${groupedItems[key].length} ${groupedItems[key].length === 1 ? 'record' : 'records'})</span>
+                    </td>
+                `;
+                container.appendChild(groupHeader);
+                
+                groupedItems[key].forEach(item => {
+                    container.appendChild(item.cloneNode(true));
+                });
+            });
+        }
+
+        // Filter sales by status (all, pending, completed)
+        function filterSalesByStatus(sales, status) {
+            if (status === 'all') {
+                return sales;
+            } else if (status === 'pending') {
+                return sales.filter(sale => {
+                    const statusSpan = sale.querySelector('td:nth-child(6) span');
+                    return statusSpan && statusSpan.textContent.trim() === 'Pending';
+                });
+            } else if (status === 'completed') {
+                return sales.filter(sale => {
+                    const statusSpan = sale.querySelector('td:nth-child(6) span');
+                    return statusSpan && statusSpan.textContent.trim() === 'Paid';
+                });
+            }
+            return sales;
+        }
+
+        // Update the data based on the selected time period and status filter
         function updateData(timePeriod, statusFilter) {
             showLoading();
+            
             emptyState.classList.add('hidden');
+            
             currentFilter = timePeriod;
             currentStatusFilter = statusFilter;
+            
             const url = new URL(window.location);
             url.searchParams.set('time', timePeriod);
             url.searchParams.set('page', '{{ page }}');
             url.searchParams.set('per_page', '{{ per_page }}');
-            if (searchInput.value) url.searchParams.set('search', searchInput.value);
-            fetch(url)
+            if (searchInput.value) {
+                url.searchParams.set('search', searchInput.value);
+            }
+            fetch(url, {
+                method: 'GET'
+            })
                 .then(response => response.text())
                 .then(html => {
                     const parser = new DOMParser();
                     const doc = parser.parseFromString(html, 'text/html');
+                    
                     if (statusFilter === 'expenses') {
                         salesHistory.classList.add('hidden');
                         expensesList.classList.remove('hidden');
-                        const expensesRows = doc.querySelectorAll('#expenses-list tr');
-                        document.querySelector('#expenses-list tbody').innerHTML = '';
-                        expensesRows.forEach(row => document.querySelector('#expenses-list tbody').appendChild(row.cloneNode(true)));
-                        if (expensesRows.length === 0) emptyState.classList.remove('hidden');
+                        
+                        originalExpenseRows = Array.from(doc.querySelectorAll('#expenses-list tbody tr[data-date]'));
+                        if (originalExpenseRows.length === 0) {
+                            emptyState.classList.remove('hidden');
+                        } else {
+                            const groupedExpenses = groupByPeriod(originalExpenseRows, timePeriod);
+                            renderGroupedItems(groupedExpenses, timePeriod, 'expenses');
+                        }
                     } else {
                         salesHistory.classList.remove('hidden');
                         expensesList.classList.add('hidden');
+                        
                         originalSalesRows = Array.from(doc.querySelectorAll('#sales-history-body tr[data-date]'));
                         const filteredSales = filterSalesByStatus(originalSalesRows, statusFilter);
+                        
                         if (filteredSales.length === 0) {
                             emptyState.classList.remove('hidden');
                         } else {
                             const groupedSales = groupByPeriod(filteredSales, timePeriod);
                             renderGroupedItems(groupedSales, timePeriod, 'sales');
-                            fetchRealtimeStats(originalSalesRows);
+
+                            // Update dashboard stats
+                            const todaySales = calculateTodaySales(originalSalesRows);
+                            const retailSales = todaySales.filter(row => row.querySelector('td:nth-child(4) span').textContent.trim() === 'retail');
+                            const wholesaleSales = todaySales.filter(row => row.querySelector('td:nth-child(4) span').textContent.trim() === 'wholesale');
+
+                            document.querySelector('.total-sales-amount').textContent = calculateTotalSales(todaySales);
+                            document.querySelector('.retail-sales-amount').textContent = calculateTotalSales(retailSales);
+                            document.querySelector('.wholesale-sales-amount').textContent = calculateTotalSales(wholesaleSales);
                         }
                     }
+                    
                     hideLoading();
                 })
                 .catch(error => {
                     console.error('Error fetching data:', error);
                     hideLoading();
                     emptyState.classList.remove('hidden');
+                    emptyState.querySelector('p').textContent = 'Error loading data. Please try again.';
                 });
         }
 
-        // Mark Notification Read
+        // Event listeners for filter buttons
+        allBtn.addEventListener('click', () => updateData(currentFilter, 'all'));
+        pendingBtn.addEventListener('click', () => updateData(currentFilter, 'pending'));
+        completedBtn.addEventListener('click', () => updateData(currentFilter, 'completed'));
+        expensesBtn.addEventListener('click', () => updateData(currentFilter, 'expenses'));
+        timeFilter.addEventListener('change', (e) => updateData(e.target.value, currentStatusFilter));
+
+        // Notification modal toggle
+        notificationBell.addEventListener('click', () => {
+            notificationModal.classList.remove('hidden');
+        });
+
+        closeNotificationModal.addEventListener('click', () => {
+            notificationModal.classList.add('hidden');
+        });
+
+        // Close modal when clicking outside
+        notificationModal.addEventListener('click', (e) => {
+            if (e.target === notificationModal) {
+                notificationModal.classList.add('hidden');
+            }
+        });
+
+        // Mark notification as read
         function markNotificationRead(notificationId) {
             fetch(`/mark_notification_read/${notificationId}`, {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'}
+                headers: {
+                    'Content-Type': 'application/json'
+                }
             })
             .then(response => {
                 if (response.ok) {
-                    const notificationDiv = document.querySelector(`button[onclick="markNotificationRead('${notificationId}')"]`).parentElement.parentElement;
+                    const notificationDiv = document.querySelector(`[onclick="markNotificationRead('${notificationId}')"]`).parentElement.parentElement;
                     notificationDiv.classList.remove('bg-blue-50', 'dark:bg-blue-900');
                     notificationDiv.querySelector('button').remove();
-                    const unreadBadge = notificationBell.querySelector('span');
-                    const unreadCount = parseInt(unreadBadge?.textContent || '0') - 1;
-                    if (unreadCount > 0) unreadBadge.textContent = unreadCount;
-                    else unreadBadge?.remove();
-                    fetchRealtimeStats(originalSalesRows);
-                } else alert('Error marking notification as read');
+                    const badge = document.querySelector('#notification-bell span');
+                    let count = parseInt(badge.textContent) - 1;
+                    if (count <= 0) {
+                        badge.remove();
+                    } else {
+                        badge.textContent = count;
+                    }
+                } else {
+                    alert('Error marking notification as read');
+                }
             })
             .catch(error => {
                 console.error('Error:', error);
@@ -470,17 +665,24 @@
             });
         }
 
-        // Event Listeners
-        allBtn.addEventListener('click', () => updateData(currentFilter, 'all'));
-        pendingBtn.addEventListener('click', () => updateData(currentFilter, 'pending'));
-        completedBtn.addEventListener('click', () => updateData(currentFilter, 'completed'));
-        expensesBtn.addEventListener('click', () => updateData(currentFilter, 'expenses'));
-        timeFilter.addEventListener('change', () => updateData(timeFilter.value, currentStatusFilter));
-        searchInput.addEventListener('input', () => updateData(currentFilter, currentStatusFilter));
-        notificationBell.addEventListener('click', () => notificationModal.classList.toggle('hidden'));
-        closeNotificationModal.addEventListener('click', () => notificationModal.classList.add('hidden'));
+        // Toggle main dropdown menu
+        function toggleMenu(menuId) {
+            const menu = document.getElementById(menuId);
+            const allMenus = document.querySelectorAll('[id^="menu-"]');
+            allMenus.forEach(m => {
+                if (m.id !== menuId) m.classList.add('hidden');
+            });
+            menu.classList.toggle('hidden');
+        }
 
-        // Initial Setup
-        updateData(currentFilter, currentStatusFilter);
+        // Close menus when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('button[onclick^="toggleMenu"]')) {
+                document.querySelectorAll('[id^="menu-"]').forEach(menu => menu.classList.add('hidden'));
+            }
+        });
+
+        // Initialize with default filters
+        updateData(currentFilter, 'all');
     </script>
 {% endblock %}
