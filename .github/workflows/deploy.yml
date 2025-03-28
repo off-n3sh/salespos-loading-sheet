@@ -23,6 +23,10 @@ jobs:
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
 
+      - name: Fetch Firebase Config from Secret Manager
+        run: |
+          gcloud secrets versions access latest --secret="firebase-config" --project="${{ secrets.GCP_PROJECT_ID }}" > firebase_config.json
+
       - name: Configure Docker for Artifact Registry
         run: |
           REGION=$(echo "${{ secrets.GCP_REGION }}" | tr -d '\n\r\t ')

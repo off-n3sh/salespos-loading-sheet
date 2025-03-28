@@ -12,6 +12,7 @@ import os
 from functools import wraps
 from firebase_admin.auth import UserNotFoundError
 
+
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY')
 if not app.secret_key:
@@ -32,6 +33,9 @@ db = firestore.client()
 # Set Kenyan timezone
 KENYA_TZ = pytz.timezone('Africa/Nairobi')
 
+with open('firebase_config.json', 'r') as f:
+    firebase_config = json.load(f)
+    
 # Custom Jinja2 filter for pluralization
 def pluralize_filter(value, singular='', plural='s'):
     if isinstance(value, (int, float)) and value != 1:
@@ -131,6 +135,10 @@ def logout():
     session.pop('user', None)
     return redirect(url_for('splash'))
 
+@app.route('/firebase-config')
+def get_firebase_config():
+    return jsonify(firebase_config)
+    
 # New Routes
 @app.route('/')
 def splash():
