@@ -155,13 +155,10 @@ def health_check():
 def auth_route():
     if 'user' in session:
         return redirect(url_for('dashboard'))
-    
-    error = None
-    signup_success = False
-    
+
     if request.method == 'POST':
         form_type = request.form.get('form_type')
-        
+
         if form_type == 'signup':
             try:
                 email = request.form['email']
@@ -183,17 +180,18 @@ def auth_route():
                     'created_at': firestore.SERVER_TIMESTAMP
                 })
 
-                signup_success = True
-                return render_template('auth.html', error=None, signup_success=signup_success)
+                # Return JSON success response
+                return jsonify({"status": "success", "message": "Signup successful! Verify your email."})
 
             except auth.EmailAlreadyExistsError:
-                error = "Email already exists. Please log in or use a different email."
+                return jsonify({"status": "error", "error": "Email already exists. Try logging in."}), 400
             except UserNotFoundError:
-                error = "User not found in Firebase Auth. Please try again."
+                return jsonify({"status": "error", "error": "User not found. Did you sign up with Firebase first?"}), 404
             except Exception as e:
-                error = f"Signup failed: {str(e)}"
+                return jsonify({"status": "error", "error": f"Signup failed: {str(e)}"}), 500
 
-    return render_template('auth.html', error=error, signup_success=signup_success)
+    # GET request: render the auth page
+    return render_template('auth.html', error=None, signup_success=False)
     
 @app.route('/login', methods=['POST'])
 def login():
