@@ -216,12 +216,6 @@ def login():
         return jsonify({'error': str(e)}), 400
 
 # Placeholder for dashboard (ensure this exists)
-@app.route('/logout')
-def logout():
-    session.pop('user', None)
-    return redirect(url_for('splash'))
-
-# Routes
 @app.route('/dashboard', methods=['GET'])
 @no_cache
 @login_required
@@ -281,13 +275,13 @@ def dashboard():
                 'receipt_id': order_dict.get('receipt_id', doc.id),
                 'salesperson_name': order_dict.get('salesperson_name', 'N/A'),
                 'shop_name': order_dict.get('shop_name', 'Unknown Shop'),
-                'items': process_items(order_dict.get('items')),
+                'items': json.dumps(order_dict.get('items', [])),  # Serialize items for the template
                 'photoUrl': order_dict.get('photoUrl', ''),
                 'payment': order_dict.get('payment', 0),
                 'balance': order_dict.get('balance', 0),
                 'date': process_date(order_dict.get('date')),
                 'closed_date': process_date(order_dict.get('closed_date', None)) if order_dict.get('closed_date') else None,
-                'order_type': order_dict.get('order_type', 'wholesale'),
+                'order_type': order_dict.get('order_type', 'wholesale'),  # Ensure order_type is passed
                 'final_payment': order_dict.get('final_payment', 0),
                 'last_payment_date': process_date(order_dict.get('last_payment_date', order_dict.get('date')))
             })
@@ -309,13 +303,13 @@ def dashboard():
                 'receipt_id': order_dict.get('receipt_id', doc.id),
                 'salesperson_name': order_dict.get('salesperson_name', 'N/A'),
                 'shop_name': order_dict.get('shop_name', 'Unknown Shop'),
-                'items': process_items(order_dict.get('items')),
+                'items': json.dumps(order_dict.get('items', [])),  # Serialize items for the template
                 'photoUrl': order_dict.get('photoUrl', ''),
                 'payment': order_dict.get('payment', 0),
                 'balance': order_dict.get('balance', 0),
                 'date': process_date(order_dict.get('date')),
                 'closed_date': process_date(order_dict.get('closed_date', None)) if order_dict.get('closed_date') else None,
-                'order_type': order_dict.get('order_type', 'wholesale'),
+                'order_type': order_dict.get('order_type', 'wholesale'),  # Ensure order_type is passed
                 'final_payment': order_dict.get('final_payment', 0),
                 'last_payment_date': process_date(order_dict.get('last_payment_date', order_dict.get('date')))
             })
@@ -355,7 +349,7 @@ def dashboard():
         order_date = process_date(order_dict.get('date'))
         last_payment_date = process_date(order_dict.get('last_payment_date', order_dict.get('date')))
         closed_date = process_date(order_dict.get('closed_date', None)) if order_dict.get('closed_date') else None
-        order_type = order_dict.get('order_type', 'wholesale')
+        order_type = order_dict.get('order_type', 'wholesale')  # Use order_type from the database
         initial_payment = float(order_dict.get('payment', 0))
         final_payment = float(order_dict.get('final_payment', 0))
         balance = float(order_dict.get('balance', 0))
@@ -376,17 +370,20 @@ def dashboard():
 
         # Today's sales: initial payment for new orders today, additional payment for payments today
         if order_date >= today_start and order_date < today_end:
+            # New order placed today: count the initial payment
             if order_type == 'retail':
                 retail_sales_today += initial_payment
             else:
                 wholesale_sales_today += initial_payment
-        elif last_payment_date >= today_start and last_payment_date < today_end and final_payment > 0:
-            if order_type == 'retail':
-                retail_sales_today += final_payment
-            else:
-                wholesale_sales_today += final_payment
+        if last_payment_date >= today_start and last_payment_date < today_end:
+            # Payment made today: count the final_payment (additional payment made today)
+            if final_payment > 0:
+                if order_type == 'retail':
+                    retail_sales_today += final_payment
+                else:
+                    wholesale_sales_today += final_payment
 
-    # Add retail collection sales
+    # Add retail collection sales (direct retail sales, not orders)
     retail_sales_today += sum(
         r.to_dict().get('amount', 0) for r in db.collection('retail')
         .where('date', '==', now.strftime('%Y-%m-%d')).get()
@@ -443,8 +440,7 @@ def dashboard():
         retail_closed_orders=retail_closed_orders,
         wholesale_open_orders=wholesale_open_orders,
         wholesale_closed_orders=wholesale_closed_orders
-    )
-        
+    )        
 @app.route('/mark_notification_read/<notification_id>', methods=['POST'])
 @no_cache
 @login_required

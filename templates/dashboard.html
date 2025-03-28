@@ -232,6 +232,9 @@
                         data-last-payment-date="{{ sale.last_payment_date.strftime('%Y-%m-%d') if sale.last_payment_date else '' }}"
                         data-closed-date="{{ sale.closed_date.strftime('%Y-%m-%d') if sale.closed_date else '' }}"
                         data-search="{{ sale.shop_name | lower }} {{ sale.salesperson_name | lower }}"
+                        data-order-type="{{ sale.order_type }}"
+                        data-initial-payment="{{ sale.payment }}"
+                        data-final-payment="{{ sale.final_payment }}"
                         class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="w-10 h-10 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
@@ -253,8 +256,8 @@
                             {{ sale.closed_date.strftime('%d/%m/%Y %H:%M:%S') if sale.closed_date else 'Not Closed' }}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
-                            <span class="px-2 py-1 rounded-full text-xs font-medium {% if 'retail' in sale.items|lower %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% else %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200{% endif %}">
-                                {% if 'retail' in sale.items|lower %}retail{% else %}wholesale{% endif %}
+                            <span class="px-2 py-1 rounded-full text-xs font-medium {% if sale.order_type == 'retail' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% else %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200{% endif %}">
+                                {{ sale.order_type }}
                             </span>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
@@ -273,7 +276,7 @@
                             </button>
                             <div id="menu-{{ sale.receipt_id }}" class="hidden absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 border rounded-lg shadow-lg z-20">
                                 <a href="{{ url_for('receipt', order_id=sale.receipt_id) }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">View Receipt</a>
-                                {% if 'wholesale' in sale.items|lower %}
+                                {% if sale.order_type == 'wholesale' %}
                                 <div class="relative">
                                     <a href="{{ url_for('load_to_loading_sheet', receipt_id=sale.receipt_id, action='current') }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Add to Current Loading Sheet</a>
                                     <a href="{{ url_for('load_to_loading_sheet', receipt_id=sale.receipt_id, action='new') }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Start New Loading Sheet</a>
@@ -439,35 +442,51 @@
             const today = new Date().toISOString().split('T')[0];
             return salesRows.filter(row => 
                 row.dataset.date === today || 
-                row.dataset.lastPaymentDate === today || 
-                row.dataset.closedDate === today
+                (row.dataset.lastPaymentDate === today && parseFloat(row.dataset.finalPayment) > 0)
             );
         }
 
         function fetchRealtimeStats(salesRows) {
-            const todaySales = calculateTodaySales(salesRows);
-            const totalSales = todaySales.reduce((sum, row) => {
-                const paymentText = row.querySelector('td:nth-child(5)').textContent.trim();
-                const payment = parseFloat(paymentText.split('/')[0]);
-                return sum + payment;
-            }, 0);
-            const retailSales = todaySales.filter(row => row.querySelector('td:nth-child(4) span').textContent.trim() === 'retail').reduce((sum, row) => {
-                const paymentText = row.querySelector('td:nth-child(5)').textContent.trim();
-                const payment = parseFloat(paymentText.split('/')[0]);
-                return sum + payment;
-            }, 0);
-            const wholesaleSales = todaySales.filter(row => row.querySelector('td:nth-child(4) span').textContent.trim() === 'wholesale').reduce((sum, row) => {
-                const paymentText = row.querySelector('td:nth-child(5)').textContent.trim();
-                const payment = parseFloat(paymentText.split('/')[0]);
-                return sum + payment;
-            }, 0);
-            const totalDebts = salesRows.reduce((sum, row) => {
+            const today = new Date().toISOString().split('T')[0];
+            let totalSales = 0;
+            let retailSales = 0;
+            let wholesaleSales = 0;
+            let totalDebts = 0;
+
+            salesRows.forEach(row => {
+                const orderDate = row.dataset.date;
+                const lastPaymentDate = row.dataset.lastPaymentDate;
+                const orderType = row.dataset.orderType;
+                const initialPayment = parseFloat(row.dataset.initialPayment) || 0;
+                const finalPayment = parseFloat(row.dataset.finalPayment) || 0;
                 const paymentText = row.querySelector('td:nth-child(5)').textContent.trim();
                 const payment = parseFloat(paymentText.split('/')[0]);
                 const total = parseFloat(paymentText.split('/')[1]);
                 const balance = total - payment;
-                return sum + balance;
-            }, 0);
+
+                // Calculate today's sales
+                if (orderDate === today) {
+                    // New order placed today: count the initial payment
+                    if (orderType === 'retail') {
+                        retailSales += initialPayment;
+                    } else {
+                        wholesaleSales += initialPayment;
+                    }
+                }
+                if (lastPaymentDate === today && finalPayment > 0) {
+                    // Payment made today: count the final_payment
+                    if (orderType === 'retail') {
+                        retailSales += finalPayment;
+                    } else {
+                        wholesaleSales += finalPayment;
+                    }
+                }
+
+                // Calculate total debts
+                totalDebts += balance;
+            });
+
+            totalSales = retailSales + wholesaleSales;
 
             document.querySelector('.total-sales-amount').textContent = totalSales.toFixed(2);
             document.querySelector('.retail-sales-amount').textContent = retailSales.toFixed(2);
