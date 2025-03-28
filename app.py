@@ -126,6 +126,11 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+@app.route('/logout')
+def logout():
+    session.pop('user', None)
+    return redirect(url_for('splash'))
+
 # New Routes
 @app.route('/')
 def splash():
