@@ -877,11 +877,59 @@ def mark_paid(order_id):
             'order_id': order_id,
             'read': False
         })
+        return redirect(url_for('dashboard', time='day'))
 
         return '', 200
     except Exception as e:
         return f"Error updating order: {str(e)}", 500
+        
+@app.route('/dashboard_stats', methods=['GET'])
+@no_cache
+@login_required
+def dashboard_stats():
+    now = datetime.now(KENYA_TZ)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_end = today_start + timedelta(days=1)
 
+    all_orders = db.collection('orders').stream()
+    retail_sales_today = 0
+    wholesale_sales_today = 0
+    total_debts = 0
+
+    for order in all_orders:
+        order_dict = order.to_dict()
+        order_date = process_date(order_dict.get('date'))
+        last_payment_date = process_date(order_dict.get('last_payment_date', order_dict.get('date')))
+        order_type = order_dict.get('order_type', 'wholesale')
+        initial_payment = float(order_dict.get('payment', 0))
+        final_payment = float(order_dict.get('final_payment', 0))
+        balance = float(order_dict.get('balance', 0))
+
+        if order_date >= today_start and order_date < today_end:
+            if order_type == 'retail':
+                retail_sales_today += initial_payment
+            else:
+                wholesale_sales_today += initial_payment
+        elif last_payment_date >= today_start and last_payment_date < today_end and final_payment > 0:
+            if order_type == 'retail':
+                retail_sales_today += final_payment
+            else:
+                wholesale_sales_today += final_payment
+        total_debts += balance
+
+    retail_sales_today += sum(
+        r.to_dict().get('amount', 0) for r in db.collection('retail')
+        .where('date', '==', now.strftime('%Y-%m-%d')).get()
+    )
+
+    total_sales_today = retail_sales_today + wholesale_sales_today
+
+    return jsonify({
+        'total_sales_today': total_sales_today,
+        'retail_sales_today': retail_sales_today,
+        'wholesale_sales_today': wholesale_sales_today,
+        'total_debts': total_debts
+    })
 
 @app.route('/return_stock/<order_id>', methods=['POST'])
 @no_cache
