@@ -4,24 +4,9 @@
     <!-- Dashboard Header -->
     <div class="mb-6">
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
-            <div class="flex items-center space-x-4">
-                <div>
-                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Dashboard Overview</h2>
-                    <p class="text-gray-600 dark:text-gray-300 mt-1">
-                        Welcome back, {{ user.firstName | default('User') }}!
-                    </p>
-                </div>
-                <!-- Notification Bell -->
-                <div class="relative">
-                    <button id="notification-bell" class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 focus:outline-none">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                        </svg>
-                        {% if unread_count > 0 %}
-                        <span class="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full">{{ unread_count }}</span>
-                        {% endif %}
-                    </button>
-                </div>
+            <div>
+                <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Dashboard Overview</h2>
+                <p class="text-gray-600 dark:text-gray-300 mt-1">Welcome back, {{ user.firstName | default('User') }}!</p>
             </div>
             <div class="mt-4 md:mt-0 flex flex-col sm:flex-row items-center space-y-3 sm:space-y-0 sm:space-x-4">
                 <div id="time-display" class="bg-blue-50 dark:bg-gray-700 px-4 py-2 rounded-lg text-blue-600 dark:text-blue-300 font-medium"></div>
@@ -37,12 +22,20 @@
                             </svg>
                         </button>
                         {% if search %}
-                        <a href="{{ url_for('dashboard', time=time_filter, page=1, per_page=per_page) }}" class="ml-2 p-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 focus:outline-none">
-                            Clear
-                        </a>
+                        <a href="{{ url_for('dashboard', time=time_filter, page=1, per_page=per_page) }}" class="ml-2 p-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 focus:outline-none">Clear</a>
                         {% endif %}
                     </div>
                 </form>
+                <div class="relative">
+                    <button id="notification-bell" class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 focus:outline-none">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                        </svg>
+                        {% if unread_count > 0 %}
+                        <span class="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full">{{ unread_count }}</span>
+                        {% endif %}
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -154,7 +147,7 @@
                         </svg>
                     </div>
                 </div>
-                <p class="text-2xl font-bold text-red-600 dark:text-red-400 mt-3">{{ total_debts | round(2) | default(0) }}</p>
+                <p class="text-2xl font-bold text-red-600 dark:text-red-400 mt-3 debt-amount">{{ total_debts | round(2) | default(0) }}</p>
                 <div class="mt-4 text-xs text-gray-500 dark:text-gray-400">
                     Total pending collections
                 </div>
@@ -202,7 +195,7 @@
             </div>
             
             <div class="ml-auto flex items-center space-x-3">
-                <label for="time-filter" class="text-sm font-medium text-gray-700 dark:text-gray-300">Time Period:</label>
+                <label for="time-filter" class="text-sm font-medium text-gray-700 dark:text-gray-300">Time:</label>
                 <select id="time-filter" class="py-2 px-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
                     <option value="all" {% if time_filter == 'all' %}selected{% endif %}>All Time</option>
                     <option value="day" {% if time_filter == 'day' %}selected{% endif %}>Daily</option>
@@ -235,7 +228,11 @@
                 </thead>
                 <tbody id="sales-history-body" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     {% for sale in sales_history %}
-                    <tr data-date="{{ sale.date.strftime('%Y-%m-%d') }}" data-search="{{ sale.shop_name | lower }} {{ sale.salesperson_name | lower }}" class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                    <tr data-date="{{ sale.date.strftime('%Y-%m-%d') }}"
+                        data-last-payment-date="{{ sale.last_payment_date.strftime('%Y-%m-%d') if sale.last_payment_date else '' }}"
+                        data-closed-date="{{ sale.closed_date.strftime('%Y-%m-%d') if sale.closed_date else '' }}"
+                        data-search="{{ sale.shop_name | lower }} {{ sale.salesperson_name | lower }}"
+                        class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="w-10 h-10 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
                                 {% if sale.photoUrl %}
@@ -256,8 +253,8 @@
                             {{ sale.closed_date.strftime('%d/%m/%Y %H:%M:%S') if sale.closed_date else 'Not Closed' }}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
-                            <span class="px-2 py-1 rounded-full text-xs font-medium {% if sale.order_type == 'retail' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% else %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200{% endif %}">
-                                {{ sale.order_type }}
+                            <span class="px-2 py-1 rounded-full text-xs font-medium {% if 'retail' in sale.items|lower %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% else %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200{% endif %}">
+                                {% if 'retail' in sale.items|lower %}retail{% else %}wholesale{% endif %}
                             </span>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
@@ -276,7 +273,7 @@
                             </button>
                             <div id="menu-{{ sale.receipt_id }}" class="hidden absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 border rounded-lg shadow-lg z-20">
                                 <a href="{{ url_for('receipt', order_id=sale.receipt_id) }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">View Receipt</a>
-                                {% if sale.order_type != 'retail' %}
+                                {% if 'wholesale' in sale.items|lower %}
                                 <div class="relative">
                                     <a href="{{ url_for('load_to_loading_sheet', receipt_id=sale.receipt_id, action='current') }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Add to Current Loading Sheet</a>
                                     <a href="{{ url_for('load_to_loading_sheet', receipt_id=sale.receipt_id, action='new') }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Start New Loading Sheet</a>
@@ -284,6 +281,30 @@
                                 {% endif %}
                             </div>
                         </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Expenses List (Hidden by Default) -->
+        <div id="expenses-list" class="hidden overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50 dark:bg-gray-900">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Description</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Amount</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Category</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
+                    </tr>
+                </thead>
+                <tbody id="expenses-body">
+                    {% for expense in expenses %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" data-date="{{ expense.date.strftime('%Y-%m-%d') }}" data-search="{{ expense.description | lower }} {{ expense.category | lower }}">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-200">{{ expense.description }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600 dark:text-red-300">KSh {{ "%.2f" % expense.amount }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-200">{{ expense.category }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-200">{{ expense.date.strftime('%d/%m/%Y') }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -314,34 +335,6 @@
             </div>
         </div>
 
-        <!-- Expenses List (Hidden by Default) -->
-        <div id="expenses-list" class="hidden overflow-x-auto">
-            <table class="w-full">
-                <thead class="bg-gray-50 dark:bg-gray-900">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Description</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Amount</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Category</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    {% for expense in expenses %}
-                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" data-date="{{ expense.date.strftime('%Y-%m-%d') }}" data-search="{{ expense.description | lower }} {{ expense.category | lower }}">
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-200">{{ expense.description }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600 dark:text-red-300">{{ expense.amount | round(2) }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-200">{{ expense.date.strftime('%d/%m/%Y %H:%M:%S') }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-                                {{ expense.category }}
-                            </span>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        
         <!-- Empty State for Filtered Data -->
         <div id="empty-state" class="hidden p-8 text-center">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -352,312 +345,196 @@
         </div>
     </div>
 
+    <!-- Recent Activity -->
+    <div class="mt-8 bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Recent Activity</h3>
+        <ul class="space-y-4">
+            {% for activity in recent_activity %}
+            <li class="flex justify-between items-center">
+                <div>
+                    <p class="text-gray-900 dark:text-white">
+                        <a href="{{ url_for('receipt', order_id=activity.receipt_id) }}" class="text-blue-600 dark:text-blue-400 hover:underline">{{ activity.receipt_id }}</a>
+                        - {{ activity.salesperson_name }} at {{ activity.shop_name }}
+                    </p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">{{ activity.date.strftime('%d/%m/%Y %H:%M') }}</p>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden z-40">
+        <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-600"></div>
+    </div>
+
     <!-- JavaScript -->
     <script>
-        // Time display function
-        function updateTime() {
-            const nairobiTime = new Date().toLocaleString('en-US', { 
-                timeZone: 'Africa/Nairobi', 
-                day: '2-digit', 
-                month: '2-digit', 
-                year: 'numeric', 
-                hour: '2-digit', 
-                minute: '2-digit', 
-                second: '2-digit', 
-                hour12: false 
-            });
-            document.getElementById('time-display').textContent = nairobiTime.replace(',', '');
-        }
-        updateTime();
-        setInterval(updateTime, 1000);
-
-        // Get DOM elements
-        const searchInput = document.getElementById('search-input');
+        const notificationBell = document.getElementById('notification-bell');
+        const notificationModal = document.getElementById('notification-modal');
+        const closeNotificationModal = document.getElementById('close-notification-modal');
         const allBtn = document.getElementById('all-btn');
         const pendingBtn = document.getElementById('pending-btn');
         const completedBtn = document.getElementById('completed-btn');
         const expensesBtn = document.getElementById('expenses-btn');
         const salesHistory = document.getElementById('sales-history');
-        const salesHistoryBody = document.getElementById('sales-history-body');
         const expensesList = document.getElementById('expenses-list');
-        const timeFilter = document.getElementById('time-filter');
-        const loadingSpinner = document.getElementById('loading-spinner');
         const emptyState = document.getElementById('empty-state');
-        const notificationBell = document.getElementById('notification-bell');
-        const notificationModal = document.getElementById('notification-modal');
-        const closeNotificationModal = document.getElementById('close-notification-modal');
-        
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const searchInput = document.getElementById('search-input');
+        const timeFilter = document.getElementById('time-filter');
+        let originalSalesRows = [];
         let currentFilter = '{{ time_filter }}';
         let currentStatusFilter = 'all';
-        let originalSalesRows = Array.from(salesHistoryBody.querySelectorAll('tr[data-date]'));
-        let originalExpenseRows = Array.from(expensesList.querySelectorAll('tr[data-date]'));
 
-        // Show loading spinner
-        function showLoading() {
-            loadingSpinner.classList.remove('hidden');
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('time-display').textContent = now.toLocaleString('en-US', { timeZone: 'Africa/Nairobi' });
+        }
+        setInterval(updateTime, 1000);
+        updateTime();
+
+        notificationBell.addEventListener('click', () => notificationModal.classList.toggle('hidden'));
+        closeNotificationModal.addEventListener('click', () => notificationModal.classList.add('hidden'));
+
+        function showLoading() { loadingOverlay.classList.remove('hidden'); }
+        function hideLoading() { loadingOverlay.classList.add('hidden'); }
+
+        function filterSalesByStatus(rows, status) {
+            if (status === 'all') return rows;
+            return rows.filter(row => {
+                const balance = parseFloat(row.querySelector('td:nth-child(5)').textContent.split('/')[1]) - parseFloat(row.querySelector('td:nth-child(5)').textContent.split('/')[0]) || 0;
+                return status === 'pending' ? balance > 0 : balance === 0;
+            });
         }
 
-        // Hide loading spinner
-        function hideLoading() {
-            loadingSpinner.classList.add('hidden');
+        function groupByPeriod(rows, period) {
+            const grouped = {};
+            rows.forEach(row => {
+                const dateStr = row.dataset.date;
+                const date = new Date(dateStr);
+                let key;
+                if (period === 'day') key = dateStr;
+                else if (period === 'week') key = `${date.getFullYear()}-W${Math.ceil((date.getDate() + (date.getDay() === 0 ? 6 : date.getDay() - 1)) / 7)}`;
+                else if (period === 'month') key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                else if (period === 'year') key = date.getFullYear().toString();
+                else key = 'all';
+                if (!grouped[key]) grouped[key] = [];
+                grouped[key].push(row);
+            });
+            return grouped;
         }
 
-        // Calculate today's sales, including partially paid orders
+        function renderGroupedItems(grouped, period, type) {
+            const tbody = type === 'sales' ? document.getElementById('sales-history-body') : document.getElementById('expenses-body');
+            tbody.innerHTML = '';
+            if (type === 'sales') {
+                Object.keys(grouped).sort((a, b) => b.localeCompare(a)).forEach(key => {
+                    grouped[key].forEach(row => tbody.appendChild(row.cloneNode(true)));
+                });
+            }
+        }
+
         function calculateTodaySales(salesRows) {
             const today = new Date().toISOString().split('T')[0];
-            return salesRows.filter(row => {
-                const saleDate = row.dataset.date;
-                const closedDateText = row.querySelector('td:nth-child(3)').textContent.trim();
-                const closedDate = closedDateText !== 'Not Closed' ? new Date(closedDateText.split(' ')[0].split('/').reverse().join('-')).toISOString().split('T')[0] : null;
+            return salesRows.filter(row => 
+                row.dataset.date === today || 
+                row.dataset.lastPaymentDate === today || 
+                row.dataset.closedDate === today
+            );
+        }
+
+        function fetchRealtimeStats(salesRows) {
+            const todaySales = calculateTodaySales(salesRows);
+            const totalSales = todaySales.reduce((sum, row) => {
+                const paymentText = row.querySelector('td:nth-child(5)').textContent.trim();
+                const payment = parseFloat(paymentText.split('/')[0]);
+                return sum + payment;
+            }, 0);
+            const retailSales = todaySales.filter(row => row.querySelector('td:nth-child(4) span').textContent.trim() === 'retail').reduce((sum, row) => {
+                const paymentText = row.querySelector('td:nth-child(5)').textContent.trim();
+                const payment = parseFloat(paymentText.split('/')[0]);
+                return sum + payment;
+            }, 0);
+            const wholesaleSales = todaySales.filter(row => row.querySelector('td:nth-child(4) span').textContent.trim() === 'wholesale').reduce((sum, row) => {
+                const paymentText = row.querySelector('td:nth-child(5)').textContent.trim();
+                const payment = parseFloat(paymentText.split('/')[0]);
+                return sum + payment;
+            }, 0);
+            const totalDebts = salesRows.reduce((sum, row) => {
                 const paymentText = row.querySelector('td:nth-child(5)').textContent.trim();
                 const payment = parseFloat(paymentText.split('/')[0]);
                 const total = parseFloat(paymentText.split('/')[1]);
                 const balance = total - payment;
-                
-                return saleDate === today || 
-                       (closedDate === today && balance > 0);
-            });
+                return sum + balance;
+            }, 0);
+
+            document.querySelector('.total-sales-amount').textContent = totalSales.toFixed(2);
+            document.querySelector('.retail-sales-amount').textContent = retailSales.toFixed(2);
+            document.querySelector('.wholesale-sales-amount').textContent = wholesaleSales.toFixed(2);
+            document.querySelector('.debt-amount').textContent = totalDebts.toFixed(2);
         }
 
-        // Calculate total sales amount from rows
-        function calculateTotalSales(salesRows) {
-            return salesRows.reduce((total, row) => {
-                const paymentText = row.querySelector('td:nth-child(5)').textContent.trim();
-                const payment = parseFloat(paymentText.split('/')[0]);
-                return total + payment;
-            }, 0).toFixed(2);
-        }
-
-        // Format date for display in group headers
-        function formatGroupDate(dateString, period) {
-            const date = new Date(dateString);
-            
-            if (period === 'day') {
-                return date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-            } else if (period === 'week') {
-                const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
-                const daysSinceYearStart = Math.floor((date - firstDayOfYear) / (1000 * 60 * 60 * 24));
-                const weekNumber = Math.ceil((daysSinceYearStart + firstDayOfYear.getDay() + 1) / 7);
-                const weekStart = new Date(date);
-                weekStart.setDate(date.getDate() - date.getDay());
-                const weekEnd = new Date(weekStart);
-                weekEnd.setDate(weekStart.getDate() + 6);
-                return `Week ${weekNumber} (${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })})`;
-            } else if (period === 'month') {
-                return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-            } else if (period === 'year') {
-                return date.getFullYear().toString();
-            } else {
-                return 'All Time';
-            }
-        }
-
-        // Group sales or expenses by time period (reverse sort)
-        function groupByPeriod(items, period) {
-            if (period === 'all') {
-                return { 'All Records': items };
-            }
-            
-            const grouped = {};
-            items.forEach(item => {
-                const date = new Date(item.dataset.date);
-                let key;
-                
-                if (period === 'day') {
-                    key = date.toISOString().split('T')[0];
-                } else if (period === 'week') {
-                    const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
-                    const daysSinceYearStart = Math.floor((date - firstDayOfYear) / (1000 * 60 * 60 * 24));
-                    const weekNumber = Math.ceil((daysSinceYearStart + firstDayOfYear.getDay() + 1) / 7);
-                    key = `${date.getFullYear()}-W${weekNumber.toString().padStart(2, '0')}`;
-                } else if (period === 'month') {
-                    key = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
-                } else if (period === 'year') {
-                    key = date.getFullYear().toString();
-                }
-                
-                if (!grouped[key]) {
-                    grouped[key] = [];
-                }
-                grouped[key].push(item);
-            });
-            
-            return grouped;
-        }
-
-        // Sort group keys in DESCENDING order (newest first)
-        function sortGroupKeys(keys, period) {
-            if (period === 'all') {
-                return keys;
-            }
-            return keys.sort((a, b) => b.localeCompare(a));
-        }
-
-        // Render the grouped data with formatted headers
-        function renderGroupedItems(groupedItems, period, itemType) {
-            const container = itemType === 'sales' ? salesHistoryBody : document.querySelector('#expenses-list tbody');
-            container.innerHTML = '';
-            
-            const sortedKeys = sortGroupKeys(Object.keys(groupedItems), period);
-            
-            if (sortedKeys.length === 0) {
-                emptyState.classList.remove('hidden');
-                return;
-            }
-            
-            emptyState.classList.add('hidden');
-            
-            sortedKeys.forEach(key => {
-                const formattedHeader = formatGroupDate(key, period);
-                const groupHeader = document.createElement('tr');
-                groupHeader.className = 'bg-blue-50 dark:bg-blue-900/20';
-                groupHeader.innerHTML = `
-                    <td colspan="7" class="px-6 py-3 text-sm font-semibold text-blue-800 dark:text-blue-200">
-                        ${formattedHeader}
-                        <span class="ml-2 text-gray-500 dark:text-blue-300">(${groupedItems[key].length} ${groupedItems[key].length === 1 ? 'record' : 'records'})</span>
-                    </td>
-                `;
-                container.appendChild(groupHeader);
-                
-                groupedItems[key].forEach(item => {
-                    container.appendChild(item.cloneNode(true));
-                });
-            });
-        }
-
-        // Filter sales by status (all, pending, completed)
-        function filterSalesByStatus(sales, status) {
-            if (status === 'all') {
-                return sales;
-            } else if (status === 'pending') {
-                return sales.filter(sale => {
-                    const statusSpan = sale.querySelector('td:nth-child(6) span');
-                    return statusSpan && statusSpan.textContent.trim() === 'Pending';
-                });
-            } else if (status === 'completed') {
-                return sales.filter(sale => {
-                    const statusSpan = sale.querySelector('td:nth-child(6) span');
-                    return statusSpan && statusSpan.textContent.trim() === 'Paid';
-                });
-            }
-            return sales;
-        }
-
-        // Update the data based on the selected time period and status filter
         function updateData(timePeriod, statusFilter) {
             showLoading();
-            
             emptyState.classList.add('hidden');
-            
             currentFilter = timePeriod;
             currentStatusFilter = statusFilter;
-            
             const url = new URL(window.location);
             url.searchParams.set('time', timePeriod);
             url.searchParams.set('page', '{{ page }}');
             url.searchParams.set('per_page', '{{ per_page }}');
-            if (searchInput.value) {
-                url.searchParams.set('search', searchInput.value);
-            }
-            fetch(url, {
-                method: 'GET'
-            })
+            if (searchInput.value) url.searchParams.set('search', searchInput.value);
+            fetch(url)
                 .then(response => response.text())
                 .then(html => {
                     const parser = new DOMParser();
                     const doc = parser.parseFromString(html, 'text/html');
-                    
                     if (statusFilter === 'expenses') {
                         salesHistory.classList.add('hidden');
                         expensesList.classList.remove('hidden');
-                        
-                        originalExpenseRows = Array.from(doc.querySelectorAll('#expenses-list tbody tr[data-date]'));
-                        if (originalExpenseRows.length === 0) {
-                            emptyState.classList.remove('hidden');
-                        } else {
-                            const groupedExpenses = groupByPeriod(originalExpenseRows, timePeriod);
-                            renderGroupedItems(groupedExpenses, timePeriod, 'expenses');
-                        }
+                        const expensesRows = doc.querySelectorAll('#expenses-body tr');
+                        document.getElementById('expenses-body').innerHTML = '';
+                        expensesRows.forEach(row => document.getElementById('expenses-body').appendChild(row.cloneNode(true)));
+                        if (expensesRows.length === 0) emptyState.classList.remove('hidden');
                     } else {
                         salesHistory.classList.remove('hidden');
                         expensesList.classList.add('hidden');
-                        
                         originalSalesRows = Array.from(doc.querySelectorAll('#sales-history-body tr[data-date]'));
                         const filteredSales = filterSalesByStatus(originalSalesRows, statusFilter);
-                        
                         if (filteredSales.length === 0) {
                             emptyState.classList.remove('hidden');
                         } else {
                             const groupedSales = groupByPeriod(filteredSales, timePeriod);
                             renderGroupedItems(groupedSales, timePeriod, 'sales');
-
-                            // Update dashboard stats
-                            const todaySales = calculateTodaySales(originalSalesRows);
-                            const retailSales = todaySales.filter(row => row.querySelector('td:nth-child(4) span').textContent.trim() === 'retail');
-                            const wholesaleSales = todaySales.filter(row => row.querySelector('td:nth-child(4) span').textContent.trim() === 'wholesale');
-
-                            document.querySelector('.total-sales-amount').textContent = calculateTotalSales(todaySales);
-                            document.querySelector('.retail-sales-amount').textContent = calculateTotalSales(retailSales);
-                            document.querySelector('.wholesale-sales-amount').textContent = calculateTotalSales(wholesaleSales);
+                            fetchRealtimeStats(originalSalesRows);
                         }
                     }
-                    
                     hideLoading();
                 })
                 .catch(error => {
                     console.error('Error fetching data:', error);
                     hideLoading();
                     emptyState.classList.remove('hidden');
-                    emptyState.querySelector('p').textContent = 'Error loading data. Please try again.';
                 });
         }
 
-        // Event listeners for filter buttons
-        allBtn.addEventListener('click', () => updateData(currentFilter, 'all'));
-        pendingBtn.addEventListener('click', () => updateData(currentFilter, 'pending'));
-        completedBtn.addEventListener('click', () => updateData(currentFilter, 'completed'));
-        expensesBtn.addEventListener('click', () => updateData(currentFilter, 'expenses'));
-        timeFilter.addEventListener('change', (e) => updateData(e.target.value, currentStatusFilter));
-
-        // Notification modal toggle
-        notificationBell.addEventListener('click', () => {
-            notificationModal.classList.remove('hidden');
-        });
-
-        closeNotificationModal.addEventListener('click', () => {
-            notificationModal.classList.add('hidden');
-        });
-
-        // Close modal when clicking outside
-        notificationModal.addEventListener('click', (e) => {
-            if (e.target === notificationModal) {
-                notificationModal.classList.add('hidden');
-            }
-        });
-
-        // Mark notification as read
         function markNotificationRead(notificationId) {
             fetch(`/mark_notification_read/${notificationId}`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
+                headers: {'Content-Type': 'application/json'}
             })
             .then(response => {
                 if (response.ok) {
-                    const notificationDiv = document.querySelector(`[onclick="markNotificationRead('${notificationId}')"]`).parentElement.parentElement;
+                    const notificationDiv = document.querySelector(`button[onclick="markNotificationRead('${notificationId}')"]`).parentElement.parentElement;
                     notificationDiv.classList.remove('bg-blue-50', 'dark:bg-blue-900');
                     notificationDiv.querySelector('button').remove();
-                    const badge = document.querySelector('#notification-bell span');
-                    let count = parseInt(badge.textContent) - 1;
-                    if (count <= 0) {
-                        badge.remove();
-                    } else {
-                        badge.textContent = count;
-                    }
-                } else {
-                    alert('Error marking notification as read');
-                }
+                    const unreadBadge = notificationBell.querySelector('span');
+                    const unreadCount = parseInt(unreadBadge?.textContent || '0') - 1;
+                    if (unreadCount > 0) unreadBadge.textContent = unreadCount;
+                    else unreadBadge?.remove();
+                    fetchRealtimeStats(originalSalesRows);
+                } else alert('Error marking notification as read');
             })
             .catch(error => {
                 console.error('Error:', error);
@@ -665,7 +542,6 @@
             });
         }
 
-        // Toggle main dropdown menu
         function toggleMenu(menuId) {
             const menu = document.getElementById(menuId);
             const allMenus = document.querySelectorAll('[id^="menu-"]');
@@ -675,14 +551,20 @@
             menu.classList.toggle('hidden');
         }
 
-        // Close menus when clicking outside
         document.addEventListener('click', (e) => {
             if (!e.target.closest('button[onclick^="toggleMenu"]')) {
                 document.querySelectorAll('[id^="menu-"]').forEach(menu => menu.classList.add('hidden'));
             }
         });
 
-        // Initialize with default filters
-        updateData(currentFilter, 'all');
+        allBtn.addEventListener('click', () => updateData(currentFilter, 'all'));
+        pendingBtn.addEventListener('click', () => updateData(currentFilter, 'pending'));
+        completedBtn.addEventListener('click', () => updateData(currentFilter, 'completed'));
+        expensesBtn.addEventListener('click', () => updateData(currentFilter, 'expenses'));
+        timeFilter.addEventListener('change', () => updateData(timeFilter.value, currentStatusFilter));
+        searchInput.addEventListener('input', () => updateData(currentFilter, currentStatusFilter));
+
+        originalSalesRows = Array.from(document.querySelectorAll('#sales-history-body tr[data-date]'));
+        updateData(currentFilter, currentStatusFilter);
     </script>
 {% endblock %}
