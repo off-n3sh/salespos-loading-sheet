@@ -6,9 +6,7 @@
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
             <div>
                 <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Dashboard Overview</h2>
-                <p class="text-gray-600 dark:text-gray-300 mt-1">
-                    Welcome back, {{ user.firstName | default('User') }}!
-                </p>
+                <p class="text-gray-600 dark:text-gray-300 mt-1">Welcome back, {{ user.firstName | default('User') }}!</p>
             </div>
             <div class="mt-4 md:mt-0 flex flex-col sm:flex-row items-center space-y-3 sm:space-y-0 sm:space-x-4">
                 <div id="time-display" class="bg-blue-50 dark:bg-gray-700 px-4 py-2 rounded-lg text-blue-600 dark:text-blue-300 font-medium"></div>
@@ -24,13 +22,10 @@
                             </svg>
                         </button>
                         {% if search %}
-                        <a href="{{ url_for('dashboard', time=time_filter, page=1, per_page=per_page) }}" class="ml-2 p-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 focus:outline-none">
-                            Clear
-                        </a>
+                        <a href="{{ url_for('dashboard', time=time_filter, page=1, per_page=per_page) }}" class="ml-2 p-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 focus:outline-none">Clear</a>
                         {% endif %}
                     </div>
                 </form>
-                <!-- Single Notification Bell -->
                 <div class="relative">
                     <button id="notification-bell" class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 focus:outline-none">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -81,33 +76,23 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Total Sales Today</h3>
-            <p class="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-2">
-                KSh <span class="total-sales-amount">{{ total_sales_today | floatformat(2) }}</span>
-            </p>
+            <p class="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-2">KSh {{ "%.2f" % total_sales_today }}</p>
         </div>
         <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Retail Sales Today</h3>
-            <p class="text-2xl font-bold text-green-600 dark:text-green-400 mt-2">
-                KSh <span class="retail-sales-amount">{{ retail_sales_today | floatformat(2) }}</span>
-            </p>
+            <p class="text-2xl font-bold text-green-600 dark:text-green-400 mt-2">KSh {{ "%.2f" % retail_sales_today }}</p>
         </div>
         <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Wholesale Sales Today</h3>
-            <p class="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-2">
-                KSh <span class="wholesale-sales-amount">{{ wholesale_sales_today | floatformat(2) }}</span>
-            </p>
+            <p class="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-2">KSh {{ "%.2f" % wholesale_sales_today }}</p>
         </div>
         <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Outstanding Debts</h3>
-            <p class="text-2xl font-bold text-red-600 dark:text-red-400 mt-2">
-                KSh <span class="debt-amount">{{ total_debts | floatformat(2) }}</span>
-            </p>
+            <p class="text-2xl font-bold text-red-600 dark:text-red-400 mt-2">KSh {{ "%.2f" % total_debts }}</p>
         </div>
         <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Total Expenses</h3>
-            <p class="text-2xl font-bold text-yellow-600 dark:text-yellow-400 mt-2">
-                KSh {{ total_expenses | floatformat(2) }}
-            </p>
+            <p class="text-2xl font-bold text-yellow-600 dark:text-yellow-400 mt-2">KSh {{ "%.2f" % total_expenses }}</p>
         </div>
         <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Open Orders</h3>
@@ -130,7 +115,7 @@
         </select>
     </div>
 
-    <!-- Sales History and Expenses -->
+    <!-- Sales History -->
     <div id="sales-history" class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 {% if request.args.get('status') == 'expenses' %}hidden{% endif %}">
         <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Sales History</h3>
         <div class="overflow-x-auto">
@@ -154,14 +139,12 @@
                         data-closed-date="{{ sale.closed_date.strftime('%Y-%m-%d') if sale.closed_date else '' }}"
                         data-search="{{ sale.shop_name | lower }} {{ sale.salesperson_name | lower }}"
                         class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                        <td class="p-3 text-gray-900 dark:text-white">
-                            <a href="{{ url_for('receipt', order_id=sale.receipt_id) }}" class="text-blue-600 dark:text-blue-400 hover:underline">{{ sale.receipt_id }}</a>
-                        </td>
+                        <td class="p-3 text-gray-900 dark:text-white"><a href="{{ url_for('receipt', order_id=sale.receipt_id) }}" class="text-blue-600 dark:text-blue-400 hover:underline">{{ sale.receipt_id }}</a></td>
                         <td class="p-3 text-gray-900 dark:text-white">{{ sale.salesperson_name }}</td>
                         <td class="p-3 text-gray-900 dark:text-white">{{ sale.shop_name }}</td>
                         <td class="p-3 text-gray-900 dark:text-white">{{ sale.items }}</td>
-                        <td class="p-3 text-gray-900 dark:text-white">KSh {{ sale.payment | floatformat(2) }}</td>
-                        <td class="p-3 text-gray-900 dark:text-white">KSh {{ sale.balance | floatformat(2) }}</td>
+                        <td class="p-3 text-gray-900 dark:text-white">KSh {{ "%.2f" % sale.payment }}</td>
+                        <td class="p-3 text-gray-900 dark:text-white">KSh {{ "%.2f" % sale.balance }}</td>
                         <td class="p-3 text-gray-900 dark:text-white">{{ sale.date.strftime('%d/%m/%Y') }}</td>
                         <td class="p-3">
                             {% if sale.balance > 0 %}
@@ -175,7 +158,6 @@
                 </tbody>
             </table>
         </div>
-        <!-- Pagination -->
         <div class="mt-4 flex justify-between items-center">
             <div class="text-sm text-gray-700 dark:text-gray-300">
                 Showing {{ (page - 1) * per_page + 1 }} to {{ page * per_page if page * per_page <= total_orders else total_orders }} of {{ total_orders }} orders
@@ -208,7 +190,7 @@
                     {% for expense in expenses %}
                     <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                         <td class="p-3 text-gray-900 dark:text-white">{{ expense.description }}</td>
-                        <td class="p-3 text-gray-900 dark:text-white">KSh {{ expense.amount | floatformat(2) }}</td>
+                        <td class="p-3 text-gray-900 dark:text-white">KSh {{ "%.2f" % expense.amount }}</td>
                         <td class="p-3 text-gray-900 dark:text-white">{{ expense.category }}</td>
                         <td class="p-3 text-gray-900 dark:text-white">{{ expense.date.strftime('%d/%m/%Y') }}</td>
                     </tr>
@@ -248,209 +230,6 @@
 
     <!-- JavaScript -->
     <script>
-    	
-    	const notificationBell = document.getElementById('notification-bell');
-    	const notificationModal = document.getElementById('notification-modal');
-    	const closeNotificationModal = document.getElementById('close-notification-modal');
-    	const filterButtons = document.querySelectorAll('.filter-btn');
-   	const statusFilter = document.getElementById('status-filter');
-    	const salesHistory = document.getElementById('sales-history');
-    	const expensesList = document.getElementById('expenses-list');
-    	const emptyState = document.getElementById('empty-state');
-   	const loadingOverlay = document.getElementById('loading-overlay');
-    	const searchInput = document.getElementById('search-input');
-    	let originalSalesRows = [];
-    	let currentFilter = '{{ time_filter }}';
-    	let currentStatusFilter = '{{ request.args.get('status', 'all') }}';
-    	function updateTime() {
-        const now = new Date();
-        document.getElementById('time-display').textContent = now.toLocaleString('en-US', { timeZone: 'Africa/Nairobi' });
-    }
-    setInterval(updateTime, 1000);
-    updateTime();
-
-    // Notification Modal
-    notificationBell.addEventListener('click', () => {
-        notificationModal.classList.toggle('hidden');
-    });
-    closeNotificationModal.addEventListener('click', () => {
-        notificationModal.classList.add('hidden');
-    });
-
-    // Loading State
-    function showLoading() {
-        loadingOverlay.classList.remove('hidden');
-    }
-    function hideLoading() {
-        loadingOverlay.classList.add('hidden');
-    }
-
-    // Filter Sales by Status
-    function filterSalesByStatus(rows, status) {
-        if (status === 'all') return rows;
-        return rows.filter(row => {
-            const balance = parseFloat(row.querySelector('td:nth-child(6)').textContent.replace('KSh ', '')) || 0;
-            return status === 'open' ? balance > 0 : balance === 0;
-        });
-    }
-
-    // Group by Period
-    function groupByPeriod(rows, period) {
-        const grouped = {};
-        rows.forEach(row => {
-            const dateStr = row.dataset.date;
-            const date = new Date(dateStr);
-            let key;
-            if (period === 'day') key = dateStr;
-            else if (period === 'week') key = `${date.getFullYear()}-W${Math.ceil((date.getDate() + (date.getDay() === 0 ? 6 : date.getDay() - 1)) / 7)}`;
-            else if (period === 'month') key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-            else if (period === 'year') key = date.getFullYear().toString();
-            else key = 'all';
-            if (!grouped[key]) grouped[key] = [];
-            grouped[key].push(row);
-        });
-        return grouped;
-    }
-
-    // Render Grouped Items
-    function renderGroupedItems(grouped, period, type) {
-        const tbody = type === 'sales' ? document.getElementById('sales-history-body') : document.getElementById('expenses-body');
-        tbody.innerHTML = '';
-        if (type === 'sales') {
-            Object.keys(grouped).sort((a, b) => b.localeCompare(a)).forEach(key => {
-                grouped[key].forEach(row => tbody.appendChild(row.cloneNode(true)));
-            });
-        }
-    }
-
-    // Calculate Today's Sales Including Payments/Closures
-    function calculateTodaySales(salesRows) {
-        const today = new Date().toISOString().split('T')[0];
-        return salesRows.filter(row => 
-            row.dataset.date === today || 
-            row.dataset.lastPaymentDate === today || 
-            row.dataset.closedDate === today
-        );
-    }
-
-    // Fetch Real-Time Stats
-    function fetchRealtimeStats() {
-        const url = '{{ url_for("dashboard_stats") }}';
-        showLoading();
-        fetch(url)
-            .then(response => response.json())
-            .then(data => {
-                document.querySelector('.total-sales-amount').textContent = data.total_sales_today.toFixed(2);
-                document.querySelector('.retail-sales-amount').textContent = data.retail_sales_today.toFixed(2);
-                document.querySelector('.wholesale-sales-amount').textContent = data.wholesale_sales_today.toFixed(2);
-                document.querySelector('.debt-amount').textContent = data.total_debts.toFixed(2);
-                hideLoading();
-            })
-            .catch(error => {
-                console.error('Error fetching stats:', error);
-                hideLoading();
-            });
-    }
-
-    // Update Data
-    function updateData(timePeriod, statusFilter) {
-        showLoading();
-        emptyState.classList.add('hidden');
-        currentFilter = timePeriod;
-        currentStatusFilter = statusFilter;
-        const url = new URL(window.location);
-        url.searchParams.set('time', timePeriod);
-        url.searchParams.set('page', '{{ page }}');
-        url.searchParams.set('per_page', '{{ per_page }}');
-        if (searchInput.value) {
-            url.searchParams.set('search', searchInput.value);
-        }
-        fetch(url)
-            .then(response => response.text())
-            .then(html => {
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, 'text/html');
-                if (statusFilter === 'expenses') {
-                    salesHistory.classList.add('hidden');
-                    expensesList.classList.remove('hidden');
-                    const expensesRows = doc.querySelectorAll('#expenses-body tr');
-                    document.getElementById('expenses-body').innerHTML = '';
-                    expensesRows.forEach(row => document.getElementById('expenses-body').appendChild(row.cloneNode(true)));
-                    if (expensesRows.length === 0) emptyState.classList.remove('hidden');
-                } else {
-                    salesHistory.classList.remove('hidden');
-                    expensesList.classList.add('hidden');
-                    originalSalesRows = Array.from(doc.querySelectorAll('#sales-history-body tr[data-date]'));
-                    const filteredSales = filterSalesByStatus(originalSalesRows, statusFilter);
-                    if (filteredSales.length === 0) {
-                        emptyState.classList.remove('hidden');
-                    } else {
-                        const groupedSales = groupByPeriod(filteredSales, timePeriod);
-                        renderGroupedItems(groupedSales, timePeriod, 'sales');
-                        fetchRealtimeStats(); // Update stats in real-time
-                    }
-                }
-                hideLoading();
-            })
-            .catch(error => {
-                console.error('Error fetching data:', error);
-                hideLoading();
-                emptyState.classList.remove('hidden');
-            });
-    }
-
-    // Mark Notification Read
-    function markNotificationRead(notificationId) {
-        fetch(`/mark_notification_read/${notificationId}`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'}
-        })
-        .then(response => {
-            if (response.ok) {
-                const notificationDiv = document.querySelector(`button[onclick="markNotificationRead('${notificationId}')"]`).parentElement.parentElement;
-                notificationDiv.classList.remove('bg-blue-50', 'dark:bg-blue-900');
-                notificationDiv.querySelector('button').remove();
-                const unreadBadge = notificationBell.querySelector('span');
-                const unreadCount = parseInt(unreadBadge?.textContent || '0') - 1;
-                if (unreadCount > 0) {
-                    unreadBadge.textContent = unreadCount;
-                } else {
-                    unreadBadge?.remove();
-                }
-                fetchRealtimeStats(); // Refresh stats after marking read
-            } else {
-                alert('Error marking notification as read');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error marking notification as read');
-        });
-    }
-
-    // Event Listeners
-    filterButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-            filterButtons.forEach(b => b.classList.remove('bg-blue-600', 'text-white'));
-            filterButtons.forEach(b => b.classList.add('bg-gray-200', 'dark:bg-gray-700', 'text-gray-700', 'dark:text-gray-300'));
-            btn.classList.remove('bg-gray-200', 'dark:bg-gray-700', 'text-gray-700', 'dark:text-gray-300');
-            btn.classList.add('bg-blue-600', 'text-white');
-            updateData(btn.dataset.filter, currentStatusFilter);
-        });
-    });
-
-    statusFilter.addEventListener('change', () => {
-        updateData(currentFilter, statusFilter.value);
-    });
-
-    searchInput.addEventListener('input', () => {
-        updateData(currentFilter, currentStatusFilter);
-    });
-
-    // Initial Setup
-    originalSalesRows = Array.from(document.querySelectorAll('#sales-history-body tr[data-date]'));
-    updateData(currentFilter, currentStatusFilter);
-    	//insert
         const notificationBell = document.getElementById('notification-bell');
         const notificationModal = document.getElementById('notification-modal');
         const closeNotificationModal = document.getElementById('close-notification-modal');
@@ -465,7 +244,6 @@
         let currentFilter = '{{ time_filter }}';
         let currentStatusFilter = '{{ request.args.get('status', 'all') }}';
 
-        // Time Display
         function updateTime() {
             const now = new Date();
             document.getElementById('time-display').textContent = now.toLocaleString('en-US', { timeZone: 'Africa/Nairobi' });
@@ -473,23 +251,12 @@
         setInterval(updateTime, 1000);
         updateTime();
 
-        // Notification Modal
-        notificationBell.addEventListener('click', () => {
-            notificationModal.classList.toggle('hidden');
-        });
-        closeNotificationModal.addEventListener('click', () => {
-            notificationModal.classList.add('hidden');
-        });
+        notificationBell.addEventListener('click', () => notificationModal.classList.toggle('hidden'));
+        closeNotificationModal.addEventListener('click', () => notificationModal.classList.add('hidden'));
 
-        // Loading State
-        function showLoading() {
-            loadingOverlay.classList.remove('hidden');
-        }
-        function hideLoading() {
-            loadingOverlay.classList.add('hidden');
-        }
+        function showLoading() { loadingOverlay.classList.remove('hidden'); }
+        function hideLoading() { loadingOverlay.classList.add('hidden'); }
 
-        // Filter Sales by Status
         function filterSalesByStatus(rows, status) {
             if (status === 'all') return rows;
             return rows.filter(row => {
@@ -498,7 +265,6 @@
             });
         }
 
-        // Group by Period
         function groupByPeriod(rows, period) {
             const grouped = {};
             rows.forEach(row => {
@@ -516,7 +282,6 @@
             return grouped;
         }
 
-        // Render Grouped Items
         function renderGroupedItems(grouped, period, type) {
             const tbody = type === 'sales' ? document.getElementById('sales-history-body') : document.getElementById('expenses-body');
             tbody.innerHTML = '';
@@ -527,17 +292,6 @@
             }
         }
 
-        // Calculate Today's Sales Including Payments/Closures
-        function calculateTodaySales(salesRows) {
-            const today = new Date().toISOString().split('T')[0];
-            return salesRows.filter(row => 
-                row.dataset.date === today || 
-                row.dataset.lastPaymentDate === today || 
-                row.dataset.closedDate === today
-            );
-        }
-
-        // Fetch Real-Time Stats
         function fetchRealtimeStats() {
             const url = '{{ url_for("dashboard_stats") }}';
             showLoading();
@@ -556,7 +310,6 @@
                 });
         }
 
-        // Update Data
         function updateData(timePeriod, statusFilter) {
             showLoading();
             emptyState.classList.add('hidden');
@@ -566,9 +319,7 @@
             url.searchParams.set('time', timePeriod);
             url.searchParams.set('page', '{{ page }}');
             url.searchParams.set('per_page', '{{ per_page }}');
-            if (searchInput.value) {
-                url.searchParams.set('search', searchInput.value);
-            }
+            if (searchInput.value) url.searchParams.set('search', searchInput.value);
             fetch(url)
                 .then(response => response.text())
                 .then(html => {
@@ -591,7 +342,7 @@
                         } else {
                             const groupedSales = groupByPeriod(filteredSales, timePeriod);
                             renderGroupedItems(groupedSales, timePeriod, 'sales');
-                            fetchRealtimeStats(); // Update stats in real-time
+                            fetchRealtimeStats();
                         }
                     }
                     hideLoading();
@@ -603,7 +354,6 @@
                 });
         }
 
-        // Mark Notification Read
         function markNotificationRead(notificationId) {
             fetch(`/mark_notification_read/${notificationId}`, {
                 method: 'POST',
@@ -616,15 +366,10 @@
                     notificationDiv.querySelector('button').remove();
                     const unreadBadge = notificationBell.querySelector('span');
                     const unreadCount = parseInt(unreadBadge?.textContent || '0') - 1;
-                    if (unreadCount > 0) {
-                        unreadBadge.textContent = unreadCount;
-                    } else {
-                        unreadBadge?.remove();
-                    }
-                    fetchRealtimeStats(); // Refresh stats after marking read
-                } else {
-                    alert('Error marking notification as read');
-                }
+                    if (unreadCount > 0) unreadBadge.textContent = unreadCount;
+                    else unreadBadge?.remove();
+                    fetchRealtimeStats();
+                } else alert('Error marking notification as read');
             })
             .catch(error => {
                 console.error('Error:', error);
@@ -632,7 +377,6 @@
             });
         }
 
-        // Event Listeners
         filterButtons.forEach(btn => {
             btn.addEventListener('click', () => {
                 filterButtons.forEach(b => b.classList.remove('bg-blue-600', 'text-white'));
@@ -643,15 +387,9 @@
             });
         });
 
-        statusFilter.addEventListener('change', () => {
-            updateData(currentFilter, statusFilter.value);
-        });
+        statusFilter.addEventListener('change', () => updateData(currentFilter, statusFilter.value));
+        searchInput.addEventListener('input', () => updateData(currentFilter, currentStatusFilter));
 
-        searchInput.addEventListener('input', () => {
-            updateData(currentFilter, currentStatusFilter);
-        });
-
-        // Initial Setup
         originalSalesRows = Array.from(document.querySelectorAll('#sales-history-body tr[data-date]'));
         updateData(currentFilter, currentStatusFilter);
     </script>
