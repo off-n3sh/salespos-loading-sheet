@@ -4,9 +4,22 @@
     <!-- Dashboard Header -->
     <div class="mb-6">
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
-            <div>
-                <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Dashboard Overview</h2>
-                <p class="text-gray-600 dark:text-gray-300 mt-1">Welcome back, {{ user.firstName | default('User') }}!</p>
+            <div class="flex items-center space-x-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Dashboard Overview</h2>
+                    <p class="text-gray-600 dark:text-gray-300 mt-1">Welcome back, {{ user.firstName | default('User') }}!</p>
+                </div>
+                <!-- Notification Bell -->
+                <div class="relative">
+                    <button id="notification-bell" class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 focus:outline-none">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                        </svg>
+                        {% if unread_count > 0 %}
+                        <span class="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full">{{ unread_count }}</span>
+                        {% endif %}
+                    </button>
+                </div>
             </div>
             <div class="mt-4 md:mt-0 flex flex-col sm:flex-row items-center space-y-3 sm:space-y-0 sm:space-x-4">
                 <div id="time-display" class="bg-blue-50 dark:bg-gray-700 px-4 py-2 rounded-lg text-blue-600 dark:text-blue-300 font-medium"></div>
@@ -26,16 +39,6 @@
                         {% endif %}
                     </div>
                 </form>
-                <div class="relative">
-                    <button id="notification-bell" class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 focus:outline-none">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                        </svg>
-                        {% if unread_count > 0 %}
-                        <span class="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full">{{ unread_count }}</span>
-                        {% endif %}
-                    </button>
-                </div>
             </div>
         </div>
     </div>
@@ -74,197 +77,278 @@
 
     <!-- Main Stats Section -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Total Sales Today</h3>
-            <p class="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-2">KSh {{ "%.2f" % total_sales_today }}</p>
+        <!-- Main Stats Column -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Total Sales Card (Spotlight) -->
+            <div class="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-6 rounded-xl shadow-lg relative overflow-hidden group transition-all duration-300 hover:shadow-xl transform hover:-translate-y-1">
+                <div class="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-10 -mt-10"></div>
+                <div class="flex items-center justify-between relative z-10">
+                    <div>
+                        <h3 class="text-lg font-medium text-blue-100">Total Sales Today</h3>
+                        <p class="text-4xl font-bold mt-2">KSh <span class="total-sales-amount">{{ "%.2f" % total_sales_today }}</span></p>
+                    </div>
+                    <div class="bg-white bg-opacity-20 p-4 rounded-full">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Retail & Wholesale Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <!-- Retail Card -->
+                <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 transition-shadow duration-300 hover:shadow-lg">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="text-gray-500 dark:text-gray-400 text-sm font-medium">Retail Sales Today</h3>
+                            <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">KSh <span class="retail-sales-amount">{{ "%.2f" % retail_sales_today }}</span></p>
+                        </div>
+                        <div class="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Wholesale Card -->
+                <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 transition-shadow duration-300 hover:shadow-lg">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="text-gray-500 dark:text-gray-400 text-sm font-medium">Wholesale Sales Today</h3>
+                            <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">KSh <span class="wholesale-sales-amount">{{ "%.2f" % wholesale_sales_today }}</span></p>
+                        </div>
+                        <div class="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Retail Sales Today</h3>
-            <p class="text-2xl font-bold text-green-600 dark:text-green-400 mt-2">KSh {{ "%.2f" % retail_sales_today }}</p>
-        </div>
-        <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Wholesale Sales Today</h3>
-            <p class="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-2">KSh {{ "%.2f" % wholesale_sales_today }}</p>
-        </div>
-        <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Outstanding Debts</h3>
-            <p class="text-2xl font-bold text-red-600 dark:text-red-400 mt-2">KSh {{ "%.2f" % total_debts }}</p>
-        </div>
-        <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Total Expenses</h3>
-            <p class="text-2xl font-bold text-yellow-600 dark:text-yellow-400 mt-2">KSh {{ "%.2f" % total_expenses }}</p>
-        </div>
-        <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Open Orders</h3>
-            <p class="text-2xl font-bold text-orange-600 dark:text-orange-400 mt-2">{{ open_orders_count }}</p>
+
+        <!-- Side Stats Column -->
+        <div class="lg:col-span-1 space-y-6">
+            <!-- Debt Card -->
+            <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border-l-4 border-red-500 border-t border-r border-b border-gray-200 dark:border-gray-700 transition-shadow duration-300 hover:shadow-lg">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-gray-500 dark:text-gray-400 text-sm font-medium">Outstanding Debt</h3>
+                    <div class="p-2 bg-red-100 dark:bg-red-900 rounded-lg">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                    </div>
+                </div>
+                <p class="text-2xl font-bold text-red-600 dark:text-red-400 mt-3">KSh <span class="debt-amount">{{ "%.2f" % total_debts }}</span></p>
+                <div class="mt-4 text-xs text-gray-500 dark:text-gray-400">Total retail & wholesale pending</div>
+            </div>
+
+            <!-- Expenses Card -->
+            <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border-l-4 border-purple-500 border-t border-r border-b border-gray-200 dark:border-gray-700 transition-shadow duration-300 hover:shadow-lg">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-gray-500 dark:text-gray-400 text-sm font-medium">Total Expenses</h3>
+                    <div class="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                    </div>
+                </div>
+                <p class="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-3">KSh {{ "%.2f" % total_expenses }}</p>
+                <div class="mt-4 text-xs text-gray-500 dark:text-gray-400">Business costs and expenses</div>
+            </div>
         </div>
     </div>
 
-    <!-- Filter Buttons -->
-    <div class="mb-6 flex flex-wrap gap-3">
-        <button class="filter-btn px-4 py-2 rounded-lg {% if time_filter == 'day' %}bg-blue-600 text-white{% else %}bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300{% endif %}" data-filter="day">Day</button>
-        <button class="filter-btn px-4 py-2 rounded-lg {% if time_filter == 'week' %}bg-blue-600 text-white{% else %}bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300{% endif %}" data-filter="week">Week</button>
-        <button class="filter-btn px-4 py-2 rounded-lg {% if time_filter == 'month' %}bg-blue-600 text-white{% else %}bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300{% endif %}" data-filter="month">Month</button>
-        <button class="filter-btn px-4 py-2 rounded-lg {% if time_filter == 'year' %}bg-blue-600 text-white{% else %}bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300{% endif %}" data-filter="year">Year</button>
-        <button class="filter-btn px-4 py-2 rounded-lg {% if time_filter == 'all' %}bg-blue-600 text-white{% else %}bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300{% endif %}" data-filter="all">All Time</button>
-        <select id="status-filter" class="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 focus:outline-none">
-            <option value="all" {% if not request.args.get('status') or request.args.get('status') == 'all' %}selected{% endif %}>All Orders</option>
-            <option value="open" {% if request.args.get('status') == 'open' %}selected{% endif %}>Open Orders</option>
-            <option value="closed" {% if request.args.get('status') == 'closed' %}selected{% endif %}>Closed Orders</option>
-            <option value="expenses" {% if request.args.get('status') == 'expenses' %}selected{% endif %}>Expenses</option>
-        </select>
-    </div>
+    <!-- Sales History Section -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden mb-8">
+        <div class="p-5 border-b border-gray-200 dark:border-gray-700">
+            <h2 class="text-xl font-bold text-gray-900 dark:text-white">Sales History</h2>
+        </div>
+        
+        <!-- Filter Controls -->
+        <div class="p-4 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex flex-wrap gap-3 items-center">
+            <div class="flex space-x-2">
+                <button id="all-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
+                    All <span class="ml-2 bg-white bg-opacity-20 px-2 py-0.5 rounded-full text-xs">{{ total_orders }}</span>
+                </button>
+                <button id="pending-btn" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
+                    Pending <span class="ml-2 bg-white bg-opacity-20 px-2 py-0.5 rounded-full text-xs">{{ sales_history | selectattr('balance', '>', 0) | list | length }}</span>
+                </button>
+                <button id="completed-btn" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
+                    Completed <span class="ml-2 bg-white bg-opacity-20 px-2 py-0.5 rounded-full text-xs">{{ sales_history | selectattr('balance', '==', 0) | list | length }}</span>
+                </button>
+                <button id="expenses-btn" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
+                    Expenses
+                </button>
+            </div>
+            
+            <div class="ml-auto flex items-center space-x-3">
+                <label for="time-filter" class="text-sm font-medium text-gray-700 dark:text-gray-300">Time Period:</label>
+                <select id="time-filter" class="py-2 px-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                    <option value="all" {% if time_filter == 'all' %}selected{% endif %}>All Time</option>
+                    <option value="day" {% if time_filter == 'day' %}selected{% endif %}>Daily</option>
+                    <option value="week" {% if time_filter == 'week' %}selected{% endif %}>Weekly</option>
+                    <option value="month" {% if time_filter == 'month' %}selected{% endif %}>Monthly</option>
+                    <option value="year" {% if time_filter == 'year' %}selected{% endif %}>Yearly</option>
+                </select>
+                <div id="loading-spinner" class="hidden">
+                    <svg class="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </div>
+            </div>
+        </div>
 
-    <!-- Sales History -->
-    <div id="sales-history" class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 {% if request.args.get('status') == 'expenses' %}hidden{% endif %}">
-        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Sales History</h3>
-        <div class="overflow-x-auto">
-            <table class="min-w-full">
-                <thead>
-                    <tr class="bg-gray-100 dark:bg-gray-700">
-                        <th class="p-3 text-left text-gray-700 dark:text-gray-300">Receipt ID</th>
-                        <th class="p-3 text-left text-gray-700 dark:text-gray-300">Salesperson</th>
-                        <th class="p-3 text-left text-gray-700 dark:text-gray-300">Shop</th>
-                        <th class="p-3 text-left text-gray-700 dark:text-gray-300">Items</th>
-                        <th class="p-3 text-left text-gray-700 dark:text-gray-300">Payment</th>
-                        <th class="p-3 text-left text-gray-700 dark:text-gray-300">Balance</th>
-                        <th class="p-3 text-left text-gray-700 dark:text-gray-300">Date</th>
-                        <th class="p-3 text-left text-gray-700 dark:text-gray-300">Status</th>
+        <!-- Sales History Table -->
+        <div id="sales-history" class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50 dark:bg-gray-900">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Receipt ID</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Salesperson</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Shop</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Items</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Payment</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Balance</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
                     </tr>
                 </thead>
-                <tbody id="sales-history-body">
+                <tbody id="sales-history-body" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     {% for sale in sales_history %}
                     <tr data-date="{{ sale.date.strftime('%Y-%m-%d') }}"
                         data-last-payment-date="{{ sale.last_payment_date.strftime('%Y-%m-%d') if sale.last_payment_date else '' }}"
                         data-closed-date="{{ sale.closed_date.strftime('%Y-%m-%d') if sale.closed_date else '' }}"
                         data-search="{{ sale.shop_name | lower }} {{ sale.salesperson_name | lower }}"
                         class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                        <td class="p-3 text-gray-900 dark:text-white"><a href="{{ url_for('receipt', order_id=sale.receipt_id) }}" class="text-blue-600 dark:text-blue-400 hover:underline">{{ sale.receipt_id }}</a></td>
-                        <td class="p-3 text-gray-900 dark:text-white">{{ sale.salesperson_name }}</td>
-                        <td class="p-3 text-gray-900 dark:text-white">{{ sale.shop_name }}</td>
-                        <td class="p-3 text-gray-900 dark:text-white">{{ sale.items }}</td>
-                        <td class="p-3 text-gray-900 dark:text-white">KSh {{ "%.2f" % sale.payment }}</td>
-                        <td class="p-3 text-gray-900 dark:text-white">KSh {{ "%.2f" % sale.balance }}</td>
-                        <td class="p-3 text-gray-900 dark:text-white">{{ sale.date.strftime('%d/%m/%Y') }}</td>
-                        <td class="p-3">
-                            {% if sale.balance > 0 %}
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">Open</span>
-                            {% else %}
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">Closed</span>
-                            {% endif %}
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                            <a href="{{ url_for('receipt', order_id=sale.receipt_id) }}" class="text-blue-600 dark:text-blue-400 hover:underline">{{ sale.receipt_id }}</a>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{{ sale.salesperson_name }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{{ sale.shop_name }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{{ sale.items }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">KSh {{ "%.2f" % sale.payment }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">KSh {{ "%.2f" % sale.balance }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-200">{{ sale.date.strftime('%d/%m/%Y') }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 py-1 rounded-full text-xs font-medium {% if sale.balance > 0 %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200{% else %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% endif %}">
+                                {% if sale.balance > 0 %}Pending{% else %}Paid{% endif %}
+                            </span>
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-        <div class="mt-4 flex justify-between items-center">
-            <div class="text-sm text-gray-700 dark:text-gray-300">
-                Showing {{ (page - 1) * per_page + 1 }} to {{ page * per_page if page * per_page <= total_orders else total_orders }} of {{ total_orders }} orders
-            </div>
-            <div class="flex space-x-2">
-                {% if page > 1 %}
-                <a href="{{ url_for('dashboard', page=page-1, per_page=per_page, time=time_filter, search=search) }}" class="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600">Previous</a>
-                {% endif %}
-                {% if page * per_page < total_orders %}
-                <a href="{{ url_for('dashboard', page=page+1, per_page=per_page, time=time_filter, search=search) }}" class="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600">Next</a>
-                {% endif %}
-            </div>
-        </div>
-    </div>
 
-    <!-- Expenses List -->
-    <div id="expenses-list" class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 {% if request.args.get('status') != 'expenses' %}hidden{% endif %}">
-        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Expenses</h3>
-        <div class="overflow-x-auto">
-            <table class="min-w-full">
-                <thead>
-                    <tr class="bg-gray-100 dark:bg-gray-700">
-                        <th class="p-3 text-left text-gray-700 dark:text-gray-300">Description</th>
-                        <th class="p-3 text-left text-gray-700 dark:text-gray-300">Amount</th>
-                        <th class="p-3 text-left text-gray-700 dark:text-gray-300">Category</th>
-                        <th class="p-3 text-left text-gray-700 dark:text-gray-300">Date</th>
+        <!-- Expenses List (Hidden by Default) -->
+        <div id="expenses-list" class="hidden overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50 dark:bg-gray-900">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Description</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Amount</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Category</th>
                     </tr>
                 </thead>
-                <tbody id="expenses-body">
+                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     {% for expense in expenses %}
-                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                        <td class="p-3 text-gray-900 dark:text-white">{{ expense.description }}</td>
-                        <td class="p-3 text-gray-900 dark:text-white">KSh {{ "%.2f" % expense.amount }}</td>
-                        <td class="p-3 text-gray-900 dark:text-white">{{ expense.category }}</td>
-                        <td class="p-3 text-gray-900 dark:text-white">{{ expense.date.strftime('%d/%m/%Y') }}</td>
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" data-date="{{ expense.date.strftime('%Y-%m-%d') }}" data-search="{{ expense.description | lower }} {{ expense.category | lower }}">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-200">{{ expense.description }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600 dark:text-red-300">KSh {{ "%.2f" % expense.amount }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-200">{{ expense.date.strftime('%d/%m/%Y') }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                                {{ expense.category }}
+                            </span>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-    </div>
 
-    <!-- Empty State -->
-    <div id="empty-state" class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 text-center hidden">
-        <p class="text-gray-700 dark:text-gray-300">No data available for the selected filters.</p>
-    </div>
+        <!-- Pagination Controls -->
+        <div class="p-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center">
+            <div class="text-sm text-gray-600 dark:text-gray-400">
+                Showing {{ (page - 1) * per_page + 1 }} to {{ (page - 1) * per_page + sales_history | length }} of {{ total_orders }} orders
+            </div>
+            <div class="flex items-center space-x-2">
+                {% if page > 1 %}
+                <a href="{{ url_for('dashboard', page=page-1, per_page=per_page, time=time_filter, search=search) }}" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Previous</a>
+                {% endif %}
+                <form method="GET" action="{{ url_for('dashboard') }}" class="flex items-center">
+                    <input type="hidden" name="time" value="{{ time_filter }}">
+                    <input type="hidden" name="per_page" value="{{ per_page }}">
+                    <input type="hidden" name="search" value="{{ search }}">
+                    <label for="jump-to-page" class="text-sm text-gray-600 dark:text-gray-400 mr-2">Page:</label>
+                    <input type="number" id="jump-to-page" name="page" value="{{ page }}" min="1" max="{{ total_pages }}" class="w-16 p-2 border rounded-md dark:bg-gray-800 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                    <span class="text-sm text-gray-600 dark:text-gray-400 mx-2">of {{ total_pages }}</span>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Go</button>
+                </form>
+                {% if page < total_pages %}
+                <a href="{{ url_for('dashboard', page=page+1, per_page=per_page, time=time_filter, search=search) }}" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Next</a>
+                {% endif %}
+            </div>
+        </div>
 
-    <!-- Recent Activity -->
-    <div class="mt-8 bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
-        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Recent Activity</h3>
-        <ul class="space-y-4">
-            {% for activity in recent_activity %}
-            <li class="flex justify-between items-center">
-                <div>
-                    <p class="text-gray-900 dark:text-white">
-                        <a href="{{ url_for('receipt', order_id=activity.receipt_id) }}" class="text-blue-600 dark:text-blue-400 hover:underline">{{ activity.receipt_id }}</a>
-                        - {{ activity.salesperson_name }} at {{ activity.shop_name }}
-                    </p>
-                    <p class="text-sm text-gray-500 dark:text-gray-400">{{ activity.date.strftime('%d/%m/%Y %H:%M') }}</p>
-                </div>
-            </li>
-            {% endfor %}
-        </ul>
-    </div>
-
-    <!-- Loading Overlay -->
-    <div id="loading-overlay" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden z-40">
-        <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-600"></div>
+        <!-- Empty State for Filtered Data -->
+        <div id="empty-state" class="hidden p-8 text-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p class="mt-4 text-gray-600 dark:text-gray-400 text-lg">No data found for the selected filter</p>
+            <p class="text-gray-500 dark:text-gray-500 text-sm mt-2">Try changing your filter criteria</p>
+        </div>
     </div>
 
     <!-- JavaScript -->
     <script>
-        const notificationBell = document.getElementById('notification-bell');
-        const notificationModal = document.getElementById('notification-modal');
-        const closeNotificationModal = document.getElementById('close-notification-modal');
-        const filterButtons = document.querySelectorAll('.filter-btn');
-        const statusFilter = document.getElementById('status-filter');
-        const salesHistory = document.getElementById('sales-history');
-        const expensesList = document.getElementById('expenses-list');
-        const emptyState = document.getElementById('empty-state');
-        const loadingOverlay = document.getElementById('loading-overlay');
-        const searchInput = document.getElementById('search-input');
-        let originalSalesRows = [];
-        let currentFilter = '{{ time_filter }}';
-        let currentStatusFilter = '{{ request.args.get('status', 'all') }}';
-
+        // Time display function
         function updateTime() {
-            const now = new Date();
-            document.getElementById('time-display').textContent = now.toLocaleString('en-US', { timeZone: 'Africa/Nairobi' });
+            const now = new Date().toLocaleString('en-US', { timeZone: 'Africa/Nairobi' });
+            document.getElementById('time-display').textContent = now;
         }
         setInterval(updateTime, 1000);
         updateTime();
 
-        notificationBell.addEventListener('click', () => notificationModal.classList.toggle('hidden'));
-        closeNotificationModal.addEventListener('click', () => notificationModal.classList.add('hidden'));
+        // DOM Elements
+        const notificationBell = document.getElementById('notification-bell');
+        const notificationModal = document.getElementById('notification-modal');
+        const closeNotificationModal = document.getElementById('close-notification-modal');
+        const searchInput = document.getElementById('search-input');
+        const allBtn = document.getElementById('all-btn');
+        const pendingBtn = document.getElementById('pending-btn');
+        const completedBtn = document.getElementById('completed-btn');
+        const expensesBtn = document.getElementById('expenses-btn');
+        const salesHistory = document.getElementById('sales-history');
+        const salesHistoryBody = document.getElementById('sales-history-body');
+        const expensesList = document.getElementById('expenses-list');
+        const timeFilter = document.getElementById('time-filter');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const emptyState = document.getElementById('empty-state');
+        let originalSalesRows = Array.from(salesHistoryBody.querySelectorAll('tr[data-date]'));
+        let currentFilter = '{{ time_filter }}';
+        let currentStatusFilter = 'all';
 
-        function showLoading() { loadingOverlay.classList.remove('hidden'); }
-        function hideLoading() { loadingOverlay.classList.add('hidden'); }
+        // Loading State
+        function showLoading() { loadingSpinner.classList.remove('hidden'); }
+        function hideLoading() { loadingSpinner.classList.add('hidden'); }
 
+        // Filter Sales by Status
         function filterSalesByStatus(rows, status) {
             if (status === 'all') return rows;
             return rows.filter(row => {
                 const balance = parseFloat(row.querySelector('td:nth-child(6)').textContent.replace('KSh ', '')) || 0;
-                return status === 'open' ? balance > 0 : balance === 0;
+                return status === 'pending' ? balance > 0 : balance === 0;
             });
         }
 
+        // Group by Period
         function groupByPeriod(rows, period) {
             const grouped = {};
             rows.forEach(row => {
@@ -282,8 +366,9 @@
             return grouped;
         }
 
+        // Render Grouped Items
         function renderGroupedItems(grouped, period, type) {
-            const tbody = type === 'sales' ? document.getElementById('sales-history-body') : document.getElementById('expenses-body');
+            const tbody = type === 'sales' ? salesHistoryBody : expensesList.querySelector('tbody');
             tbody.innerHTML = '';
             if (type === 'sales') {
                 Object.keys(grouped).sort((a, b) => b.localeCompare(a)).forEach(key => {
@@ -292,24 +377,31 @@
             }
         }
 
-        function fetchRealtimeStats() {
-            const url = '{{ url_for("dashboard_stats") }}';
-            showLoading();
-            fetch(url)
-                .then(response => response.json())
-                .then(data => {
-                    document.querySelector('.total-sales-amount').textContent = data.total_sales_today.toFixed(2);
-                    document.querySelector('.retail-sales-amount').textContent = data.retail_sales_today.toFixed(2);
-                    document.querySelector('.wholesale-sales-amount').textContent = data.wholesale_sales_today.toFixed(2);
-                    document.querySelector('.debt-amount').textContent = data.total_debts.toFixed(2);
-                    hideLoading();
-                })
-                .catch(error => {
-                    console.error('Error fetching stats:', error);
-                    hideLoading();
-                });
+        // Calculate Today's Sales Including Payments/Closures
+        function calculateTodaySales(salesRows) {
+            const today = new Date().toISOString().split('T')[0];
+            return salesRows.filter(row => 
+                row.dataset.date === today || 
+                row.dataset.lastPaymentDate === today || 
+                row.dataset.closedDate === today
+            );
         }
 
+        // Fetch Real-Time Stats
+        function fetchRealtimeStats(salesRows) {
+            const todaySales = calculateTodaySales(salesRows);
+            const totalSales = todaySales.reduce((sum, row) => sum + parseFloat(row.querySelector('td:nth-child(5)').textContent.replace('KSh ', '')), 0);
+            const retailSales = todaySales.filter(row => row.querySelector('td:nth-child(4)').textContent.includes('retail')).reduce((sum, row) => sum + parseFloat(row.querySelector('td:nth-child(5)').textContent.replace('KSh ', '')), 0);
+            const wholesaleSales = todaySales.filter(row => row.querySelector('td:nth-child(4)').textContent.includes('wholesale')).reduce((sum, row) => sum + parseFloat(row.querySelector('td:nth-child(5)').textContent.replace('KSh ', '')), 0);
+            const totalDebts = salesRows.reduce((sum, row) => sum + parseFloat(row.querySelector('td:nth-child(6)').textContent.replace('KSh ', '')), 0);
+
+            document.querySelector('.total-sales-amount').textContent = totalSales.toFixed(2);
+            document.querySelector('.retail-sales-amount').textContent = retailSales.toFixed(2);
+            document.querySelector('.wholesale-sales-amount').textContent = wholesaleSales.toFixed(2);
+            document.querySelector('.debt-amount').textContent = totalDebts.toFixed(2);
+        }
+
+        // Update Data
         function updateData(timePeriod, statusFilter) {
             showLoading();
             emptyState.classList.add('hidden');
@@ -328,9 +420,9 @@
                     if (statusFilter === 'expenses') {
                         salesHistory.classList.add('hidden');
                         expensesList.classList.remove('hidden');
-                        const expensesRows = doc.querySelectorAll('#expenses-body tr');
-                        document.getElementById('expenses-body').innerHTML = '';
-                        expensesRows.forEach(row => document.getElementById('expenses-body').appendChild(row.cloneNode(true)));
+                        const expensesRows = doc.querySelectorAll('#expenses-list tr');
+                        document.querySelector('#expenses-list tbody').innerHTML = '';
+                        expensesRows.forEach(row => document.querySelector('#expenses-list tbody').appendChild(row.cloneNode(true)));
                         if (expensesRows.length === 0) emptyState.classList.remove('hidden');
                     } else {
                         salesHistory.classList.remove('hidden');
@@ -342,7 +434,7 @@
                         } else {
                             const groupedSales = groupByPeriod(filteredSales, timePeriod);
                             renderGroupedItems(groupedSales, timePeriod, 'sales');
-                            fetchRealtimeStats();
+                            fetchRealtimeStats(originalSalesRows);
                         }
                     }
                     hideLoading();
@@ -354,6 +446,7 @@
                 });
         }
 
+        // Mark Notification Read
         function markNotificationRead(notificationId) {
             fetch(`/mark_notification_read/${notificationId}`, {
                 method: 'POST',
@@ -368,7 +461,7 @@
                     const unreadCount = parseInt(unreadBadge?.textContent || '0') - 1;
                     if (unreadCount > 0) unreadBadge.textContent = unreadCount;
                     else unreadBadge?.remove();
-                    fetchRealtimeStats();
+                    fetchRealtimeStats(originalSalesRows);
                 } else alert('Error marking notification as read');
             })
             .catch(error => {
@@ -377,20 +470,17 @@
             });
         }
 
-        filterButtons.forEach(btn => {
-            btn.addEventListener('click', () => {
-                filterButtons.forEach(b => b.classList.remove('bg-blue-600', 'text-white'));
-                filterButtons.forEach(b => b.classList.add('bg-gray-200', 'dark:bg-gray-700', 'text-gray-700', 'dark:text-gray-300'));
-                btn.classList.remove('bg-gray-200', 'dark:bg-gray-700', 'text-gray-700', 'dark:text-gray-300');
-                btn.classList.add('bg-blue-600', 'text-white');
-                updateData(btn.dataset.filter, currentStatusFilter);
-            });
-        });
-
-        statusFilter.addEventListener('change', () => updateData(currentFilter, statusFilter.value));
+        // Event Listeners
+        allBtn.addEventListener('click', () => updateData(currentFilter, 'all'));
+        pendingBtn.addEventListener('click', () => updateData(currentFilter, 'pending'));
+        completedBtn.addEventListener('click', () => updateData(currentFilter, 'completed'));
+        expensesBtn.addEventListener('click', () => updateData(currentFilter, 'expenses'));
+        timeFilter.addEventListener('change', () => updateData(timeFilter.value, currentStatusFilter));
         searchInput.addEventListener('input', () => updateData(currentFilter, currentStatusFilter));
+        notificationBell.addEventListener('click', () => notificationModal.classList.toggle('hidden'));
+        closeNotificationModal.addEventListener('click', () => notificationModal.classList.add('hidden'));
 
-        originalSalesRows = Array.from(document.querySelectorAll('#sales-history-body tr[data-date]'));
+        // Initial Setup
         updateData(currentFilter, currentStatusFilter);
     </script>
 {% endblock %}
