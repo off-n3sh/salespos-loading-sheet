@@ -4,24 +4,11 @@
     <!-- Dashboard Header -->
     <div class="mb-6">
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
-            <div class="flex items-center space-x-4">
-                <div>
-                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Dashboard Overview</h2>
-                    <p class="text-gray-600 dark:text-gray-300 mt-1">
-                        Welcome back, {{ user.firstName | default('User') }}!
-                    </p>
-                </div>
-                <!-- Notification Bell -->
-                <div class="relative">
-                    <button id="notification-bell" class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 focus:outline-none">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                        </svg>
-                        {% if unread_count > 0 %}
-                        <span class="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full">{{ unread_count }}</span>
-                        {% endif %}
-                    </button>
-                </div>
+            <div>
+                <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Dashboard Overview</h2>
+                <p class="text-gray-600 dark:text-gray-300 mt-1">
+                    Welcome back, {{ user.firstName | default('User') }}!
+                </p>
             </div>
             <div class="mt-4 md:mt-0 flex flex-col sm:flex-row items-center space-y-3 sm:space-y-0 sm:space-x-4">
                 <div id="time-display" class="bg-blue-50 dark:bg-gray-700 px-4 py-2 rounded-lg text-blue-600 dark:text-blue-300 font-medium"></div>
@@ -43,6 +30,17 @@
                         {% endif %}
                     </div>
                 </form>
+                <!-- Notification Bell -->
+                <div class="relative">
+                    <button id="notification-bell" class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 focus:outline-none">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                        </svg>
+                        {% if unread_count > 0 %}
+                        <span class="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full">{{ unread_count }}</span>
+                        {% endif %}
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -90,9 +88,7 @@
                     <div>
                         <h3 class="text-lg font-medium text-blue-100">Total Sales</h3>
                         <p class="text-4xl font-bold mt-2 total-sales-amount">{{ total_sales_today | round(2) | default(0) }}</p>
-                        <p class="text-blue-100 mt-2 text-sm">
-                            Today's performance ({{ open_orders_count }} open, {{ closed_orders_count }} closed)
-                        </p>
+                        <p class="text-blue-100 mt-2 text-sm">Today's business performance</p>
                     </div>
                     <div class="bg-white bg-opacity-20 p-4 rounded-full">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -110,9 +106,7 @@
                         <div>
                             <h3 class="text-gray-500 dark:text-gray-400 text-sm font-medium">Retail Sales</h3>
                             <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1 retail-sales-amount">{{ retail_sales_today | round(2) | default(0) }}</p>
-                            <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                {{ retail_open_orders }} open, {{ retail_closed_orders }} closed
-                            </div>
+                            <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">Today's walk-in customers</div>
                         </div>
                         <div class="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -128,9 +122,7 @@
                         <div>
                             <h3 class="text-gray-500 dark:text-gray-400 text-sm font-medium">Wholesale Sales</h3>
                             <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1 wholesale-sales-amount">{{ wholesale_sales_today | round(2) | default(0) }}</p>
-                            <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                {{ wholesale_open_orders }} open, {{ wholesale_closed_orders }} closed
-                            </div>
+                            <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">Today's business clients</div>
                         </div>
                         <div class="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -154,10 +146,8 @@
                         </svg>
                     </div>
                 </div>
-                <p class="text-2xl font-bold text-red-600 dark:text-red-400 mt-3">{{ total_debts | round(2) | default(0) }}</p>
-                <div class="mt-4 text-xs text-gray-500 dark:text-gray-400">
-                    Total pending collections
-                </div>
+                <p class="text-2xl font-bold text-red-600 dark:text-red-400 mt-3 debt-amount">{{ total_debts | round(2) | default(0) }}</p>
+                <div class="mt-4 text-xs text-gray-500 dark:text-gray-400">Total pending collections</div>
             </div>
 
             <!-- Expenses Card -->
@@ -171,9 +161,7 @@
                     </div>
                 </div>
                 <p class="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-3">{{ total_expenses | round(2) | default(0) }}</p>
-                <div class="mt-4 text-xs text-gray-500 dark:text-gray-400">
-                    Business costs and expenses
-                </div>
+                <div class="mt-4 text-xs text-gray-500 dark:text-gray-400">Business costs and expenses</div>
             </div>
         </div>
     </div>
@@ -405,18 +393,7 @@
         // Calculate today's sales, including partially paid orders
         function calculateTodaySales(salesRows) {
             const today = new Date().toISOString().split('T')[0];
-            return salesRows.filter(row => {
-                const saleDate = row.dataset.date;
-                const closedDateText = row.querySelector('td:nth-child(3)').textContent.trim();
-                const closedDate = closedDateText !== 'Not Closed' ? new Date(closedDateText.split(' ')[0].split('/').reverse().join('-')).toISOString().split('T')[0] : null;
-                const paymentText = row.querySelector('td:nth-child(5)').textContent.trim();
-                const payment = parseFloat(paymentText.split('/')[0]);
-                const total = parseFloat(paymentText.split('/')[1]);
-                const balance = total - payment;
-                
-                return saleDate === today || 
-                       (closedDate === today && balance > 0);
-            });
+            return salesRows.filter(row => row.dataset.date === today);
         }
 
         // Calculate total sales amount from rows
@@ -428,10 +405,20 @@
             }, 0).toFixed(2);
         }
 
+        // Calculate outstanding debt
+        function calculateOutstandingDebt(salesRows) {
+            return salesRows.reduce((total, row) => {
+                const paymentText = row.querySelector('td:nth-child(5)').textContent.trim();
+                const payment = parseFloat(paymentText.split('/')[0]);
+                const totalAmount = parseFloat(paymentText.split('/')[1]);
+                const balance = totalAmount - payment;
+                return total + (balance > 0 ? balance : 0);
+            }, 0).toFixed(2);
+        }
+
         // Format date for display in group headers
         function formatGroupDate(dateString, period) {
             const date = new Date(dateString);
-            
             if (period === 'day') {
                 return date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
             } else if (period === 'week') {
@@ -457,12 +444,10 @@
             if (period === 'all') {
                 return { 'All Records': items };
             }
-            
             const grouped = {};
             items.forEach(item => {
                 const date = new Date(item.dataset.date);
                 let key;
-                
                 if (period === 'day') {
                     key = date.toISOString().split('T')[0];
                 } else if (period === 'week') {
@@ -475,13 +460,11 @@
                 } else if (period === 'year') {
                     key = date.getFullYear().toString();
                 }
-                
                 if (!grouped[key]) {
                     grouped[key] = [];
                 }
                 grouped[key].push(item);
             });
-            
             return grouped;
         }
 
@@ -497,16 +480,12 @@
         function renderGroupedItems(groupedItems, period, itemType) {
             const container = itemType === 'sales' ? salesHistoryBody : document.querySelector('#expenses-list tbody');
             container.innerHTML = '';
-            
             const sortedKeys = sortGroupKeys(Object.keys(groupedItems), period);
-            
             if (sortedKeys.length === 0) {
                 emptyState.classList.remove('hidden');
                 return;
             }
-            
             emptyState.classList.add('hidden');
-            
             sortedKeys.forEach(key => {
                 const formattedHeader = formatGroupDate(key, period);
                 const groupHeader = document.createElement('tr');
@@ -518,7 +497,6 @@
                     </td>
                 `;
                 container.appendChild(groupHeader);
-                
                 groupedItems[key].forEach(item => {
                     container.appendChild(item.cloneNode(true));
                 });
@@ -546,12 +524,9 @@
         // Update the data based on the selected time period and status filter
         function updateData(timePeriod, statusFilter) {
             showLoading();
-            
             emptyState.classList.add('hidden');
-            
             currentFilter = timePeriod;
             currentStatusFilter = statusFilter;
-            
             const url = new URL(window.location);
             url.searchParams.set('time', timePeriod);
             url.searchParams.set('page', '{{ page }}');
@@ -566,11 +541,9 @@
                 .then(html => {
                     const parser = new DOMParser();
                     const doc = parser.parseFromString(html, 'text/html');
-                    
                     if (statusFilter === 'expenses') {
                         salesHistory.classList.add('hidden');
                         expensesList.classList.remove('hidden');
-                        
                         originalExpenseRows = Array.from(doc.querySelectorAll('#expenses-list tbody tr[data-date]'));
                         if (originalExpenseRows.length === 0) {
                             emptyState.classList.remove('hidden');
@@ -581,27 +554,23 @@
                     } else {
                         salesHistory.classList.remove('hidden');
                         expensesList.classList.add('hidden');
-                        
                         originalSalesRows = Array.from(doc.querySelectorAll('#sales-history-body tr[data-date]'));
                         const filteredSales = filterSalesByStatus(originalSalesRows, statusFilter);
-                        
                         if (filteredSales.length === 0) {
                             emptyState.classList.remove('hidden');
                         } else {
                             const groupedSales = groupByPeriod(filteredSales, timePeriod);
                             renderGroupedItems(groupedSales, timePeriod, 'sales');
-
                             // Update dashboard stats
                             const todaySales = calculateTodaySales(originalSalesRows);
                             const retailSales = todaySales.filter(row => row.querySelector('td:nth-child(4) span').textContent.trim() === 'retail');
                             const wholesaleSales = todaySales.filter(row => row.querySelector('td:nth-child(4) span').textContent.trim() === 'wholesale');
-
                             document.querySelector('.total-sales-amount').textContent = calculateTotalSales(todaySales);
                             document.querySelector('.retail-sales-amount').textContent = calculateTotalSales(retailSales);
                             document.querySelector('.wholesale-sales-amount').textContent = calculateTotalSales(wholesaleSales);
+                            document.querySelector('.debt-amount').textContent = calculateOutstandingDebt(originalSalesRows);
                         }
                     }
-                    
                     hideLoading();
                 })
                 .catch(error => {
@@ -618,6 +587,7 @@
         completedBtn.addEventListener('click', () => updateData(currentFilter, 'completed'));
         expensesBtn.addEventListener('click', () => updateData(currentFilter, 'expenses'));
         timeFilter.addEventListener('change', (e) => updateData(e.target.value, currentStatusFilter));
+        searchInput.addEventListener('input', () => updateData(currentFilter, currentStatusFilter));
 
         // Notification modal toggle
         notificationBell.addEventListener('click', () => {
@@ -655,6 +625,7 @@
                     } else {
                         badge.textContent = count;
                     }
+                    updateData(currentFilter, currentStatusFilter); // Refresh after marking read
                 } else {
                     alert('Error marking notification as read');
                 }
