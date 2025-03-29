@@ -292,7 +292,7 @@ def dashboard():
                 'balance': order_dict.get('balance', 0),
                 'date': process_date(order_dict.get('date')),
                 'closed_date': process_date(order_dict.get('closed_date', None)) if order_dict.get('closed_date') else None,
-                'order_type': order_dict.get('order_type', 'wholesale'),  # Ensure order_type is passed
+                'order_type': order_dict.get('order_type', 'wholesale'),
                 'final_payment': order_dict.get('final_payment', 0),
                 'last_payment_date': process_date(order_dict.get('last_payment_date', order_dict.get('date')))
             })
@@ -320,7 +320,7 @@ def dashboard():
                 'balance': order_dict.get('balance', 0),
                 'date': process_date(order_dict.get('date')),
                 'closed_date': process_date(order_dict.get('closed_date', None)) if order_dict.get('closed_date') else None,
-                'order_type': order_dict.get('order_type', 'wholesale'),  # Ensure order_type is passed
+                'order_type': order_dict.get('order_type', 'wholesale'),
                 'final_payment': order_dict.get('final_payment', 0),
                 'last_payment_date': process_date(order_dict.get('last_payment_date', order_dict.get('date')))
             })
@@ -348,6 +348,7 @@ def dashboard():
     all_orders = db.collection('orders').stream()
     retail_sales_today = 0
     wholesale_sales_today = 0
+    total_debts = 0
     open_orders_count = 0
     closed_orders_count = 0
     retail_open_orders = 0
@@ -360,9 +361,9 @@ def dashboard():
         order_date = process_date(order_dict.get('date'))
         last_payment_date = process_date(order_dict.get('last_payment_date', order_dict.get('date')))
         closed_date = process_date(order_dict.get('closed_date', None)) if order_dict.get('closed_date') else None
-        order_type = order_dict.get('order_type', 'wholesale')  # Use order_type from the database
-        initial_payment = float(order_dict.get('payment', 0))
-        final_payment = float(order_dict.get('final_payment', 0))
+        order_type = order_dict.get('order_type', 'wholesale')
+        initial_payment = float(order_dict.get('payment', 0))  # Total paid so far
+        final_payment = float(order_dict.get('final_payment', 0))  # Last payment amount
         balance = float(order_dict.get('balance', 0))
 
         # Count open and closed orders
@@ -379,34 +380,34 @@ def dashboard():
             else:
                 wholesale_closed_orders += 1
 
-        # Today's sales: initial payment for new orders today, additional payment for payments today
-        if order_date >= today_start and order_date < today_end:
-            # New order placed today: count the initial payment
-            if order_type == 'retail':
-                retail_sales_today += initial_payment
-            else:
-                wholesale_sales_today += initial_payment
+        # Today's sales: only count payments made today
         if last_payment_date >= today_start and last_payment_date < today_end:
-            # Payment made today: count the final_payment (additional payment made today)
             if final_payment > 0:
                 if order_type == 'retail':
                     retail_sales_today += final_payment
                 else:
                     wholesale_sales_today += final_payment
+        # For new orders today with no subsequent payments, count initial payment
+        elif order_date >= today_start and order_date < today_end and (not last_payment_date or last_payment_date == order_date):
+            if initial_payment > 0:
+                if order_type == 'retail':
+                    retail_sales_today += initial_payment
+                else:
+                    wholesale_sales_today += initial_payment
 
-    # Add retail collection sales (direct retail sales, not orders)
+    # Add direct retail sales from 'retail' collection
     retail_sales_today += sum(
         r.to_dict().get('amount', 0) for r in db.collection('retail')
         .where('date', '==', now.strftime('%Y-%m-%d')).get()
     )
 
     total_sales_today = retail_sales_today + wholesale_sales_today
-    total_debts = sum(o.to_dict().get('balance', 0) for o in all_orders if o.to_dict().get('balance', 0) > 0)
+    total_debts = sum(o.to_dict().get('balance', 0) for o in db.collection('orders').stream() if o.to_dict().get('balance', 0) > 0)
     expenses = [doc.to_dict() for doc in db.collection('expenses').order_by('date', direction=firestore.Query.DESCENDING).get()]
     total_expenses = sum(e['amount'] for e in expenses)
 
     # Fetch notifications for the current user
-    user_id = session['user'].get('id', '')
+    user_id = session['user'].get('uid', '')  # Use 'uid' from session
     notifications_ref = db.collection('notifications').where('recipient', '==', user_id).order_by('timestamp', direction=firestore.Query.DESCENDING).limit(10).stream()
     notifications = []
     unread_count = 0
@@ -425,6 +426,9 @@ def dashboard():
     sales_history = filtered_orders
     recent_activity = orders[:3]
     total_pages = (total_orders + per_page - 1) // per_page
+
+    # Debug print to verify stats
+    print(f"Total Debts: {total_debts}, Retail Today: {retail_sales_today}, Wholesale Today: {wholesale_sales_today}")
 
     return render_template(
         'dashboard.html',
@@ -451,7 +455,7 @@ def dashboard():
         retail_closed_orders=retail_closed_orders,
         wholesale_open_orders=wholesale_open_orders,
         wholesale_closed_orders=wholesale_closed_orders
-    )        
+    )
 @app.route('/mark_notification_read/<notification_id>', methods=['POST'])
 @no_cache
 @login_required
@@ -859,13 +863,13 @@ def mark_paid(order_id):
 
         new_payment = current_payment + amount_paid
         new_balance = max(current_balance - amount_paid, 0)
-        final_payment = amount_paid if new_balance > 0 else (current_balance if current_payment == 0 else amount_paid)
+        final_payment = amount_paid  # Only the new payment amount
 
         update_data = {
             'payment': new_payment,
             'balance': new_balance,
-            'final_payment': order_dict.get('final_payment', 0) + final_payment,  # Cumulative final payment
-            'last_payment_date': now  # Track when the last payment was made
+            'final_payment': final_payment,  # Overwrite with latest payment
+            'last_payment_date': now
         }
         if new_balance == 0 and current_balance > 0:
             update_data['closed_date'] = now
@@ -885,8 +889,52 @@ def mark_paid(order_id):
             'read': False
         })
         return redirect(url_for('dashboard', time='day'))
+    except Exception as e:
+        return f"Error updating order: {str(e)}", 500@app.route('/mark_paid/<order_id>', methods=['POST'])
+@no_cache
+@login_required
+def mark_paid(order_id):
+    orders_ref = db.collection('orders').where('receipt_id', '==', order_id).limit(1).stream()
+    order_doc = next(orders_ref, None)
+    if not order_doc:
+        return "Order not found", 404
 
-        return '', 200
+    try:
+        order_ref = db.collection('orders').document(order_doc.id)
+        order_dict = order_doc.to_dict()
+        current_payment = float(order_dict.get('payment', 0))
+        current_balance = float(order_dict.get('balance', 0))
+        amount_paid = float(request.form.get('amount_paid', 0))
+        now = datetime.now(KENYA_TZ)
+
+        new_payment = current_payment + amount_paid
+        new_balance = max(current_balance - amount_paid, 0)
+        final_payment = amount_paid  # Only the new payment amount
+
+        update_data = {
+            'payment': new_payment,
+            'balance': new_balance,
+            'final_payment': final_payment,  # Overwrite with latest payment
+            'last_payment_date': now
+        }
+        if new_balance == 0 and current_balance > 0:
+            update_data['closed_date'] = now
+            notification_message = f"Order #{order_id} fully paid and closed on {now.strftime('%d/%m/%Y %H:%M')}"
+            log_user_action('Closed Order', f"Order #{order_id} marked fully paid")
+        else:
+            notification_message = f"Order #{order_id} partially paid. New balance: KSh {new_balance} on {now.strftime('%d/%m/%Y %H:%M')}"
+            log_user_action('Marked Paid', f"Order #{order_id} - Paid {amount_paid} KES, New Balance {new_balance} KES")
+
+        order_ref.update(update_data)
+
+        db.collection('notifications').add({
+            'recipient': order_dict.get('salesperson_id', ''),
+            'message': notification_message,
+            'timestamp': now,
+            'order_id': order_id,
+            'read': False
+        })
+        return redirect(url_for('dashboard', time='day'))
     except Exception as e:
         return f"Error updating order: {str(e)}", 500
         

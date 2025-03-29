@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Home{% endblock %}
+{% block title %}Dashboard{% endblock %}
 {% block content %}
     <!-- Dashboard Header -->
     <div class="mb-6">
@@ -76,13 +76,13 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         <!-- Main Stats Column -->
         <div class="lg:col-span-2 space-y-6">
-            <!-- Total Sales Card (Spotlight) -->
+            <!-- Total Sales Card -->
             <div class="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-6 rounded-xl shadow-lg relative overflow-hidden group transition-all duration-300 hover:shadow-xl transform hover:-translate-y-1">
                 <div class="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-10 -mt-10"></div>
                 <div class="flex items-center justify-between relative z-10">
                     <div>
-                        <h3 class="text-lg font-medium text-blue-100">Total Sales</h3>
-                        <p class="text-4xl font-bold mt-2 total-sales-amount">{{ total_sales_today | round(2) | default(0) }}</p>
+                        <h3 class="text-lg font-medium text-blue-100">Today's Business Total Sales</h3>
+                        <p class="text-4xl font-bold mt-2">{{ total_sales_today | round(2) | default(0) }}</p>
                         <p class="text-blue-100 mt-2 text-sm">
                             Today's performance ({{ open_orders_count }} open, {{ closed_orders_count }} closed)
                         </p>
@@ -101,8 +101,8 @@
                 <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 transition-shadow duration-300 hover:shadow-lg">
                     <div class="flex justify-between items-start">
                         <div>
-                            <h3 class="text-gray-500 dark:text-gray-400 text-sm font-medium">Retail Sales</h3>
-                            <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1 retail-sales-amount">{{ retail_sales_today | round(2) | default(0) }}</p>
+                            <h3 class="text-gray-500 dark:text-gray-400 text-sm font-medium">Walk-in Customers</h3>
+                            <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ retail_sales_today | round(2) | default(0) }}</p>
                             <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                                 {{ retail_open_orders }} open, {{ retail_closed_orders }} closed
                             </div>
@@ -114,13 +114,13 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Wholesale Card -->
                 <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 transition-shadow duration-300 hover:shadow-lg">
                     <div class="flex justify-between items-start">
                         <div>
-                            <h3 class="text-gray-500 dark:text-gray-400 text-sm font-medium">Wholesale Sales</h3>
-                            <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1 wholesale-sales-amount">{{ wholesale_sales_today | round(2) | default(0) }}</p>
+                            <h3 class="text-gray-500 dark:text-gray-400 text-sm font-medium">Business Clients</h3>
+                            <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ wholesale_sales_today | round(2) | default(0) }}</p>
                             <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                                 {{ wholesale_open_orders }} open, {{ wholesale_closed_orders }} closed
                             </div>
@@ -147,7 +147,7 @@
                         </svg>
                     </div>
                 </div>
-                <p class="text-2xl font-bold text-red-600 dark:text-red-400 mt-3 debt-amount">{{ total_debts | round(2) | default(0) }}</p>
+                <p class="text-2xl font-bold text-red-600 dark:text-red-400 mt-3">{{ total_debts | round(2) | default(0) }}</p>
                 <div class="mt-4 text-xs text-gray-500 dark:text-gray-400">
                     Total pending collections
                 </div>
@@ -176,7 +176,7 @@
         <div class="p-5 border-b border-gray-200 dark:border-gray-700">
             <h2 class="text-xl font-bold text-gray-900 dark:text-white">Sales History</h2>
         </div>
-        
+
         <!-- Filter Controls -->
         <div class="p-4 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex flex-wrap gap-3 items-center">
             <div class="flex space-x-2">
@@ -193,7 +193,7 @@
                     Expenses
                 </button>
             </div>
-            
+
             <div class="ml-auto flex items-center space-x-3">
                 <label for="time-filter" class="text-sm font-medium text-gray-700 dark:text-gray-300">Time:</label>
                 <select id="time-filter" class="py-2 px-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
