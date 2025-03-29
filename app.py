@@ -272,6 +272,12 @@ def dashboard():
             paginated_orders = matching_orders[start_idx:end_idx]
             for doc, _ in paginated_orders:
                 order_dict = doc.to_dict()
+                balance = float(order_dict.get('balance', 0))
+                closed_date = process_date(order_dict.get('closed_date'))
+                # Validate: Pending orders (balance > 0) should not have a closed_date
+                if balance > 0 and closed_date:
+                    print(f"WARNING: Order {doc.id} has balance {balance} but closed_date {closed_date}")
+                    closed_date = None  # Forcefully unset closed_date for pending orders
                 orders.append({
                     'receipt_id': order_dict.get('receipt_id', doc.id),
                     'salesperson_name': order_dict.get('salesperson_name', 'N/A'),
@@ -279,9 +285,9 @@ def dashboard():
                     'items': json.dumps(order_dict.get('items', [])),  # Serialize items for the template
                     'photoUrl': order_dict.get('photoUrl', ''),
                     'payment': float(order_dict.get('payment', 0)),
-                    'balance': float(order_dict.get('balance', 0)),
+                    'balance': balance,
                     'date': process_date(order_dict.get('date')),
-                    'closed_date': process_date(order_dict.get('closed_date')),
+                    'closed_date': closed_date,
                     'order_type': order_dict.get('order_type', 'wholesale'),
                     'final_payment': float(order_dict.get('final_payment', 0)),
                     'last_payment_date': process_date(order_dict.get('last_payment_date', order_dict.get('date')))
@@ -308,6 +314,12 @@ def dashboard():
         orders_query = orders_ref.limit(per_page).stream()
         for doc in orders_query:
             order_dict = doc.to_dict()
+            balance = float(order_dict.get('balance', 0))
+            closed_date = process_date(order_dict.get('closed_date'))
+            # Validate: Pending orders (balance > 0) should not have a closed_date
+            if balance > 0 and closed_date:
+                print(f"WARNING: Order {doc.id} has balance {balance} but closed_date {closed_date}")
+                closed_date = None  # Forcefully unset closed_date for pending orders
             orders.append({
                 'receipt_id': order_dict.get('receipt_id', doc.id),
                 'salesperson_name': order_dict.get('salesperson_name', 'N/A'),
@@ -315,9 +327,9 @@ def dashboard():
                 'items': json.dumps(order_dict.get('items', [])),  # Serialize items for the template
                 'photoUrl': order_dict.get('photoUrl', ''),
                 'payment': float(order_dict.get('payment', 0)),
-                'balance': float(order_dict.get('balance', 0)),
+                'balance': balance,
                 'date': process_date(order_dict.get('date')),
-                'closed_date': process_date(order_dict.get('closed_date')),
+                'closed_date': closed_date,
                 'order_type': order_dict.get('order_type', 'wholesale'),
                 'final_payment': float(order_dict.get('final_payment', 0)),
                 'last_payment_date': process_date(order_dict.get('last_payment_date', order_dict.get('date')))
@@ -350,7 +362,7 @@ def dashboard():
     wholesale_open_orders = 0
     wholesale_closed_orders = 0
 
-    # Fetch all orders for stats (separate from paginated list)
+    # Fetch all orders for stats
     all_orders = db.collection('orders').stream()
     for order in all_orders:
         order_dict = order.to_dict()
@@ -360,6 +372,12 @@ def dashboard():
         initial_payment = float(order_dict.get('payment', 0))  # Total paid so far
         final_payment = float(order_dict.get('final_payment', 0))  # Last payment amount
         balance = float(order_dict.get('balance', 0))
+        closed_date = process_date(order_dict.get('closed_date'))
+
+        # Validate: Pending orders (balance > 0) should not have a closed_date
+        if balance > 0 and closed_date:
+            print(f"WARNING: Order {order.id} has balance {balance} but closed_date {closed_date}")
+            closed_date = None  # Forcefully unset closed_date for pending orders
 
         # Count open and closed orders
         if balance > 0:
@@ -454,7 +472,6 @@ def dashboard():
         wholesale_open_orders=wholesale_open_orders,
         wholesale_closed_orders=wholesale_closed_orders
     )
-
 @app.route('/mark_notification_read/<notification_id>', methods=['POST'])
 @no_cache
 @login_required
