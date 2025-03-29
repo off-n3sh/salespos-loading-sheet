@@ -431,67 +431,9 @@
         function renderGroupedItems(grouped, period, type) {
             const tbody = type === 'sales' ? document.getElementById('sales-history-body') : document.getElementById('expenses-body');
             tbody.innerHTML = '';
-            if (type === 'sales') {
-                Object.keys(grouped).sort((a, b) => b.localeCompare(a)).forEach(key => {
-                    grouped[key].forEach(row => tbody.appendChild(row.cloneNode(true)));
-                });
-            }
-        }
-
-        function calculateTodaySales(salesRows) {
-            const today = new Date().toISOString().split('T')[0];
-            return salesRows.filter(row => 
-                row.dataset.date === today || 
-                (row.dataset.lastPaymentDate === today && parseFloat(row.dataset.finalPayment) > 0)
-            );
-        }
-
-        function fetchRealtimeStats(salesRows) {
-            const today = new Date().toISOString().split('T')[0];
-            let totalSales = 0;
-            let retailSales = 0;
-            let wholesaleSales = 0;
-            let totalDebts = 0;
-
-            salesRows.forEach(row => {
-                const orderDate = row.dataset.date;
-                const lastPaymentDate = row.dataset.lastPaymentDate;
-                const orderType = row.dataset.orderType;
-                const initialPayment = parseFloat(row.dataset.initialPayment) || 0;
-                const finalPayment = parseFloat(row.dataset.finalPayment) || 0;
-                const paymentText = row.querySelector('td:nth-child(5)').textContent.trim();
-                const payment = parseFloat(paymentText.split('/')[0]);
-                const total = parseFloat(paymentText.split('/')[1]);
-                const balance = total - payment;
-
-                // Calculate today's sales
-                if (orderDate === today) {
-                    // New order placed today: count the initial payment
-                    if (orderType === 'retail') {
-                        retailSales += initialPayment;
-                    } else {
-                        wholesaleSales += initialPayment;
-                    }
-                }
-                if (lastPaymentDate === today && finalPayment > 0) {
-                    // Payment made today: count the final_payment
-                    if (orderType === 'retail') {
-                        retailSales += finalPayment;
-                    } else {
-                        wholesaleSales += finalPayment;
-                    }
-                }
-
-                // Calculate total debts
-                totalDebts += balance;
+            Object.keys(grouped).sort((a, b) => b.localeCompare(a)).forEach(key => {
+                grouped[key].forEach(row => tbody.appendChild(row.cloneNode(true)));
             });
-
-            totalSales = retailSales + wholesaleSales;
-
-            document.querySelector('.total-sales-amount').textContent = totalSales.toFixed(2);
-            document.querySelector('.retail-sales-amount').textContent = retailSales.toFixed(2);
-            document.querySelector('.wholesale-sales-amount').textContent = wholesaleSales.toFixed(2);
-            document.querySelector('.debt-amount').textContent = totalDebts.toFixed(2);
         }
 
         function updateData(timePeriod, statusFilter) {
@@ -512,22 +454,18 @@
                     if (statusFilter === 'expenses') {
                         salesHistory.classList.add('hidden');
                         expensesList.classList.remove('hidden');
-                        const expensesRows = doc.querySelectorAll('#expenses-body tr');
-                        document.getElementById('expenses-body').innerHTML = '';
-                        expensesRows.forEach(row => document.getElementById('expenses-body').appendChild(row.cloneNode(true)));
+                        const expensesRows = Array.from(doc.querySelectorAll('#expenses-body tr'));
+                        const groupedExpenses = groupByPeriod(expensesRows, timePeriod);
+                        renderGroupedItems(groupedExpenses, timePeriod, 'expenses');
                         if (expensesRows.length === 0) emptyState.classList.remove('hidden');
                     } else {
                         salesHistory.classList.remove('hidden');
                         expensesList.classList.add('hidden');
                         originalSalesRows = Array.from(doc.querySelectorAll('#sales-history-body tr[data-date]'));
                         const filteredSales = filterSalesByStatus(originalSalesRows, statusFilter);
-                        if (filteredSales.length === 0) {
-                            emptyState.classList.remove('hidden');
-                        } else {
-                            const groupedSales = groupByPeriod(filteredSales, timePeriod);
-                            renderGroupedItems(groupedSales, timePeriod, 'sales');
-                            fetchRealtimeStats(originalSalesRows);
-                        }
+                        const groupedSales = groupByPeriod(filteredSales, timePeriod);
+                        renderGroupedItems(groupedSales, timePeriod, 'sales');
+                        if (filteredSales.length === 0) emptyState.classList.remove('hidden');
                     }
                     hideLoading();
                 })
@@ -552,7 +490,7 @@
                     const unreadCount = parseInt(unreadBadge?.textContent || '0') - 1;
                     if (unreadCount > 0) unreadBadge.textContent = unreadCount;
                     else unreadBadge?.remove();
-                    fetchRealtimeStats(originalSalesRows);
+                    updateData(currentFilter, currentStatusFilter); // Refresh dashboard
                 } else alert('Error marking notification as read');
             })
             .catch(error => {
