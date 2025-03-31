@@ -12,6 +12,7 @@
                 <div id="time-display" class="bg-blue-50 dark:bg-gray-700 px-4 py-2 rounded-lg text-blue-600 dark:text-blue-300 font-medium"></div>
                 <form method="GET" action="{{ url_for('dashboard') }}" class="flex w-full sm:w-auto">
                     <input type="hidden" name="time" value="{{ time_filter }}">
+                    <input type="hidden" name="status_filter" value="{{ status_filter | default('all') }}">
                     <input type="hidden" name="page" value="1">
                     <input type="hidden" name="per_page" value="{{ per_page }}">
                     <div class="flex">
@@ -22,7 +23,7 @@
                             </svg>
                         </button>
                         {% if search %}
-                        <a href="{{ url_for('dashboard', time=time_filter, page=1, per_page=per_page) }}" class="ml-2 p-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 focus:outline-none">Clear</a>
+                        <a href="{{ url_for('dashboard', time=time_filter, status_filter=status_filter, page=1, per_page=per_page) }}" class="ml-2 p-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 focus:outline-none">Clear</a>
                         {% endif %}
                     </div>
                 </form>
@@ -54,11 +55,50 @@
             <div class="mt-4 max-h-96 overflow-y-auto">
                 {% if notifications %}
                 {% for notification in notifications %}
-                <div class="p-4 mb-2 border-b border-gray-200 dark:border-gray-700 {% if not notification.read %}bg-blue-50 dark:bg-blue-900{% endif %}">
-                    <p class="text-sm text-gray-700 dark:text-gray-300">{{ notification.message }}</p>
+                <div class="p-4 mb-2 border-b border-gray-200 dark:border-gray-700 {% if not notification.read %}bg-blue-50 dark:bg-blue-900{% endif %} rounded-lg transition-all duration-200 hover:shadow-md">
+                    <!-- Notification Header with Icon -->
+                    <div class="flex items-center space-x-3">
+                        {% if 'Order Placed' in notification.message %}
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600 dark:text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h18v18H3V3zm6 12l4 4 8-8" />
+                        </svg>
+                        {% elif 'Logged In' in notification.message %}
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-600 dark:text-green-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14" />
+                        </svg>
+                        {% elif 'fully paid' in notification.message or 'partially paid' in notification.message %}
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-yellow-600 dark:text-yellow-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        {% else %}
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600 dark:text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m0-4h.01M12 18a6 6 0 100-12 6 6 0 000 12z" />
+                        </svg>
+                        {% endif %}
+                        <p class="text-sm font-semibold text-gray-900 dark:text-white">
+                            {% if 'Order Placed' in notification.message %}
+                            New Order
+                            {% elif 'Logged In' in notification.message %}
+                            User Login
+                            {% elif 'fully paid' in notification.message %}
+                            Order Paid
+                            {% elif 'partially paid' in notification.message %}
+                            Partial Payment
+                            {% else %}
+                            General Update
+                            {% endif %}
+                        </p>
+                    </div>
+                    <!-- Notification Body -->
+                    <p class="text-sm text-gray-700 dark:text-gray-300 mt-1">{{ notification.message }}</p>
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ notification.timestamp.strftime('%d/%m/%Y %H:%M:%S') }}</p>
+                    <!-- Action Links -->
                     <div class="mt-2 flex justify-between items-center">
+                        {% if notification.order_id %}
                         <a href="{{ url_for('receipt', order_id=notification.order_id) }}" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">View Order</a>
+                        {% else %}
+                        <span class="text-sm text-gray-400 dark:text-gray-500">No action available</span>
+                        {% endif %}
                         {% if not notification.read %}
                         <button onclick="markNotificationRead('{{ notification.id }}')" class="text-sm text-green-600 dark:text-green-400 hover:underline">Mark as Read</button>
                         {% endif %}
@@ -66,7 +106,12 @@
                 </div>
                 {% endfor %}
                 {% else %}
-                <p class="text-sm text-gray-500 dark:text-gray-400">No notifications found.</p>
+                <div class="p-4 text-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                    </svg>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">No notifications found.</p>
+                </div>
                 {% endif %}
             </div>
         </div>
@@ -180,17 +225,17 @@
         <!-- Filter Controls -->
         <div class="p-4 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex flex-wrap gap-3 items-center">
             <div class="flex space-x-2">
-                <button id="all-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
-                    All <span class="ml-2 bg-white bg-opacity-20 px-2 py-0.5 rounded-full text-xs">{{ total_orders }}</span>
+                <button id="all-btn" class="px-4 py-2 {% if status_filter == 'all' %}bg-blue-600{% else %}bg-gray-500{% endif %} hover:bg-blue-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
+                    All <span id="all-count" class="ml-2 bg-white bg-opacity-20 px-2 py-0.5 rounded-full text-xs">{{ total_orders }}</span>
                 </button>
-                <button id="pending-btn" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
-                    Pending <span class="ml-2 bg-white bg-opacity-20 px-2 py-0.5 rounded-full text-xs">{{ sales_history | selectattr('balance', '>', 0) | list | length }}</span>
+                <button id="pending-btn" class="px-4 py-2 {% if status_filter == 'pending' %}bg-red-600{% else %}bg-gray-500{% endif %} hover:bg-red-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
+                    Pending <span id="pending-count" class="ml-2 bg-white bg-opacity-20 px-2 py-0.5 rounded-full text-xs">{{ pending_count }}</span>
                 </button>
-                <button id="completed-btn" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
-                    Completed <span class="ml-2 bg-white bg-opacity-20 px-2 py-0.5 rounded-full text-xs">{{ sales_history | selectattr('balance', '==', 0) | list | length }}</span>
+                <button id="completed-btn" class="px-4 py-2 {% if status_filter == 'completed' %}bg-green-600{% else %}bg-gray-500{% endif %} hover:bg-green-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
+                    Completed <span id="completed-count" class="ml-2 bg-white bg-opacity-20 px-2 py-0.5 rounded-full text-xs">{{ completed_count }}</span>
                 </button>
-                <button id="expenses-btn" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
-                    Expenses
+                <button id="expenses-btn" class="px-4 py-2 {% if status_filter == 'expenses' %}bg-purple-600{% else %}bg-gray-500{% endif %} hover:bg-purple-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
+                    Expenses <span id="expenses-count" class="ml-2 bg-white bg-opacity-20 px-2 py-0.5 rounded-full text-xs">{{ expenses|length }}</span>
                 </button>
             </div>
 
@@ -198,10 +243,10 @@
                 <label for="time-filter" class="text-sm font-medium text-gray-700 dark:text-gray-300">Time:</label>
                 <select id="time-filter" class="py-2 px-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
                     <option value="all" {% if time_filter == 'all' %}selected{% endif %}>All Time</option>
-                    <option value="day" {% if time_filter == 'day' %}selected{% endif %}>Daily</option>
-                    <option value="week" {% if time_filter == 'week' %}selected{% endif %}>Weekly</option>
-                    <option value="month" {% if time_filter == 'month' %}selected{% endif %}>Monthly</option>
-                    <option value="year" {% if time_filter == 'year' %}selected{% endif %}>Yearly</option>
+                    <option value="day" {% if time_filter == 'day' %}selected{% endif %}>Today</option>
+                    <option value="week" {% if time_filter == 'week' %}selected{% endif %}>This Week</option>
+                    <option value="month" {% if time_filter == 'month' %}selected{% endif %}>This Month</option>
+                    <option value="year" {% if time_filter == 'year' %}selected{% endif %}>This Year</option>
                 </select>
                 <div id="loading-spinner" class="hidden">
                     <svg class="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -213,7 +258,7 @@
         </div>
 
         <!-- Sales History Table -->
-        <div id="sales-history" class="overflow-x-auto">
+        <div id="sales-history" class="overflow-x-auto {% if status_filter == 'expenses' %}hidden{% endif %}">
             <table class="w-full">
                 <thead class="bg-gray-50 dark:bg-gray-900">
                     <tr>
@@ -235,6 +280,7 @@
                         data-order-type="{{ sale.order_type }}"
                         data-initial-payment="{{ sale.payment }}"
                         data-final-payment="{{ sale.final_payment }}"
+                        data-balance="{{ sale.balance }}"
                         class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="w-10 h-10 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
@@ -290,8 +336,8 @@
             </table>
         </div>
 
-        <!-- Expenses List (Hidden by Default) -->
-        <div id="expenses-list" class="hidden overflow-x-auto">
+        <!-- Expenses List -->
+        <div id="expenses-list" class="overflow-x-auto {% if status_filter != 'expenses' %}hidden{% endif %}">
             <table class="w-full">
                 <thead class="bg-gray-50 dark:bg-gray-900">
                     <tr>
@@ -321,19 +367,20 @@
             </div>
             <div class="flex items-center space-x-2">
                 {% if page > 1 %}
-                <a href="{{ url_for('dashboard', page=page-1, per_page=per_page, time=time_filter, search=search) }}" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Previous</a>
+                <a href="{{ url_for('dashboard', page=page-1, per_page=per_page, time=time_filter, search=search, status_filter=status_filter) }}" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Previous</a>
                 {% endif %}
                 <form method="GET" action="{{ url_for('dashboard') }}" class="flex items-center">
                     <input type="hidden" name="time" value="{{ time_filter }}">
                     <input type="hidden" name="per_page" value="{{ per_page }}">
                     <input type="hidden" name="search" value="{{ search }}">
+                    <input type="hidden" name="status_filter" value="{{ status_filter }}">
                     <label for="jump-to-page" class="text-sm text-gray-600 dark:text-gray-400 mr-2">Page:</label>
                     <input type="number" id="jump-to-page" name="page" value="{{ page }}" min="1" max="{{ total_pages }}" class="w-16 p-2 border rounded-md dark:bg-gray-800 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
                     <span class="text-sm text-gray-600 dark:text-gray-400 mx-2">of {{ total_pages }}</span>
                     <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Go</button>
                 </form>
                 {% if page < total_pages %}
-                <a href="{{ url_for('dashboard', page=page+1, per_page=per_page, time=time_filter, search=search) }}" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Next</a>
+                <a href="{{ url_for('dashboard', page=page+1, per_page=per_page, time=time_filter, search=search, status_filter=status_filter) }}" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Next</a>
                 {% endif %}
             </div>
         </div>
@@ -349,8 +396,11 @@
     </div>
 
     <!-- Loading Overlay -->
-    <div id="loading-overlay" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden z-40">
-        <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-600"></div>
+    <div id="loading-overlay" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden z-50">
+        <svg class="animate-spin h-10 w-10 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
     </div>
 
     <!-- JavaScript -->
@@ -358,6 +408,7 @@
         const notificationBell = document.getElementById('notification-bell');
         const notificationModal = document.getElementById('notification-modal');
         const closeNotificationModal = document.getElementById('close-notification-modal');
+        const timeFilter = document.getElementById('time-filter');
         const allBtn = document.getElementById('all-btn');
         const pendingBtn = document.getElementById('pending-btn');
         const completedBtn = document.getElementById('completed-btn');
@@ -365,99 +416,26 @@
         const salesHistory = document.getElementById('sales-history');
         const expensesList = document.getElementById('expenses-list');
         const emptyState = document.getElementById('empty-state');
-        const loadingOverlay = document.getElementById('loading-overlay');
-        const searchInput = document.getElementById('search-input');
-        const timeFilter = document.getElementById('time-filter');
-        let originalSalesRows = [];
+        const loadingSpinner = document.getElementById('loading-spinner');
         let currentFilter = '{{ time_filter }}';
-        let currentStatusFilter = 'all';
+        let currentStatusFilter = '{{ status_filter | default('all') }}';
 
-        function updateTime() {
-            const now = new Date();
-            document.getElementById('time-display').textContent = now.toLocaleString('en-US', { timeZone: 'Africa/Nairobi' });
-        }
-        setInterval(updateTime, 1000);
-        updateTime();
-
-        notificationBell.addEventListener('click', () => notificationModal.classList.toggle('hidden'));
-        closeNotificationModal.addEventListener('click', () => notificationModal.classList.add('hidden'));
-
-        function showLoading() { loadingOverlay.classList.remove('hidden'); }
-        function hideLoading() { loadingOverlay.classList.add('hidden'); }
-
-        function filterSalesByStatus(rows, status) {
-            if (status === 'all') return rows;
-            return rows.filter(row => {
-                const balance = parseFloat(row.querySelector('td:nth-child(5)').textContent.split('/')[1]) - parseFloat(row.querySelector('td:nth-child(5)').textContent.split('/')[0]) || 0;
-                return status === 'pending' ? balance > 0 : balance === 0;
-            });
+        // Toggle Menu Function
+        function toggleMenu(menuId) {
+            const menu = document.getElementById(menuId);
+            menu.classList.toggle('hidden');
         }
 
-        function groupByPeriod(rows, period) {
-            const grouped = {};
-            rows.forEach(row => {
-                const dateStr = row.dataset.date;
-                const date = new Date(dateStr);
-                let key;
-                if (period === 'day') key = dateStr;
-                else if (period === 'week') key = `${date.getFullYear()}-W${Math.ceil((date.getDate() + (date.getDay() === 0 ? 6 : date.getDay() - 1)) / 7)}`;
-                else if (period === 'month') key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-                else if (period === 'year') key = date.getFullYear().toString();
-                else key = 'all';
-                if (!grouped[key]) grouped[key] = [];
-                grouped[key].push(row);
-            });
-            return grouped;
-        }
+        // Notification Modal Toggle
+        notificationBell.addEventListener('click', () => {
+            notificationModal.classList.toggle('hidden');
+        });
 
-        function renderGroupedItems(grouped, period, type) {
-            const tbody = type === 'sales' ? document.getElementById('sales-history-body') : document.getElementById('expenses-body');
-            tbody.innerHTML = '';
-            Object.keys(grouped).sort((a, b) => b.localeCompare(a)).forEach(key => {
-                grouped[key].forEach(row => tbody.appendChild(row.cloneNode(true)));
-            });
-        }
+        closeNotificationModal.addEventListener('click', () => {
+            notificationModal.classList.add('hidden');
+        });
 
-        function updateData(timePeriod, statusFilter) {
-            showLoading();
-            emptyState.classList.add('hidden');
-            currentFilter = timePeriod;
-            currentStatusFilter = statusFilter;
-            const url = new URL(window.location);
-            url.searchParams.set('time', timePeriod);
-            url.searchParams.set('page', '{{ page }}');
-            url.searchParams.set('per_page', '{{ per_page }}');
-            if (searchInput.value) url.searchParams.set('search', searchInput.value);
-            fetch(url)
-                .then(response => response.text())
-                .then(html => {
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(html, 'text/html');
-                    if (statusFilter === 'expenses') {
-                        salesHistory.classList.add('hidden');
-                        expensesList.classList.remove('hidden');
-                        const expensesRows = Array.from(doc.querySelectorAll('#expenses-body tr'));
-                        const groupedExpenses = groupByPeriod(expensesRows, timePeriod);
-                        renderGroupedItems(groupedExpenses, timePeriod, 'expenses');
-                        if (expensesRows.length === 0) emptyState.classList.remove('hidden');
-                    } else {
-                        salesHistory.classList.remove('hidden');
-                        expensesList.classList.add('hidden');
-                        originalSalesRows = Array.from(doc.querySelectorAll('#sales-history-body tr[data-date]'));
-                        const filteredSales = filterSalesByStatus(originalSalesRows, statusFilter);
-                        const groupedSales = groupByPeriod(filteredSales, timePeriod);
-                        renderGroupedItems(groupedSales, timePeriod, 'sales');
-                        if (filteredSales.length === 0) emptyState.classList.remove('hidden');
-                    }
-                    hideLoading();
-                })
-                .catch(error => {
-                    console.error('Error fetching data:', error);
-                    hideLoading();
-                    emptyState.classList.remove('hidden');
-                });
-        }
-
+        // Mark Notification as Read
         function markNotificationRead(notificationId) {
             fetch(`/mark_notification_read/${notificationId}`, {
                 method: 'POST',
@@ -470,10 +448,14 @@
                     notificationDiv.querySelector('button').remove();
                     const unreadBadge = notificationBell.querySelector('span');
                     const unreadCount = parseInt(unreadBadge?.textContent || '0') - 1;
-                    if (unreadCount > 0) unreadBadge.textContent = unreadCount;
-                    else unreadBadge?.remove();
-                    updateData(currentFilter, currentStatusFilter); // Refresh dashboard
-                } else alert('Error marking notification as read');
+                    if (unreadCount > 0) {
+                        unreadBadge.textContent = unreadCount;
+                    } else {
+                        unreadBadge?.remove();
+                    }
+                } else {
+                    alert('Error marking notification as read');
+                }
             })
             .catch(error => {
                 console.error('Error:', error);
@@ -481,29 +463,78 @@
             });
         }
 
-        function toggleMenu(menuId) {
-            const menu = document.getElementById(menuId);
-            const allMenus = document.querySelectorAll('[id^="menu-"]');
-            allMenus.forEach(m => {
-                if (m.id !== menuId) m.classList.add('hidden');
-            });
-            menu.classList.toggle('hidden');
+        // Update Data Function
+        function updateData(timeFilter, statusFilter) {
+            const searchQuery = document.getElementById('search-input').value;
+            loadingSpinner.classList.remove('hidden');
+            fetch(`/dashboard?page=1&per_page={{ per_page }}&time=${timeFilter}&search=${encodeURIComponent(searchQuery)}&status_filter=${statusFilter}`)
+                .then(response => response.text())
+                .then(html => {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const newSalesHistoryBody = doc.getElementById('sales-history-body');
+                    const newExpensesBody = doc.getElementById('expenses-body');
+                    document.getElementById('sales-history-body').innerHTML = newSalesHistoryBody ? newSalesHistoryBody.innerHTML : '';
+                    document.getElementById('expenses-body').innerHTML = newExpensesBody ? newExpensesBody.innerHTML : '';
+                    loadingSpinner.classList.add('hidden');
+                    toggleVisibility(statusFilter);
+                })
+                .catch(error => {
+                    console.error('Error updating data:', error);
+                    loadingSpinner.classList.add('hidden');
+                });
         }
 
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('button[onclick^="toggleMenu"]')) {
-                document.querySelectorAll('[id^="menu-"]').forEach(menu => menu.classList.add('hidden'));
-            }
+        // Toggle Visibility Based on Filter
+        function toggleVisibility(statusFilter) {
+            salesHistory.classList.toggle('hidden', statusFilter === 'expenses');
+            expensesList.classList.toggle('hidden', statusFilter !== 'expenses');
+            const hasData = statusFilter === 'expenses' ? expensesList.querySelectorAll('tr').length > 0 : salesHistory.querySelectorAll('tr').length > 0;
+            emptyState.classList.toggle('hidden', hasData);
+            allBtn.classList.toggle('bg-blue-600', statusFilter === 'all');
+            allBtn.classList.toggle('bg-gray-500', statusFilter !== 'all');
+            pendingBtn.classList.toggle('bg-red-600', statusFilter === 'pending');
+            pendingBtn.classList.toggle('bg-gray-500', statusFilter !== 'pending');
+            completedBtn.classList.toggle('bg-green-600', statusFilter === 'completed');
+            completedBtn.classList.toggle('bg-gray-500', statusFilter !== 'completed');
+            expensesBtn.classList.toggle('bg-purple-600', statusFilter === 'expenses');
+            expensesBtn.classList.toggle('bg-gray-500', statusFilter !== 'expenses');
+        }
+
+        // Filter Button Event Listeners
+        allBtn.addEventListener('click', () => {
+            currentStatusFilter = 'all';
+            updateData(currentFilter, currentStatusFilter);
         });
 
-        allBtn.addEventListener('click', () => updateData(currentFilter, 'all'));
-        pendingBtn.addEventListener('click', () => updateData(currentFilter, 'pending'));
-        completedBtn.addEventListener('click', () => updateData(currentFilter, 'completed'));
-        expensesBtn.addEventListener('click', () => updateData(currentFilter, 'expenses'));
-        timeFilter.addEventListener('change', () => updateData(timeFilter.value, currentStatusFilter));
-        searchInput.addEventListener('input', () => updateData(currentFilter, currentStatusFilter));
+        pendingBtn.addEventListener('click', () => {
+            currentStatusFilter = 'pending';
+            updateData(currentFilter, currentStatusFilter);
+        });
 
-        originalSalesRows = Array.from(document.querySelectorAll('#sales-history-body tr[data-date]'));
-        updateData(currentFilter, currentStatusFilter);
+        completedBtn.addEventListener('click', () => {
+            currentStatusFilter = 'completed';
+            updateData(currentFilter, currentStatusFilter);
+        });
+
+        expensesBtn.addEventListener('click', () => {
+            currentStatusFilter = 'expenses';
+            updateData(currentFilter, currentStatusFilter);
+        });
+
+        // Time Filter Change
+        timeFilter.addEventListener('change', () => {
+            currentFilter = timeFilter.value;
+            updateData(currentFilter, currentStatusFilter);
+        });
+
+        // Real-Time Clock
+        function updateTime() {
+            const now = new Date();
+            const options = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
+            document.getElementById('time-display').textContent = now.toLocaleTimeString('en-US', options);
+        }
+        setInterval(updateTime, 1000);
+        updateTime();
     </script>
 {% endblock %}
