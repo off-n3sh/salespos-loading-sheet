@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Clients{% endblock %}
+{% block content %}
+    <!-- Clients Header -->
+    <div class="mb-6">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
+            <div>
+                <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Clients</h2>
+                <p class="text-gray-600 dark:text-gray-300 mt-1">Manage your client relationships</p>
+            </div>
+            <div class="mt-4 md:mt-0 flex items-center space-x-4">
+                <form method="GET" action="{{ url_for('clients') }}" class="flex w-full sm:w-auto">
+                    <input type="text" name="search" id="search-input" placeholder="Search clients..." class="p-2 border rounded-l-lg w-full dark:bg-gray-800 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500" value="{{ search | default('') }}">
+                    <button type="submit" class="p-2 bg-blue-600 text-white rounded-r-lg hover:bg-blue-700 focus:outline-none">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </button>
+                    {% if search %}
+                    <a href="{{ url_for('clients') }}" class="ml-2 p-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 focus:outline-none">Clear</a>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Client List -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div class="p-5 border-b border-gray-200 dark:border-gray-700">
+            <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Client Directory</h3>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 p-5" id="client-list">
+            {% if clients %}
+            {% for client in clients %}
+            <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer" data-client-id="{{ client.shop_name }}" onclick="showClientModal('{{ client.shop_name | replace('\'', '\\\'') }}', '{{ client.debt | round(2) }}', '{{ client.last_order_date.strftime('%Y-%m-%d') if client.last_order_date else 'N/A' }}', '{{ client.recent_order_amount | round(2) if client.recent_order_amount else 'None' }}', '{{ client.recent_order_id | default('') }}')">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                            <span class="text-blue-600 dark:text-blue-300 font-bold text-lg">{{ client.shop_name[0] | upper }}</span>
+                        </div>
+                        <div>
+                            <h4 class="text-lg font-medium text-gray-900 dark:text-white">{{ client.shop_name }}</h4>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">Last Order: {{ client.last_order_date.strftime('%d/%m/%Y') if client.last_order_date else 'N/A' }}</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm font-semibold {% if client.debt > 0 %}text-red-600 dark:text-red-400{% else %}text-green-600 dark:text-green-300{% endif %}">
+                            Debt: KSh {{ client.debt | round(2) | default(0) }}
+                        </p>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <p class="text-xs text-gray-600 dark:text-gray-300">Recent Order: KSh {{ client.recent_order_amount | round(2) if client.recent_order_amount else 'None' }}</p>
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="col-span-full p-8 text-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+                <p class="mt-4 text-gray-600 dark:text-gray-400 text-lg">No clients found</p>
+                <p class="text-gray-500 dark:text-gray-500 text-sm mt-2">Clients will appear once orders are placed</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Client Details Modal -->
+    <div id="client-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
+            <div class="flex justify-between items-center">
+                <h3 id="modal-client-name" class="text-lg font-medium text-gray-900 dark:text-white">Client Details</h3>
+                <button id="close-client-modal" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="mt-4">
+                <p class="text-sm text-gray-700 dark:text-gray-300"><strong>Debt:</strong> <span id="modal-client-debt"></span></p>
+                <p class="text-sm text-gray-700 dark:text-gray-300 mt-2"><strong>Last Order Date:</strong> <span id="modal-last-order-date"></span></p>
+                <p class="text-sm text-gray-700 dark:text-gray-300 mt-2"><strong>Recent Order Amount:</strong> <span id="modal-recent-order-amount"></span></p>
+                <div class="mt-4 flex justify-between">
+                    <a id="modal-view-receipt" href="#" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">View Recent Receipt</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script>
+        const searchInput = document.getElementById('search-input');
+        const clientCards = document.querySelectorAll('#client-list > div:not(.col-span-full)');
+        const clientModal = document.getElementById('client-modal');
+        const closeClientModal = document.getElementById('close-client-modal');
+
+        searchInput.addEventListener('input', () => {
+            const query = searchInput.value.toLowerCase();
+            clientCards.forEach(card => {
+                const name = card.querySelector('h4').textContent.toLowerCase();
+                card.classList.toggle('hidden', !name.includes(query));
+            });
+        });
+
+        function showClientModal(shopName, debt, lastOrderDate, recentOrderAmount, recentOrderId) {
+            document.getElementById('modal-client-name').textContent = shopName;
+            document.getElementById('modal-client-debt').textContent = `KSh ${parseFloat(debt).toFixed(2)}`;
+            document.getElementById('modal-last-order-date').textContent = lastOrderDate === 'N/A' ? 'N/A' : new Date(lastOrderDate).toLocaleDateString('en-GB');
+            document.getElementById('modal-recent-order-amount').textContent = recentOrderAmount === 'None' ? 'None' : `KSh ${parseFloat(recentOrderAmount).toFixed(2)}`;
+            const viewReceiptLink = document.getElementById('modal-view-receipt');
+            if (recentOrderId) {
+                viewReceiptLink.href = `/receipt/${recentOrderId}`;
+                viewReceiptLink.classList.remove('hidden');
+            } else {
+                viewReceiptLink.classList.add('hidden');
+            }
+            clientModal.classList.remove('hidden');
+        }
+
+        closeClientModal.addEventListener('click', () => {
+            clientModal.classList.add('hidden');
+        });
+    </script>
+{% endblock %}
