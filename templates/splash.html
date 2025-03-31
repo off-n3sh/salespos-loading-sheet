@@ -6,34 +6,34 @@
     <title>Dreamland Enterprises - Welcome</title>
     <link href="{{ url_for('static', filename='css/tailwind.min.css') }}" rel="stylesheet">
 </head>
-<body class="bg-gray-900 min-h-screen flex items-center justify-center overflow-hidden relative">
+<body class="bg-blue-100 min-h-screen flex items-center justify-center overflow-hidden relative">
     <!-- Background with gradient overlay -->
-    <div class="absolute inset-0 bg-gradient-to-br from-orange-600 to-gray-900 opacity-90"></div>
+    <div class="absolute inset-0 bg-gradient-to-br from-blue-400 to-blue-100 opacity-90"></div>
     
     <!-- Animated particles -->
     <div id="particles-js" class="absolute inset-0"></div>
 
     <!-- Main content container -->
-    <div class="container mx-auto px-4 z-10">
-        <div class="text-center text-white">
+    <div class="container mx-auto px-4 sm:px-6 lg:px-8 z-10">
+        <div class="text-center text-gray-800">
             <div class="animate-slide-down">
-                <h1 class="text-6xl font-bold mb-2">Dreamland Enterprises</h1>
-                <div class="h-1 w-32 bg-teal-500 mx-auto my-4 rounded-full"></div>
+                <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold mb-2">Dreamland Enterprises</h1>
+                <div class="h-1 w-24 sm:w-32 bg-blue-500 mx-auto my-4 rounded-full"></div>
             </div>
             
             <div class="animate-fade-in-delay">
-                <p class="text-2xl mb-6">Premium Wholesale Solutions for Your Business</p>
-                <p class="text-lg mb-10 max-w-2xl mx-auto">We connect businesses with the best products at unbeatable prices. Streamline your supply chain and boost your profits with our extensive catalog.</p>
+                <p class="text-xl sm:text-2xl mb-6">Premium Wholesale Solutions for Your Business</p>
+                <p class="text-base sm:text-lg mb-8 sm:mb-10 max-w-2xl mx-auto">We connect businesses with the best products at unbeatable prices. Streamline your supply chain and boost your profits with our extensive catalog.</p>
             </div>
             
-            <button id="get-started" class="animate-pulse-slow bg-teal-500 text-white py-3 px-10 rounded-lg hover:bg-teal-600 transition-all duration-300 transform hover:scale-105 font-bold text-lg shadow-lg">
+            <button id="get-started" class="animate-pulse-slow bg-blue-500 text-white py-2 px-6 sm:py-3 sm:px-10 rounded-lg hover:bg-blue-600 transition-all duration-300 transform hover:scale-105 font-bold text-base sm:text-lg shadow-lg">
                 Get Started
             </button>
         </div>
     </div>
 
     <!-- Loading counter -->
-    <div class="fixed bottom-8 right-8 text-white text-sm opacity-60 z-10">
+    <div class="fixed bottom-4 sm:bottom-8 right-4 sm:right-8 text-gray-800 text-xs sm:text-sm opacity-60 z-10">
         <span>Redirecting in </span><span id="countdown">3</span>
     </div>
 
@@ -96,9 +96,9 @@
         }
         
         @keyframes pulseSlow { 
-            0% { box-shadow: 0 0 0 0 rgba(20, 184, 166, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(20, 184, 166, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(20, 184, 166, 0); }
+            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
         }
         
         .animate-fade-in { 
