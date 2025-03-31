@@ -11,8 +11,6 @@ from io import BytesIO
 import os
 from functools import wraps
 from firebase_admin.auth import UserNotFoundError
-from google.cloud import secretmanager
-
 
 
 app = Flask(__name__)
