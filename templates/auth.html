@@ -232,160 +232,124 @@
             setTimeout(() => successDiv?.remove(), 5000);
         }
 
-        function getFriendlyError(error) {
-            switch (error.code) {
-                case 'auth/email-already-in-use': return "This email’s already taken. Try logging in.";
-                case 'auth/invalid-email': return "That email doesn’t look right. Check it.";
-                case 'auth/weak-password': return "Password’s too weak. Make it stronger.";
-                case 'auth/wrong-password': return "Wrong password. Try again.";
-                case 'auth/user-not-found': return "No account with that email.";
-                case 'auth/too-many-requests': return "Too many tries. Wait a bit and try again.";
-                default: return error.message || "Something went wrong. Try again.";
-            }
+	function getFriendlyError(error) {
+    switch (error.code) {
+        case 'auth/email-already-in-use': return奶粉 return "This email’s already taken. Try logging in.";
+        case 'auth/invalid-email': return "That email doesn’t look right. Check it.";
+        case 'auth/weak-password': return "Password’s too weak. Make it stronger.";
+        case 'auth/wrong-password': return "Wrong password. Try again.";
+        case 'auth/user-not-found': return "No account with that email.";
+        case 'auth/too-many-requests': return "Too many tries. Wait a bit and try again.";
+        default: return "Something went wrong. Try again later.";
+    }
+}
+
+function setupAuthListeners() {
+    signupForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const submitBtn = signupForm.querySelector('.submit-btn');
+        submitBtn.classList.add('processing');
+        submitBtn.disabled = true;
+
+        const email = document.getElementById("signup-email").value;
+        const password = document.getElementById("signup-password").value;
+        const confirmPassword = document.getElementById("signup-confirm-password").value;
+        const firstName = document.getElementById("signup-firstname").value;
+        const lastName = document.getElementById("signup-lastname").value;
+        const phone = document.getElementById("signup-phone").value;
+        const role = document.getElementById("signup-role").value;
+
+        if (password !== confirmPassword) {
+            showError(signupForm, "Passwords don’t match.");
+            submitBtn.classList.remove('processing');
+            submitBtn.disabled = false;
+            return;
         }
 
-        let auth;
-        fetch('/firebase-config')
-            .then(response => {
-                if (!response.ok) {
-                    return response.text().then(text => {
-                        throw new Error(`Config fetch failed: ${response.status} - ${text.slice(0, 100)}`);
-                    });
-                }
-                return response.json();
-            })
-            .then(config => {
-                firebase.initializeApp(config);
-                auth = firebase.auth();
-                setupAuthListeners();
-            })
-            .catch(error => {
-                console.error('Firebase init error:', error);
-                showError(loginForm, "Can’t load auth. Check your connection or try later.");
-            });
-
-        function setupAuthListeners() {
-            signupForm.addEventListener("submit", (e) => {
-                e.preventDefault();
-                const submitBtn = signupForm.querySelector('.submit-btn');
-                submitBtn.classList.add('processing');
-                submitBtn.disabled = true;
-
-                const email = document.getElementById("signup-email").value;
-                const password = document.getElementById("signup-password").value;
-                const confirmPassword = document.getElementById("signup-confirm-password").value;
-                const firstName = document.getElementById("signup-firstname").value;
-                const lastName = document.getElementById("signup-lastname").value;
-                const phone = document.getElementById("signup-phone").value;
-                const role = document.getElementById("signup-role").value;
-
-                if (password !== confirmPassword) {
-                    showError(signupForm, "Passwords don’t match.");
-                    submitBtn.classList.remove('processing');
-                    submitBtn.disabled = false;
-                    return;
-                }
-
-                auth.createUserWithEmailAndPassword(email, password)
-                    .then(userCredential => {
-                        const user = userCredential.user;
-                        return user.updateProfile({ displayName: `${firstName} ${lastName}` })
-                            .then(() => user.sendEmailVerification())
-                            .then(() => {
-                                const formData = new FormData(signupForm);
-                                return fetch(signupForm.action, {
-                                    method: 'POST',
-                                    body: formData,
-                                    headers: { 'X-CSRFToken': formData.get('csrf_token') }
-                                });
-                            });
-                    })
-                    .then(response => {
-                        if (!response.ok) {
-                            return response.text().then(text => {
-                                throw new Error(`Server error: ${response.status} - ${text.slice(0, 100)}`);
-                            });
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        if (data.status === 'success') {
-                            showSuccess(signupForm, "Signup successful! Check your email to verify.");
-                            setTimeout(() => loginTab.click(), 2000);
-                        } else {
-                            throw new Error(data.error || "Failed to save signup data.");
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Signup error:', error);
-                        showError(signupForm, getFriendlyError(error));
-                    })
-                    .finally(() => {
-                        submitBtn.classList.remove('processing');
-                        submitBtn.disabled = false;
-                    });
-            });
-
-            loginForm.addEventListener("submit", (e) => {
-                e.preventDefault();
-                const submitBtn = loginForm.querySelector('.submit-btn');
-                submitBtn.classList.add('processing');
-                submitBtn.disabled = true;
-
-                const email = document.getElementById("login-email").value;
-                const password = document.getElementById("login-password").value;
-
-                auth.signInWithEmailAndPassword(email, password)
-                    .then(userCredential => {
-                        const user = userCredential.user;
-                        return user.getIdToken();
-                    })
-                    .then(idToken => {
-                        const formData = new FormData(loginForm);
-                        formData.append('id_token', idToken);
-                        return fetch(loginForm.action, {
+        auth.createUserWithEmailAndPassword(email, password)
+            .then(userCredential => {
+                const user = userCredential.user;
+                return user.updateProfile({ displayName: `${firstName} ${lastName}` })
+                    .then(() => user.sendEmailVerification())
+                    .then(() => {
+                        const formData = new FormData(signupForm);
+                        return fetch(signupForm.action, {
                             method: 'POST',
                             body: formData,
                             headers: { 'X-CSRFToken': formData.get('csrf_token') }
                         });
-                    })
-                    .then(response => {
-                        if (!response.ok) {
-                            return response.text().then(text => {
-                                throw new Error(`Login server error: ${response.status} - ${text.slice(0, 100)}`);
-                            });
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        if (data.status === 'success') {
-                            window.location.href = '/dashboard';
-                        } else {
-                            throw new Error(data.error || "Login failed on server.");
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Login error:', error);
-                        showError(loginForm, getFriendlyError(error));
-                    })
-                    .finally(() => {
-                        submitBtn.classList.remove('processing');
-                        submitBtn.disabled = false;
                     });
-            });
-
-            document.getElementById("forgot-password").addEventListener("click", (e) => {
-                e.preventDefault();
-                const email = document.getElementById("login-email").value;
-                if (!email) {
-                    showError(loginForm, "Enter your email to reset your password.");
-                    return;
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showSuccess(signupForm, "Signup successful! Check your email to verify.");
+                    setTimeout(() => loginTab.click(), 2000);
+                } else {
+                    throw new Error(data.error || "Failed to save signup data.");
                 }
-                auth.sendPasswordResetEmail(email)
-                    .then(() => showSuccess(loginForm, "Password reset email sent! Check your inbox."))
-                    .catch(error => showError(loginForm, getFriendlyError(error)));
+            })
+            .catch(error => {
+                showError(signupForm, getFriendlyError(error));
+            })
+            .finally(() => {
+                submitBtn.classList.remove('processing');
+                submitBtn.disabled = false;
             });
+    });
+
+    loginForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const submitBtn = loginForm.querySelector('.submit-btn');
+        submitBtn.classList.add('processing');
+        submitBtn.disabled = true;
+
+        const email = document.getElementById("login-email").value;
+        const password = document.getElementById("login-password").value;
+
+        auth.signInWithEmailAndPassword(email, password)
+            .then(userCredential => {
+                const user = userCredential.user;
+                return user.getIdToken();
+            })
+            .then(idToken => {
+                const formData = new FormData(loginForm);
+                formData.append('id_token', idToken);
+                return fetch(loginForm.action, {
+                    method: 'POST',
+                    body: formData,
+                    headers: { 'X-CSRFToken': formData.get('csrf_token') }
+                });
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    window.location.href = '/dashboard';
+                } else {
+                    throw new Error(data.error || "Login failed on server.");
+                }
+            })
+            .catch(error => {
+                showError(loginForm, getFriendlyError(error));
+            })
+            .finally(() => {
+                submitBtn.classList.remove('processing');
+                submitBtn.disabled = false;
+            });
+    });
+
+    document.getElementById("forgot-password").addEventListener("click", (e) => {
+        e.preventDefault();
+        const email = document.getElementById("login-email").value;
+        if (!email) {
+            showError(loginForm, "Enter your email to reset your password.");
+            return;
         }
+        auth.sendPasswordResetEmail(email)
+            .then(() => showSuccess(loginForm, "Password reset email sent! Check your inbox."))
+            .catch(error => showError(loginForm, getFriendlyError(error)));
+    });
+}
     </script>
 
     <style>
