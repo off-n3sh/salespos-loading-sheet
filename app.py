@@ -198,6 +198,7 @@ def clients():
                          clients=clients_list, 
                          search=search_query,
                          firebase_config=firebase_config)  # firebase_config is global from app.py
+
                          
 @app.route('/auth', methods=['GET', 'POST'])
 def auth_route():
