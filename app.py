@@ -163,7 +163,6 @@ def clients():
     orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).stream()
     clients_dict = {}
     
-    # Aggregate client data from orders
     for doc in orders_ref:
         order_dict = doc.to_dict()
         shop_name = order_dict.get('shop_name', 'Unknown Shop')
@@ -196,19 +195,11 @@ def clients():
     clients_list = list(clients_dict.values())
     clients_list.sort(key=lambda x: x['last_order_date'] or datetime.min.replace(tzinfo=KENYA_TZ), reverse=True)
 
-    # Fetch Firebase config from Google Cloud Secret Manager
-    client = secretmanager.SecretManagerServiceClient()
-    project_id = "salespos-578ff"
-    secret_id = "firebase-config"
-    version_id = "latest"
-    name = f"projects/{project_id}/secrets/{secret_id}/versions/{version_id}"
-    response = client.access_secret_version(request={"name": name})
-    firebase_config = json.loads(response.payload.data.decode("UTF-8"))
-
+    # Use the globally loaded firebase_config from app startup
     return render_template('clients.html', 
                          clients=clients_list, 
                          search=search_query,
-                         firebase_config=firebase_config)
+                         firebase_config=firebase_config)  # firebase_config is global from app.py
                          
 @app.route('/auth', methods=['GET', 'POST'])
 def auth_route():
