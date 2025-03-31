@@ -12,13 +12,18 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script>
-        const firebaseConfig = {{ firebase_config | tojson | safe }};
+    const firebaseConfigRaw = {{ firebase_config | default({}) | tojson | safe }};
+    console.log("Raw firebaseConfig from Jinja2:", firebaseConfigRaw);
+    if (!firebaseConfigRaw || Object.keys(firebaseConfigRaw).length === 0) {
+        console.error("Firebase config is empty or not loaded in base.html");
+    } else {
         try {
-            firebase.initializeApp(firebaseConfig);
+            firebase.initializeApp(firebaseConfigRaw);
             console.log("Firebase initialized successfully in base.html");
         } catch (error) {
             console.error("Firebase initialization failed in base.html:", error);
         }
+    }
     </script>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-white transition-colors duration-300 font-sans">
