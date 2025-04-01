@@ -151,12 +151,10 @@ def health_check():
     """Minimal health check endpoint to confirm the app is running."""
     return jsonify({"status": "healthy", "message": "App is alive"}), 200
 
-@app.route('/clients', methods=['GET'])
+@app.route('/clients_data', methods=['GET'])
 @no_cache
 @login_required
-def clients():
-    search_query = request.args.get('search', '').lower()
-    
+def clients_data():
     # Fetch all orders from Firestore
     orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).stream()
     clients_dict = {}
@@ -164,11 +162,7 @@ def clients():
     for doc in orders_ref:
         order_dict = doc.to_dict()
         shop_name = order_dict.get('shop_name', 'Unknown Shop')
-        if search_query and search_query not in shop_name.lower():
-            continue
-            
         balance = float(order_dict.get('balance', 0))
-        payment = float(order_dict.get('payment', 0))
         date = process_date(order_dict.get('date'))
         items = order_dict.get('items', [])
         total_amount = sum(float(items[i + 5]) * float(items[i + 3]) 
@@ -192,12 +186,9 @@ def clients():
 
     clients_list = list(clients_dict.values())
     clients_list.sort(key=lambda x: x['last_order_date'] or datetime.min.replace(tzinfo=KENYA_TZ), reverse=True)
-
-    # Use the globally loaded firebase_config from app startup
-    return render_template('clients.html', 
-                         clients=clients_list, 
-                         search=search_query,
-                         firebase_config=firebase_config)  # firebase_config is global from app.py
+    
+    # Return only the necessary data for the dropdown
+    return jsonify([{'shop_name': c['shop_name'], 'debt': c['debt']} for c in clients_list])
 
                          
 @app.route('/auth', methods=['GET', 'POST'])

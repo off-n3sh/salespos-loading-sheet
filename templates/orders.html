@@ -114,7 +114,15 @@
         <form id="retail-form" method="POST" action="{{ url_for('orders') }}" class="space-y-4">
             <input type="hidden" name="order_type" value="retail">
             <input type="hidden" name="salesperson_name" value="{{ session['user']['firstName'] }} {{ session['user']['lastName'] }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"> <!-- Add CSRF token -->
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            
+            <div class="relative">
+                <label for="retail-client-select" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Client Name</label>
+                <select name="shop_name" id="retail-client-select" class="client-select w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Select or search for a client</option>
+                </select>
+                <div id="retail-client-debt" class="mt-1 text-sm text-gray-600 dark:text-gray-400 hidden">Debt: KSh 0.00</div>
+            </div>
             
             <div id="retail-items-container" class="space-y-4">
                 <div class="grid grid-cols-6 gap-2 items-center text-sm font-semibold item-row-header">
@@ -165,10 +173,15 @@
         <form id="wholesale-form" method="POST" action="{{ url_for('orders') }}" class="space-y-4">
             <input type="hidden" name="order_type" value="wholesale">
             <input type="hidden" name="salesperson_name" value="{{ session['user']['firstName'] }} {{ session['user']['lastName'] }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"> <!-- Add CSRF token -->
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             
-            <input type="text" name="shop_name" placeholder="Shop Name" 
-                   class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" required>
+            <div class="relative">
+                <label for="wholesale-client-select" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Shop Name</label>
+                <select name="shop_name" id="wholesale-client-select" class="client-select w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Select or search for a client</option>
+                </select>
+                <div id="wholesale-client-debt" class="mt-1 text-sm text-gray-600 dark:text-gray-400 hidden">Debt: KSh 0.00</div>
+            </div>
             
             <div id="wholesale-items-container" class="space-y-4">
                 <div class="grid grid-cols-6 gap-2 items-center text-sm font-semibold item-row-header">
@@ -250,11 +263,15 @@
         <form id="edit-order-form" method="POST" action="" class="space-y-4">
             <input type="hidden" name="order_type" id="edit-order-type">
             <input type="hidden" name="salesperson_name" value="{{ session['user']['firstName'] }} {{ session['user']['lastName'] }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"> <!-- Add CSRF token -->
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             
-            <input type="text" name="shop_name" id="edit-shop-name" placeholder="Shop Name" 
-                   class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" 
-                   {{ 'readonly' if session['user']['role'] != 'admin' else '' }}>
+            <div class="relative">
+                <label for="edit-client-select" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Shop Name</label>
+                <select name="shop_name" id="edit-client-select" class="client-select w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Select or search for a client</option>
+                </select>
+                <div id="edit-client-debt" class="mt-1 text-sm text-gray-600 dark:text-gray-400 hidden">Debt: KSh 0.00</div>
+            </div>
             
             <div id="edit-items-container" class="space-y-4">
                 <div class="grid grid-cols-6 gap-2 items-center text-sm font-semibold item-row-header">
@@ -299,7 +316,7 @@
         <h3 id="mark-paid-modal-title" class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Mark as Paid for Order #<span id="paid-order-id"></span></h3>
         <div id="paid-error" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded mb-4"></div>
         <form id="mark-paid-form" method="POST" action="" class="space-y-4">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"> <!-- Add CSRF token -->
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div>
                 <label class="font-semibold text-gray-900 dark:text-white">Amount Paid</label>
                 <input id="paid-amount" name="amount_paid" type="number" placeholder="Amount Paid" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 w-full" min="0" step="0.01" required>
@@ -319,7 +336,7 @@
         <h3 id="return-stock-modal-title" class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Return Stock for Order #<span id="return-order-id"></span></h3>
         <div id="return-error" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded mb-4"></div>
         <form id="return-stock-form" method="POST" action="" class="space-y-4">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"> <!-- Add CSRF token -->
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div>
                 <label class="font-semibold text-gray-900 dark:text-white">Select Items to Return</label>
                 <div id="return-stock-items-container" class="space-y-3 mt-2"></div>
@@ -358,11 +375,12 @@
     const retailContainer = document.getElementById('retail-items-container');
     const wholesaleContainer = document.getElementById('wholesale-items-container');
     const editContainer = document.getElementById('edit-items-container');
-    const manualQty = document.getElementById('manual-item-qty');
+    const manualQty = document.getElementOfId('manual-item-qty');
     const manualPrice = document.getElementById('manual-item-price');
     const manualTotal = document.getElementById('manual-total');
 
     let currentContainer;
+    let retailChoices, wholesaleChoices, editChoices;
 
     // Function to close all modals
     function closeAllModals() {
@@ -391,12 +409,70 @@
         updateSubtotal(container);
     }
 
+    // Fetch clients from Firestore and populate dropdown
+    async function populateClients(selectElement, debtDisplayElement, initialValue = '') {
+        try {
+            const response = await fetch('/clients_data'); // New endpoint we'll create
+            const clients = await response.json();
+            
+            const choicesConfig = {
+                searchEnabled: true,
+                searchChoices: true,
+                itemSelectText: '',
+                placeholderValue: 'Select or search for a client',
+                choices: clients.map(client => ({
+                    value: client.shop_name,
+                    label: `${client.shop_name} (Debt: KSh ${client.debt.toFixed(2)})`,
+                    customProperties: { debt: client.debt }
+                })),
+                addItems: true,
+                removeItemButton: false,
+                callbackOnInit: function() {
+                    this.passedElement.element.addEventListener('change', function() {
+                        const selectedClient = this.getValue();
+                        if (selectedClient && selectedClient.customProperties) {
+                            debtDisplayElement.textContent = `Debt: KSh ${selectedClient.customProperties.debt.toFixed(2)}`;
+                            debtDisplayElement.classList.remove('hidden');
+                        } else {
+                            debtDisplayElement.classList.add('hidden');
+                        }
+                    });
+                }
+            };
+
+            if (selectElement.id === 'retail-client-select' && !retailChoices) {
+                retailChoices = new Choices(selectElement, choicesConfig);
+                if (initialValue) retailChoices.setChoiceByValue(initialValue);
+            } else if (selectElement.id === 'wholesale-client-select' && !wholesaleChoices) {
+                wholesaleChoices = new Choices(selectElement, choicesConfig);
+                if (initialValue) wholesaleChoices.setChoiceByValue(initialValue);
+            } else if (selectElement.id === 'edit-client-select' && !editChoices) {
+                editChoices = new Choices(selectElement, choicesConfig);
+                if (initialValue) editChoices.setChoiceByValue(initialValue);
+            }
+
+            if (initialValue) {
+                const selectedClient = clients.find(c => c.shop_name === initialValue);
+                if (selectedClient) {
+                    debtDisplayElement.textContent = `Debt: KSh ${selectedClient.debt.toFixed(2)}`;
+                    debtDisplayElement.classList.remove('hidden');
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching clients:', error);
+            showModalError(selectElement.closest('form').id.split('-')[0], 'Failed to load client list.');
+        }
+    }
+
     openRetail.addEventListener('click', () => {
         closeAllModals();
         resetModal(retailContainer);
         retailModal.classList.remove('hidden');
         currentContainer = retailContainer;
         attachAddItemListeners(retailContainer);
+        if (!retailChoices) {
+            populateClients(document.getElementById('retail-client-select'), document.getElementById('retail-client-debt'));
+        }
     });
 
     openWholesale.addEventListener('click', () => {
@@ -405,6 +481,9 @@
         wholesaleModal.classList.remove('hidden');
         currentContainer = wholesaleContainer;
         attachAddItemListeners(wholesaleContainer);
+        if (!wholesaleChoices) {
+            populateClients(document.getElementById('wholesale-client-select'), document.getElementById('wholesale-client-debt'));
+        }
     });
 
     closeRetail.addEventListener('click', () => {
@@ -666,11 +745,17 @@
         editModal.classList.remove('hidden');
         document.getElementById('edit-order-id').textContent = receiptId;
         document.getElementById('edit-order-type').value = orderType;
-        document.getElementById('edit-shop-name').value = shopName || '';
         const form = document.getElementById('edit-order-form');
         form.action = `/edit_order/${receiptId}`;
         resetModal(editContainer);
         attachAddItemListeners(editContainer);
+
+        // Populate client dropdown with current shop name selected
+        if (!editChoices) {
+            populateClients(document.getElementById('edit-client-select'), document.getElementById('edit-client-debt'), shopName);
+        } else {
+            editChoices.setChoiceByValue(shopName);
+        }
 
         // Load existing items
         let items = typeof itemsJson === 'string' ? JSON.parse(itemsJson) : itemsJson;
@@ -685,8 +770,7 @@
                     <input type="number" value="${item.price || 0}" class="price-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
                     <input type="number" value="0" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
                     <input type="number" value="${(item.price || 0) * item.quantity}" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-                    <button type="button" class="remove-item bg-red-5
-00 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
+                    <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
                 `;
                 const addBtn = editContainer.querySelector('.add-item-btn');
                 editContainer.insertBefore(div, addBtn);
@@ -734,7 +818,7 @@
         fetch(`/delete_order/${receiptId}`, {
             method: 'POST',
             headers: {
-                'X-CSRFToken': '{{ csrf_token() }}' // Add CSRF token for DELETE request
+                'X-CSRFToken': '{{ csrf_token() }}'
             }
         })
         .then(response => {
@@ -931,36 +1015,36 @@
     });
 
     document.querySelectorAll('.filter-btn').forEach(btn => {
-    	btn.addEventListener('click', () => {
-    	    const filter = btn.getAttribute('data-filter');
-    	    document.querySelectorAll('.filter-btn').forEach(b => {
-    	        b.classList.remove('bg-blue-500', 'text-white');
-    	        b.classList.add('text-gray-600', 'dark:text-gray-300', 'hover:bg-gray-100', 'dark:hover:bg-gray-700');
+        btn.addEventListener('click', () => {
+            const filter = btn.getAttribute('data-filter');
+            document.querySelectorAll('.filter-btn').forEach(b => {
+                b.classList.remove('bg-blue-500', 'text-white');
+                b.classList.add('text-gray-600', 'dark:text-gray-300', 'hover:bg-gray-100', 'dark:hover:bg-gray-700');
+            });
+            btn.classList.remove('text-gray-600', 'dark:text-gray-300', 'hover:bg-gray-100', 'dark:hover:bg-gray-700');
+            btn.classList.add('bg-blue-500', 'text-white');
+
+            const orders = document.querySelectorAll('.order-card');
+            orders.forEach(order => {
+                const balance = parseFloat(order.getAttribute('data-balance'));
+                let show = false;
+
+                if (filter === 'all') show = true;
+                else if (filter === 'pending' && balance > 0) show = true;
+                else if (filter === 'paid' && balance === 0) show = true;
+
+                order.classList.toggle('hidden', !show);
+            });
+
+            const ordersList = document.getElementById('orders-list');
+            const sortedOrders = Array.from(orders).sort((a, b) => {
+                const dateA = new Date(a.getAttribute('data-date'));
+                const dateB = new Date(b.getAttribute('data-date'));
+                return dateB - dateA;
+            });
+            sortedOrders.forEach(order => ordersList.appendChild(order));
         });
-        btn.classList.remove('text-gray-600', 'dark:text-gray-300', 'hover:bg-gray-100', 'dark:hover:bg-gray-700');
-        btn.classList.add('bg-blue-500', 'text-white');
-
-        const orders = document.querySelectorAll('.order-card');
-        orders.forEach(order => {
-            const balance = parseFloat(order.getAttribute('data-balance'));
-            let show = false;
-
-            if (filter === 'all') show = true;
-            else if (filter === 'pending' && balance > 0) show = true;
-            else if (filter === 'paid' && balance === 0) show = true;
-
-            order.classList.toggle('hidden', !show);
-        });
-
-        const ordersList = document.getElementById('orders-list');
-        const sortedOrders = Array.from(orders).sort((a, b) => {
-            const dateA = new Date(a.getAttribute('data-date'));
-            const dateB = new Date(b.getAttribute('data-date'));
-            return dateB - dateA; // Sort by date, newest first
-        });
-        sortedOrders.forEach(order => ordersList.appendChild(order));
     });
-});
 
     document.querySelector('[data-filter="all"]').click();
 
@@ -1122,7 +1206,7 @@
         animation: ripple 0.6s linear;
     }
     .submit-btn.processing::before {
-        content: '\f1ce'; /* FontAwesome spinner icon */
+        content: '\f1ce';
         font-family: 'Font Awesome 6 Free';
         font-weight: 900;
         display: inline-block;
