@@ -401,8 +401,10 @@ def dashboard():
         filtered_orders = [o for o in orders if o['date'] >= start]
 
     # Calculate dashboard stats
-    retail_sales_today = 0.0
-    wholesale_sales_today = 0.0
+    retail_sales_today_existing = 0.0
+    wholesale_sales_today_existing = 0.0
+    retail_sales_today_new = 0.0
+    wholesale_sales_today_new = 0.0
     total_debts = 0.0
     open_orders_count = 0
     closed_orders_count = 0
@@ -428,50 +430,78 @@ def dashboard():
             print(f"WARNING: Order {order.id} has balance {balance} but closed_date {closed_date}")
             closed_date = None  # Forcefully unset closed_date for pending orders
 
-        # Count open and closed orders
-        if balance > 0:
-            open_orders_count += 1
-            if order_type == 'retail':
-                retail_open_orders += 1
+        # Count open and closed orders (for today only)
+        if order_date >= today_start and order_date < today_end:
+            if balance > 0:
+                open_orders_count += 1
+                if order_type == 'retail':
+                    retail_open_orders += 1
+                else:
+                    wholesale_open_orders += 1
             else:
-                wholesale_open_orders += 1
-            total_debts += balance
-        else:
-            closed_orders_count += 1
-            if order_type == 'retail':
-                retail_closed_orders += 1
-            else:
-                wholesale_closed_orders += 1
+                closed_orders_count += 1
+                if order_type == 'retail':
+                    retail_closed_orders += 1
+                else:
+                    wholesale_closed_orders += 1
 
-        # Today's sales: Count payments made today
-        if last_payment_date and last_payment_date >= today_start and last_payment_date < today_end:
+        # Total debts (all orders)
+        if balance > 0:
+            total_debts += balance
+
+        # Part 1: Existing logic for previous orders closed today
+        if last_payment_date and last_payment_date >= today_start and last_payment_date < today_end and order_date < today_start:
             if final_payment > 0:
                 if order_type == 'retail':
-                    retail_sales_today += final_payment
+                    retail_sales_today_existing += final_payment
                 else:
-                    wholesale_sales_today += final_payment
-        # For new orders today with no subsequent payments, count initial payment
-        elif order_date >= today_start and order_date < today_end and (not last_payment_date or last_payment_date == order_date):
-            if initial_payment > 0:
-                if order_type == 'retail':
-                    retail_sales_today += initial_payment
-                else:
-                    wholesale_sales_today += initial_payment
+                    wholesale_sales_today_existing += final_payment
 
-    # Add direct retail sales from 'retail' collection
+        # Part 2: New logic for orders opened today
+        if order_date >= today_start and order_date < today_end:
+            if closed_date and closed_date >= today_start and closed_date < today_end:
+                # Full payment today
+                payment_to_use = final_payment if final_payment > 0 else initial_payment
+                if payment_to_use > 0:
+                    if order_type == 'retail':
+                        retail_sales_today_new += payment_to_use
+                    else:
+                        wholesale_sales_today_new += payment_to_use
+            elif last_payment_date and last_payment_date >= today_start and last_payment_date < today_end:
+                # Partial payment today
+                if final_payment > 0:
+                    if order_type == 'retail':
+                        retail_sales_today_new += final_payment
+                    else:
+                        wholesale_sales_today_new += final_payment
+
+    # Combine the two parts
+    retail_sales_today = retail_sales_today_existing + retail_sales_today_new
+    wholesale_sales_today = wholesale_sales_today_existing + wholesale_sales_today_new
+
+    # Add direct retail sales from 'retail' collection (closed today only)
     retail_sales_today += sum(
-        float(r.to_dict().get('amount', 0)) 
+        float(r.to_dict().get('amount', 0))
         for r in db.collection('retail')
         .where('date', '==', now.strftime('%Y-%m-%d'))
         .stream()
+        if process_date(r.to_dict().get('closed_date')) and process_date(r.to_dict().get('closed_date')) >= today_start and process_date(r.to_dict().get('closed_date')) < today_end
     )
 
     # Calculate total sales today
     total_sales_today = retail_sales_today + wholesale_sales_today
 
     # Fetch expenses
-    expenses = [doc.to_dict() for doc in db.collection('expenses').order_by('date', direction=firestore.Query.DESCENDING).stream()]
-    total_expenses = sum(float(e.get('amount', 0)) for e in expenses)
+    expenses = [
+        {
+            'description': doc.to_dict().get('description', ''),
+            'amount': float(doc.to_dict().get('amount', 0)),
+            'category': doc.to_dict().get('category', ''),
+            'date': process_date(doc.to_dict().get('date'))
+        }
+        for doc in db.collection('expenses').order_by('date', direction=firestore.Query.DESCENDING).stream()
+    ]
+    total_expenses = sum(e['amount'] for e in expenses)
 
     # Fetch notifications for the current user
     user_id = session['user'].get('uid', '')
@@ -494,7 +524,10 @@ def dashboard():
     total_pages = (total_orders + per_page - 1) // per_page
 
     # Debug print to verify stats
-    print(f"Total Debts: {total_debts}, Retail Today: {retail_sales_today}, Wholesale Today: {wholesale_sales_today}")
+    print(f"Total Sales Today: {total_sales_today}, Retail Today: {retail_sales_today}, Wholesale Today: {wholesale_sales_today}")
+    print(f"Existing Retail: {retail_sales_today_existing}, New Retail: {retail_sales_today_new}")
+    print(f"Existing Wholesale: {wholesale_sales_today_existing}, New Wholesale: {wholesale_sales_today_new}")
+    print(f"Open Orders: {open_orders_count}, Closed Orders: {closed_orders_count}")
 
     return render_template(
         'dashboard.html',
@@ -521,6 +554,7 @@ def dashboard():
         wholesale_open_orders=wholesale_open_orders,
         wholesale_closed_orders=wholesale_closed_orders
     )
+
 @app.route('/mark_notification_read/<notification_id>', methods=['POST'])
 @no_cache
 @login_required
