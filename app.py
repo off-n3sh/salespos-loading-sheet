@@ -280,7 +280,7 @@ def login():
 @no_cache
 @login_required
 def dashboard():
-    """Render the dashboard with stats cards and sales history."""
+    """Render the dashboard with stats cards showing only orders closed today."""
     # Pagination and filter parameters
     page = int(request.args.get('page', 1))
     per_page = int(request.args.get('per_page', 50))
@@ -292,7 +292,7 @@ def dashboard():
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     today_end = today_start + timedelta(days=1)
 
-    # Fetch all orders from Firestore
+    # Fetch all orders from Firestore for sales history
     orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING)
     orders = []
 
@@ -386,7 +386,7 @@ def dashboard():
         start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
         filtered_orders = [o for o in orders if o['date'] >= start]
 
-    # Calculate dashboard stats
+    # Calculate dashboard stats (ONLY for orders closed today)
     retail_sales_today = 0.0
     wholesale_sales_today = 0.0
     total_debts = 0.0
@@ -407,7 +407,7 @@ def dashboard():
         final_payment = float(order_dict.get('final_payment', 0))
         balance = float(order_dict.get('balance', 0))
 
-        # Count open and closed orders for today
+        # Count open and closed orders for today (for display purposes)
         if order_date >= today_start and order_date < today_end:
             if closed_date and closed_date >= today_start and closed_date < today_end:
                 closed_orders_count += 1
@@ -415,45 +415,33 @@ def dashboard():
                     retail_closed_orders += 1
                 else:
                     wholesale_closed_orders += 1
-                # Include payment in sales for orders opened and closed today
-                payment_to_use = final_payment if final_payment > 0 else initial_payment
-                if payment_to_use > 0:
-                    if order_type == 'retail':
-                        retail_sales_today += payment_to_use
-                    else:
-                        wholesale_sales_today += payment_to_use
             elif balance > 0:
                 open_orders_count += 1
                 if order_type == 'retail':
                     retail_open_orders += 1
                 else:
                     wholesale_open_orders += 1
-                # Include initial payment for orders opened today but not closed
-                if initial_payment > 0:
-                    if order_type == 'retail':
-                        retail_sales_today += initial_payment
-                    else:
-                        wholesale_sales_today += initial_payment
 
-        # Add payments for orders closed today (regardless of when opened)
+        # Sales totals: ONLY include payments from orders closed today
         if closed_date and closed_date >= today_start and closed_date < today_end:
             payment_to_use = final_payment if final_payment > 0 else initial_payment
             if payment_to_use > 0:
-                if order_type == 'retail' and order_date < today_start:  # Avoid double-counting
+                if order_type == 'retail':
                     retail_sales_today += payment_to_use
-                elif order_type != 'retail' and order_date < today_start:
+                else:
                     wholesale_sales_today += payment_to_use
 
-        # Total debts across all orders
+        # Total debts across all orders (unchanged)
         if balance > 0:
             total_debts += balance
 
-    # Add retail collection sales (if applicable)
+    # Add retail collection sales closed today (if applicable)
     retail_sales_today += sum(
         float(r.to_dict().get('amount', 0))
         for r in db.collection('retail')
         .where('date', '==', now.strftime('%Y-%m-%d'))
         .stream()
+        if process_date(r.to_dict().get('closed_date')) and process_date(r.to_dict().get('closed_date')) >= today_start and process_date(r.to_dict().get('closed_date')) < today_end
     )
 
     total_sales_today = retail_sales_today + wholesale_sales_today
