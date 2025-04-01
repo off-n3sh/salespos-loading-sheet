@@ -190,6 +190,53 @@ def clients_data():
     # Return only the necessary data for the dropdown
     return jsonify([{'shop_name': c['shop_name'], 'debt': c['debt']} for c in clients_list])
 
+@app.route('/clients', methods=['GET'])
+@no_cache
+@login_required
+def clients():
+    search_query = request.args.get('search', '').lower()
+    
+    # Fetch all orders from Firestore
+    orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).stream()
+    clients_dict = {}
+    
+    for doc in orders_ref:
+        order_dict = doc.to_dict()
+        shop_name = order_dict.get('shop_name', 'Unknown Shop')
+        if search_query and search_query not in shop_name.lower():
+            continue
+            
+        balance = float(order_dict.get('balance', 0))
+        payment = float(order_dict.get('payment', 0))
+        date = process_date(order_dict.get('date'))
+        items = order_dict.get('items', [])
+        total_amount = sum(float(items[i + 5]) * float(items[i + 3]) 
+                          for i in range(0, len(items), 6) if i + 5 < len(items) and items[i] == 'product')
+
+        if shop_name not in clients_dict:
+            clients_dict[shop_name] = {
+                'shop_name': shop_name,
+                'debt': 0.0,
+                'last_order_date': None,
+                'recent_order_amount': None,
+                'recent_order_id': None
+            }
+        
+        client = clients_dict[shop_name]
+        client['debt'] += balance
+        if not client['last_order_date'] or date > client['last_order_date']:
+            client['last_order_date'] = date
+            client['recent_order_amount'] = total_amount
+            client['recent_order_id'] = order_dict.get('receipt_id', doc.id)
+
+    clients_list = list(clients_dict.values())
+    clients_list.sort(key=lambda x: x['last_order_date'] or datetime.min.replace(tzinfo=KENYA_TZ), reverse=True)
+
+    # Use the globally loaded firebase_config from app startup
+    return render_template('clients.html', 
+                         clients=clients_list, 
+                         search=search_query,
+                         firebase_config=firebase_config)  # firebase_config is global from app.py
                          
 @app.route('/auth', methods=['GET', 'POST'])
 def auth_route():
