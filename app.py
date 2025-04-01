@@ -1745,35 +1745,54 @@ def export_report():
     y = height - 170
 
     if report_type == 'stock':
-        # Stock Movement Report
+        # Enhanced Stock Movement Report
         p.setFont("Helvetica-Bold", 10)
         p.drawString(40, y, "Product")
-        p.drawString(150, y, "Category")
-        p.drawString(300, y, "Change Type")
-        p.drawString(400, y, "Quantity")
-        p.drawString(480, y, "Date")
-        p.line(40, y - 5, width - 40, y - 5)
+        p.drawString(170, y, "Category")
+        p.drawString(320, y, "Quantity")
+        p.drawString(420, y, "Value (KES)")
+        p.drawString(510, y, "Date")
+        
+        # Add proper spacing before the line
         y -= 10
-
+        p.line(40, y, width - 40, y)
+        y -= 10
+        
         stock_logs = db.collection('stock_logs').order_by('timestamp', direction=firestore.Query.DESCENDING).stream()
         p.setFont("Helvetica", 9)
         total_movement = 0
+        total_value = 0
+        
         for log in stock_logs:
             log_dict = log.to_dict()
             timestamp = process_date(log_dict.get('timestamp'))
             if start and timestamp < start:
                 continue
+                
             if y < 60:
                 p.showPage()
+                p.setFont("Helvetica-Bold", 10)
+                p.drawString(40, height - 50, "Product")
+                p.drawString(170, height - 50, "Category")
+                p.drawString(320, height - 50, "Quantity")
+                p.drawString(420, height - 50, "Value (KES)")
+                p.drawString(510, height - 50, "Date")
+                p.line(40, height - 60, width - 40, height - 60)
                 p.setFont("Helvetica", 9)
-                y = height - 50
-            p.drawString(40, y, log_dict.get('subtype', 'Unknown'))
-            p.drawString(150, y, log_dict.get('product_type', 'Unknown'))
-            p.drawString(300, y, log_dict.get('change_type', 'N/A'))
+                y = height - 80
+                
             qty = log_dict.get('quantity', 0)
+            price = log_dict.get('price_per_unit', 0)
+            value = qty * price
+            
+            p.drawString(40, y, log_dict.get('subtype', 'Unknown'))
+            p.drawString(170, y, log_dict.get('product_type', 'Unknown'))
+            p.drawString(320, y, str(qty))
+            p.drawString(420, y, f"{value:.2f}")
+            p.drawString(510, y, timestamp.strftime('%d/%m/%Y'))
+            
             total_movement += qty
-            p.drawString(400, y, str(qty))
-            p.drawString(480, y, timestamp.strftime('%d/%m/%Y'))
+            total_value += value
             y -= 15
 
         y -= 10
@@ -1781,17 +1800,20 @@ def export_report():
         y -= 15
         p.setFont("Helvetica-Bold", 10)
         p.drawString(40, y, f"Total Items Moved: {total_movement}")
+        p.drawString(320, y, f"Total Value: {total_value:.2f} KES")
 
     elif report_type == 'user':
         # User Sales Report - Grouped by User
         # First, collect and group orders by salesperson
         orders = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).stream()
         user_data = {}
+        
         for order in orders:
             order_dict = order.to_dict()
             order_date = process_date(order_dict.get('date'))
             if start and order_date < start:
                 continue
+                
             salesperson = order_dict.get('salesperson_name', 'Unknown')
             if salesperson not in user_data:
                 user_data[salesperson] = {
@@ -1815,7 +1837,7 @@ def export_report():
             # User Header
             p.setFont("Helvetica-Bold", 11)
             p.drawString(40, y, f"User: {salesperson}")
-            y -= 15
+            y -= 20
 
             # Table Header
             p.setFont("Helvetica-Bold", 9)
@@ -1825,21 +1847,32 @@ def export_report():
             p.drawString(300, y, "Debt (KES)")
             p.drawString(380, y, "Sales (KES)")
             p.drawString(460, y, "Date")
-            p.line(40, y - 5, width - 40, y - 5)
+            
             y -= 10
-
+            p.line(40, y, width - 40, y)
+            y -= 10
+            
             # Order Details
             p.setFont("Helvetica", 9)
             for order_dict in data['orders']:
                 if y < 60:
                     p.showPage()
+                    p.setFont("Helvetica-Bold", 9)
+                    p.drawString(40, height - 50, "Order ID")
+                    p.drawString(120, height - 50, "Shop")
+                    p.drawString(220, height - 50, "Items Sold")
+                    p.drawString(300, height - 50, "Debt (KES)")
+                    p.drawString(380, height - 50, "Sales (KES)")
+                    p.drawString(460, height - 50, "Date")
+                    p.line(40, height - 60, width - 40, height - 60)
                     p.setFont("Helvetica", 9)
-                    y = height - 50
+                    y = height - 80
+                    
                 p.drawString(40, y, order_dict.get('receipt_id', 'N/A'))
                 p.drawString(120, y, order_dict.get('shop_name', 'Unknown'))
                 p.drawString(220, y, str(process_items(order_dict.get('items', []))))
-                p.drawString(380, y, f"{order_dict.get('payment', 0):.2f}")
                 p.drawString(300, y, f"{order_dict.get('balance', 0):.2f}")
+                p.drawString(380, y, f"{order_dict.get('payment', 0):.2f}")
                 p.drawString(460, y, process_date(order_dict.get('date')).strftime('%d/%m/%Y'))
                 y -= 15
 
@@ -1856,30 +1889,43 @@ def export_report():
             y -= 25
 
     elif report_type == 'debt':
-        # Debt Report
+        # Enhanced Debt Report
         p.setFont("Helvetica-Bold", 10)
         p.drawString(40, y, "Order ID")
         p.drawString(120, y, "Shop")
         p.drawString(220, y, "Salesperson")
         p.drawString(320, y, "Debt Amount (KES)")
         p.drawString(420, y, "Date")
-        p.line(40, y - 5, width - 40, y - 5)
+        
         y -= 10
-
+        p.line(40, y, width - 40, y)
+        y -= 10
+        
         orders = db.collection('orders').where('balance', '>', 0).order_by('date', direction=firestore.Query.DESCENDING).stream()
         p.setFont("Helvetica", 9)
         total_debt = 0
+        
         for order in orders:
             order_dict = order.to_dict()
             order_date = process_date(order_dict.get('date'))
             if start and order_date < start:
                 continue
+                
             debt = order_dict.get('balance', 0)
             total_debt += debt
+            
             if y < 60:
                 p.showPage()
+                p.setFont("Helvetica-Bold", 10)
+                p.drawString(40, height - 50, "Order ID")
+                p.drawString(120, height - 50, "Shop")
+                p.drawString(220, height - 50, "Salesperson")
+                p.drawString(320, height - 50, "Debt Amount (KES)")
+                p.drawString(420, height - 50, "Date")
+                p.line(40, height - 60, width - 40, height - 60)
                 p.setFont("Helvetica", 9)
-                y = height - 50
+                y = height - 80
+                
             p.drawString(40, y, order_dict.get('receipt_id', order.id))
             p.drawString(120, y, order_dict.get('shop_name', 'Unknown'))
             p.drawString(220, y, order_dict.get('salesperson_name', 'Unknown'))
@@ -1894,37 +1940,57 @@ def export_report():
         p.drawString(40, y, f"Total Outstanding Debt: {total_debt:.2f} KES")
 
     elif report_type == 'sales':
-        # Sales Report
+        # Enhanced Sales Report with Debt Information
         p.setFont("Helvetica-Bold", 10)
         p.drawString(40, y, "Order ID")
-        p.drawString(120, y, "Shop")
+        p.drawString(110, y, "Shop")
         p.drawString(220, y, "Salesperson")
         p.drawString(320, y, "Items")
-        p.drawString(380, y, "Payment (KES)")
-        p.drawString(460, y, "Date")
-        p.line(40, y - 5, width - 40, y - 5)
+        p.drawString(370, y, "Payment (KES)")
+        p.drawString(450, y, "Debt (KES)")
+        p.drawString(520, y, "Date")
+        
         y -= 10
-
+        p.line(40, y, width - 40, y)
+        y -= 10
+        
         orders = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).stream()
         p.setFont("Helvetica", 9)
         total_sales = 0
+        total_debt = 0
+        
         for order in orders:
             order_dict = order.to_dict()
             order_date = process_date(order_dict.get('date'))
             if start and order_date < start:
                 continue
+                
             payment = order_dict.get('payment', 0)
+            debt = order_dict.get('balance', 0)
             total_sales += payment
+            total_debt += debt
+            
             if y < 60:
                 p.showPage()
+                p.setFont("Helvetica-Bold", 10)
+                p.drawString(40, height - 50, "Order ID")
+                p.drawString(110, height - 50, "Shop")
+                p.drawString(220, height - 50, "Salesperson")
+                p.drawString(320, height - 50, "Items")
+                p.drawString(370, height - 50, "Payment (KES)")
+                p.drawString(450, height - 50, "Debt (KES)")
+                p.drawString(520, height - 50, "Date")
+                p.line(40, height - 60, width - 40, height - 60)
                 p.setFont("Helvetica", 9)
-                y = height - 50
+                y = height - 80
+                
             p.drawString(40, y, order_dict.get('receipt_id', order.id))
-            p.drawString(120, y, order_dict.get('shop_name', 'Unknown'))
+            p.drawString(110, y, order_dict.get('shop_name', 'Unknown'))
             p.drawString(220, y, order_dict.get('salesperson_name', 'Unknown'))
             p.drawString(320, y, str(process_items(order_dict.get('items', []))))
-            p.drawString(380, y, f"{payment:.2f}")
-            p.drawString(460, y, order_date.strftime('%d/%m/%Y'))
+            p.drawString(370, y, f"{payment:.2f}")
+            p.drawString(450, y, f"{debt:.2f}")
+            p.drawString(520, y, order_date.strftime('%d/%m/%Y'))
             y -= 15
 
         y -= 10
@@ -1932,6 +1998,7 @@ def export_report():
         y -= 15
         p.setFont("Helvetica-Bold", 10)
         p.drawString(40, y, f"Total Sales: {total_sales:.2f} KES")
+        p.drawString(300, y, f"Total Outstanding Debt: {total_debt:.2f} KES")
 
     else:
         p.setFont("Helvetica", 12)
