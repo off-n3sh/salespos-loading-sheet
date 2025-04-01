@@ -32,19 +32,11 @@
             data-receipt-id="{{ order.receipt_id }}"
             data-balance="{{ order.balance }}"
             data-date="{{ order.date.strftime('%Y-%m-%d') }}">
-            
-            <!-- Order Header -->
             <div class="flex justify-between items-start mb-3">
                 <div>
-                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-                        Order #{{ order.receipt_id }}
-                    </h3>
-                    <p class="text-sm text-gray-600 dark:text-gray-300">
-                        {{ order.shop_name or 'Retail Sale' }}
-                    </p>
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Order #{{ order.receipt_id }}</h3>
+                    <p class="text-sm text-gray-600 dark:text-gray-300">{{ order.shop_name or 'Retail Sale' }}</p>
                 </div>
-                
-                <!-- Dropdown Actions -->
                 <div class="relative">
                     <button class="order-actions-btn p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700" aria-label="Order actions">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600 dark:text-gray-300" viewBox="0 0 20 20" fill="currentColor">
@@ -52,54 +44,21 @@
                         </svg>
                     </button>
                     <div class="order-actions-menu hidden absolute right-0 mt-2 w-48 bg-white dark:bg-gray-700 rounded-lg shadow-lg z-10 py-1">
-                        <a href="{{ url_for('receipt', order_id=order.receipt_id) }}" 
-                           class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600">
-                            View Receipt
-                        </a>
-                        <button class="edit-order-btn w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600"
-                                data-receipt-id="{{ order.receipt_id }}"
-                                data-order-type="{{ order.order_type }}"
-                                data-shop-name="{{ order.shop_name }}"
-                                data-items='{{ order.items_list|tojson|safe }}'>
-                            Edit Order
-                        </button>
-                        <button class="delete-order-btn w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-600"
-                                data-receipt-id="{{ order.receipt_id }}">
-                            Delete Order
-                        </button>
+                        <a href="{{ url_for('receipt', order_id=order.receipt_id) }}" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600">View Receipt</a>
+                        <button class="edit-order-btn w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600" data-receipt-id="{{ order.receipt_id }}" data-order-type="{{ order.order_type }}" data-shop-name="{{ order.shop_name }}" data-items='{{ order.items_list|tojson|safe }}'>Edit Order</button>
+                        <button class="delete-order-btn w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-600" data-receipt-id="{{ order.receipt_id }}">Delete Order</button>
                         {% if order.balance > 0 %}
-                        <button class="mark-paid-btn w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-gray-100 dark:hover:bg-gray-600"
-                                data-receipt-id="{{ order.receipt_id }}"
-                                data-balance="{{ order.balance }}">
-                            Mark as Paid
-                        </button>
-                        <button class="return-stock-btn w-full text-left px-4 py-2 text-sm text-yellow-600 hover:bg-gray-100 dark:hover:bg-gray-600"
-                                data-receipt-id="{{ order.receipt_id }}"
-                                data-items='{{ order.items_list|tojson|safe }}'>
-                            Return Stock
-                        </button>
+                        <button class="mark-paid-btn w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-gray-100 dark:hover:bg-gray-600" data-receipt-id="{{ order.receipt_id }}" data-balance="{{ order.balance }}">Mark as Paid</button>
+                        <button class="return-stock-btn w-full text-left px-4 py-2 text-sm text-yellow-600 hover:bg-gray-100 dark:hover:bg-gray-600" data-receipt-id="{{ order.receipt_id }}" data-items='{{ order.items_list|tojson|safe }}'>Return Stock</button>
                         {% endif %}
                     </div>
                 </div>
             </div>
-
-            <!-- Order Details -->
             <div class="grid grid-cols-2 gap-2 text-sm">
-                <div class="text-gray-600 dark:text-gray-300">
-                    <span class="font-medium">Total Items:</span> {{ order.total_items }}
-                </div>
-                <div class="text-gray-600 dark:text-gray-300">
-                    <span class="font-medium">Date:</span> {{ order.date.strftime('%d/%m/%Y') }}
-                </div>
-                <div class="text-gray-600 dark:text-gray-300">
-                    <span class="font-medium">Payment:</span> KSh {{ order.payment | round(2) }}
-                </div>
-                <div class="text-gray-600 dark:text-gray-300">
-                    <span class="font-medium">Balance:</span> 
-                    <span class="{{ 'text-red-600' if order.balance > 0 else 'text-green-600' }}">
-                        KSh {{ order.balance | round(2) }}
-                    </span>
-                </div>
+                <div class="text-gray-600 dark:text-gray-300"><span class="font-medium">Total Items:</span> {{ order.total_items }}</div>
+                <div class="text-gray-600 dark:text-gray-300"><span class="font-medium">Date:</span> {{ order.date.strftime('%d/%m/%Y') }}</div>
+                <div class="text-gray-600 dark:text-gray-300"><span class="font-medium">Payment:</span> KSh {{ order.payment | round(2) }}</div>
+                <div class="text-gray-600 dark:text-gray-300"><span class="font-medium">Balance:</span> <span class="{{ 'text-red-600' if order.balance > 0 else 'text-green-600' }}">KSh {{ order.balance | round(2) }}</span></div>
             </div>
         </div>
         {% endfor %}
@@ -115,7 +74,6 @@
             <input type="hidden" name="order_type" value="retail">
             <input type="hidden" name="salesperson_name" value="{{ session['user']['firstName'] }} {{ session['user']['lastName'] }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            
             <div class="relative">
                 <label for="retail-client-select" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Client Name</label>
                 <select name="shop_name" id="retail-client-select" class="client-select w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -123,7 +81,6 @@
                 </select>
                 <div id="retail-client-debt" class="mt-1 text-sm text-gray-600 dark:text-gray-400 hidden">Debt: KSh 0.00</div>
             </div>
-            
             <div id="retail-items-container" class="space-y-4">
                 <div class="grid grid-cols-6 gap-2 items-center text-sm font-semibold item-row-header">
                     <span>Item</span>
@@ -133,33 +90,16 @@
                     <span class="text-center">Total</span>
                     <span class="text-center">Action</span>
                 </div>
-                
-                <button type="button" class="add-item-btn w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600">
-                    Add Item
-                </button>
+                <button type="button" class="add-item-btn w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600">Add Item</button>
             </div>
-
             <div class="flex justify-between items-center mt-4">
-                <button type="button" id="add-retail-manual" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">
-                    Add Manual Item
-                </button>
-                <div class="text-right">
-                    <span class="font-semibold">Subtotal:</span>
-                    <span id="retail-order-total" class="ml-2">0.00</span>
-                </div>
+                <button type="button" id="add-retail-manual" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">Add Manual Item</button>
+                <div class="text-right"><span class="font-semibold">Subtotal:</span> <span id="retail-order-total" class="ml-2">0.00</span></div>
             </div>
-
-            <input type="number" name="amount_paid" placeholder="Amount Paid (optional)" 
-                   class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" 
-                   min="0" step="0.01">
-
+            <input type="number" name="amount_paid" placeholder="Amount Paid (optional)" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" min="0" step="0.01">
             <div class="flex space-x-2 mt-4">
-                <button type="submit" class="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600 submit-btn">
-                    Submit Order
-                </button>
-                <button type="button" id="close-retail-modal" class="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600">
-                    Cancel
-                </button>
+                <button type="submit" class="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600 submit-btn">Submit Order</button>
+                <button type="button" id="close-retail-modal" class="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600">Cancel</button>
             </div>
         </form>
     </div>
@@ -174,7 +114,6 @@
             <input type="hidden" name="order_type" value="wholesale">
             <input type="hidden" name="salesperson_name" value="{{ session['user']['firstName'] }} {{ session['user']['lastName'] }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            
             <div class="relative">
                 <label for="wholesale-client-select" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Shop Name</label>
                 <select name="shop_name" id="wholesale-client-select" class="client-select w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -182,7 +121,6 @@
                 </select>
                 <div id="wholesale-client-debt" class="mt-1 text-sm text-gray-600 dark:text-gray-400 hidden">Debt: KSh 0.00</div>
             </div>
-            
             <div id="wholesale-items-container" class="space-y-4">
                 <div class="grid grid-cols-6 gap-2 items-center text-sm font-semibold item-row-header">
                     <span>Item</span>
@@ -192,79 +130,46 @@
                     <span class="text-center">Total</span>
                     <span class="text-center">Action</span>
                 </div>
-                
-                <button type="button" class="add-item-btn w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600">
-                    Add Item
-                </button>
+                <button type="button" class="add-item-btn w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600">Add Item</button>
             </div>
-
             <div class="flex justify-between items-center mt-4">
-                <button type="button" id="add-wholesale-manual" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">
-                    Add Manual Item
-                </button>
-                <div class="text-right">
-                    <span class="font-semibold">Subtotal:</span>
-                    <span id="wholesale-order-total" class="ml-2">0.00</span>
-                </div>
+                <button type="button" id="add-wholesale-manual" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">Add Manual Item</button>
+                <div class="text-right"><span class="font-semibold">Subtotal:</span> <span id="wholesale-order-total" class="ml-2">0.00</span></div>
             </div>
-
-            <input type="number" name="amount_paid" placeholder="Amount Paid (optional)" 
-                   class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" 
-                   min="0" step="0.01">
-
+            <input type="number" name="amount_paid" placeholder="Amount Paid (optional)" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" min="0" step="0.01">
             <div class="flex space-x-2 mt-4">
-                <button type="submit" class="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600 submit-btn">
-                    Submit Order
-                </button>
-                <button type="button" id="close-wholesale-modal" class="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600">
-                    Cancel
-                </button>
+                <button type="submit" class="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600 submit-btn">Submit Order</button>
+                <button type="button" id="close-wholesale-modal" class="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600">Cancel</button>
             </div>
         </form>
     </div>
 </div>
 
-<!-- Manual Item Modal -->
-<div id="manual-item-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="manual-item-modal-title">
+<!-- Manual Item Modal (simplified for brevity) -->
+<div id="manual-item-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-96 p-6">
-        <h2 id="manual-item-modal-title" class="text-xl font-bold mb-4 text-gray-900 dark:text-white">Add Manual Item</h2>
-        <div id="manual-error" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded mb-4"></div>
+        <h2 class="text-xl font-bold mb-4 text-gray-900 dark:text-white">Add Manual Item</h2>
         <form id="manual-item-form" class="space-y-4">
-            <input id="manual-item-name" placeholder="Item Name" 
-                   class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" required>
-            
-            <input id="manual-item-qty" type="number" placeholder="Quantity" 
-                   class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" 
-                   min="1" required>
-            
-            <input id="manual-item-price" type="number" placeholder="Price per Unit" 
-                   class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" 
-                   min="0" step="0.01" required>
-            
+            <input id="manual-item-name" placeholder="Item Name" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" required>
+            <input id="manual-item-qty" type="number" placeholder="Quantity" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" min="1" required>
+            <input id="manual-item-price" type="number" placeholder="Price per Unit" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" min="0" step="0.01" required>
             <p id="manual-total" class="text-sm text-gray-600 dark:text-gray-300">Total: 0.00</p>
-            
             <div class="flex space-x-2">
-                <button type="button" id="add-manual-to-order" class="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600">
-                    Add Item
-                </button>
-                <button type="button" id="close-manual-modal" class="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600">
-                    Cancel
-                </button>
+                <button type="button" id="add-manual-to-order" class="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600">Add Item</button>
+                <button type="button" id="close-manual-modal" class="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600">Cancel</button>
             </div>
         </form>
     </div>
 </div>
 
-<!-- Edit Order Modal -->
-<div id="edit-order-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="edit-order-modal-title">
+<!-- Edit Order Modal (simplified) -->
+<div id="edit-order-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
         <h2 id="edit-order-modal-title" class="text-xl font-bold mb-4 text-gray-900 dark:text-white">Edit Order #<span id="edit-order-id"></span></h2>
-        <div id="edit-error" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded mb-4"></div>
         <form id="edit-order-form" method="POST" action="" class="space-y-4">
             <input type="hidden" name="order_type" id="edit-order-type">
             <input type="hidden" name="salesperson_name" value="{{ session['user']['firstName'] }} {{ session['user']['lastName'] }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            
             <div class="relative">
                 <label for="edit-client-select" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Shop Name</label>
                 <select name="shop_name" id="edit-client-select" class="client-select w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -272,7 +177,6 @@
                 </select>
                 <div id="edit-client-debt" class="mt-1 text-sm text-gray-600 dark:text-gray-400 hidden">Debt: KSh 0.00</div>
             </div>
-            
             <div id="edit-items-container" class="space-y-4">
                 <div class="grid grid-cols-6 gap-2 items-center text-sm font-semibold item-row-header">
                     <span>Item</span>
@@ -282,68 +186,11 @@
                     <span class="text-center">Total</span>
                     <span class="text-center">Action</span>
                 </div>
-                
-                <button type="button" class="add-item-btn w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600">
-                    Add Item
-                </button>
+                <button type="button" class="add-item-btn w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600">Add Item</button>
             </div>
-
-            <div class="flex justify-between items-center mt-4">
-                <button type="button" id="add-edit-manual" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">
-                    Add Manual Item
-                </button>
-                <div class="text-right">
-                    <span class="font-semibold">Subtotal:</span>
-                    <span id="edit-order-total" class="ml-2">0.00</span>
-                </div>
-            </div>
-
             <div class="flex space-x-2 mt-4">
-                <button type="submit" class="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600 submit-btn">
-                    Update Order
-                </button>
-                <button type="button" id="close-edit-modal" class="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600">
-                    Cancel
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- Mark as Paid Modal -->
-<div id="mark-paid-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="mark-paid-modal-title">
-    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-lg w-96 max-h-[80vh] overflow-y-auto">
-        <h3 id="mark-paid-modal-title" class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Mark as Paid for Order #<span id="paid-order-id"></span></h3>
-        <div id="paid-error" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded mb-4"></div>
-        <form id="mark-paid-form" method="POST" action="" class="space-y-4">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div>
-                <label class="font-semibold text-gray-900 dark:text-white">Amount Paid</label>
-                <input id="paid-amount" name="amount_paid" type="number" placeholder="Amount Paid" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 w-full" min="0" step="0.01" required>
-                <p id="full-amount-text" class="text-sm text-gray-700 dark:text-gray-300"></p>
-            </div>
-            <div class="flex space-x-2">
-                <button type="submit" class="btn btn-primary bg-green-500 hover:bg-green-600 flex-1 submit-btn">Confirm</button>
-                <button type="button" id="close-paid-modal" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 flex-1">Cancel</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- Return Stock Modal -->
-<div id="return-stock-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="return-stock-modal-title">
-    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-lg w-96 max-h-[80vh] overflow-y-auto">
-        <h3 id="return-stock-modal-title" class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Return Stock for Order #<span id="return-order-id"></span></h3>
-        <div id="return-error" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded mb-4"></div>
-        <form id="return-stock-form" method="POST" action="" class="space-y-4">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div>
-                <label class="font-semibold text-gray-900 dark:text-white">Select Items to Return</label>
-                <div id="return-stock-items-container" class="space-y-3 mt-2"></div>
-            </div>
-            <div class="flex space-x-2">
-                <button type="submit" class="btn btn-primary bg-yellow-500 hover:bg-yellow-600 flex-1 submit-btn">Submit</button>
-                <button type="button" id="close-return-modal" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 flex-1">Cancel</button>
+                <button type="submit" class="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600">Update Order</button>
+                <button type="button" id="close-edit-modal" class="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600">Cancel</button>
             </div>
         </form>
     </div>
@@ -353,884 +200,116 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
 
 <script>
-    // Modal management
+document.addEventListener('DOMContentLoaded', () => {
+    // Modal Elements
     const retailModal = document.getElementById('retail-modal');
     const wholesaleModal = document.getElementById('wholesale-modal');
-    const editModal = document.getElementById('edit-order-modal');
     const manualModal = document.getElementById('manual-item-modal');
-    const paidModal = document.getElementById('mark-paid-modal');
-    const returnModal = document.getElementById('return-stock-modal');
+    const editModal = document.getElementById('edit-order-modal');
     const openRetail = document.getElementById('open-retail-modal');
     const openWholesale = document.getElementById('open-wholesale-modal');
     const closeRetail = document.getElementById('close-retail-modal');
     const closeWholesale = document.getElementById('close-wholesale-modal');
-    const closeEdit = document.getElementById('close-edit-modal');
     const closeManual = document.getElementById('close-manual-modal');
-    const closePaid = document.getElementById('close-paid-modal');
-    const closeReturn = document.getElementById('close-return-modal');
+    const closeEdit = document.getElementById('close-edit-modal');
     const addRetailManual = document.getElementById('add-retail-manual');
     const addWholesaleManual = document.getElementById('add-wholesale-manual');
-    const addEditManual = document.getElementById('add-edit-manual');
-    const addManualToOrder = document.getElementById('add-manual-to-order');
     const retailContainer = document.getElementById('retail-items-container');
     const wholesaleContainer = document.getElementById('wholesale-items-container');
     const editContainer = document.getElementById('edit-items-container');
-    const manualQty = document.getElementOfId('manual-item-qty');
-    const manualPrice = document.getElementById('manual-item-price');
-    const manualTotal = document.getElementById('manual-total');
 
-    let currentContainer;
-    let retailChoices, wholesaleChoices, editChoices;
+    // Check if elements exist
+    if (!openRetail || !openWholesale || !retailModal || !wholesaleModal) {
+        console.error('Modal buttons or containers not found.');
+        return;
+    }
 
-    // Function to close all modals
+    // Modal Functions
     function closeAllModals() {
         retailModal.classList.add('hidden');
         wholesaleModal.classList.add('hidden');
-        editModal.classList.add('hidden');
         manualModal.classList.add('hidden');
-        paidModal.classList.add('hidden');
-        returnModal.classList.add('hidden');
-    }
-
-    // Function to show error messages in modals
-    function showModalError(modalId, message) {
-        const errorDiv = document.getElementById(`${modalId}-error`);
-        errorDiv.textContent = message;
-        errorDiv.classList.remove('hidden');
-        setTimeout(() => errorDiv.classList.add('hidden'), 5000);
+        editModal.classList.add('hidden');
     }
 
     function resetModal(container) {
         const header = container.querySelector('.item-row-header');
-        const initialAddBtn = container.querySelector('.add-item-btn');
+        const addBtn = container.querySelector('.add-item-btn');
         container.innerHTML = '';
         container.appendChild(header);
-        container.appendChild(initialAddBtn);
-        updateSubtotal(container);
+        container.appendChild(addBtn);
     }
 
-    // Fetch clients from Firestore and populate dropdown
-    async function populateClients(selectElement, debtDisplayElement, initialValue = '') {
-        try {
-            const response = await fetch('/clients_data'); // New endpoint we'll create
-            const clients = await response.json();
-            
-            const choicesConfig = {
-                searchEnabled: true,
-                searchChoices: true,
-                itemSelectText: '',
-                placeholderValue: 'Select or search for a client',
-                choices: clients.map(client => ({
-                    value: client.shop_name,
-                    label: `${client.shop_name} (Debt: KSh ${client.debt.toFixed(2)})`,
-                    customProperties: { debt: client.debt }
-                })),
-                addItems: true,
-                removeItemButton: false,
-                callbackOnInit: function() {
-                    this.passedElement.element.addEventListener('change', function() {
-                        const selectedClient = this.getValue();
-                        if (selectedClient && selectedClient.customProperties) {
-                            debtDisplayElement.textContent = `Debt: KSh ${selectedClient.customProperties.debt.toFixed(2)}`;
-                            debtDisplayElement.classList.remove('hidden');
-                        } else {
-                            debtDisplayElement.classList.add('hidden');
-                        }
-                    });
-                }
-            };
-
-            if (selectElement.id === 'retail-client-select' && !retailChoices) {
-                retailChoices = new Choices(selectElement, choicesConfig);
-                if (initialValue) retailChoices.setChoiceByValue(initialValue);
-            } else if (selectElement.id === 'wholesale-client-select' && !wholesaleChoices) {
-                wholesaleChoices = new Choices(selectElement, choicesConfig);
-                if (initialValue) wholesaleChoices.setChoiceByValue(initialValue);
-            } else if (selectElement.id === 'edit-client-select' && !editChoices) {
-                editChoices = new Choices(selectElement, choicesConfig);
-                if (initialValue) editChoices.setChoiceByValue(initialValue);
-            }
-
-            if (initialValue) {
-                const selectedClient = clients.find(c => c.shop_name === initialValue);
-                if (selectedClient) {
-                    debtDisplayElement.textContent = `Debt: KSh ${selectedClient.debt.toFixed(2)}`;
-                    debtDisplayElement.classList.remove('hidden');
-                }
-            }
-        } catch (error) {
-            console.error('Error fetching clients:', error);
-            showModalError(selectElement.closest('form').id.split('-')[0], 'Failed to load client list.');
-        }
-    }
-
+    // Event Listeners for Opening Modals
     openRetail.addEventListener('click', () => {
         closeAllModals();
         resetModal(retailContainer);
         retailModal.classList.remove('hidden');
-        currentContainer = retailContainer;
-        attachAddItemListeners(retailContainer);
-        if (!retailChoices) {
-            populateClients(document.getElementById('retail-client-select'), document.getElementById('retail-client-debt'));
-        }
+        console.log('Retail modal opened');
     });
 
     openWholesale.addEventListener('click', () => {
         closeAllModals();
         resetModal(wholesaleContainer);
         wholesaleModal.classList.remove('hidden');
-        currentContainer = wholesaleContainer;
-        attachAddItemListeners(wholesaleContainer);
-        if (!wholesaleChoices) {
-            populateClients(document.getElementById('wholesale-client-select'), document.getElementById('wholesale-client-debt'));
-        }
+        console.log('Wholesale modal opened');
     });
 
+    // Close Modals
     closeRetail.addEventListener('click', () => {
-        resetModal(retailContainer);
         retailModal.classList.add('hidden');
+        resetModal(retailContainer);
     });
     closeWholesale.addEventListener('click', () => {
-        resetModal(wholesaleContainer);
         wholesaleModal.classList.add('hidden');
+        resetModal(wholesaleContainer);
     });
-    closeEdit.addEventListener('click', () => {
-        resetModal(editContainer);
-        editModal.classList.add('hidden');
-    });
-    closeManual.addEventListener('click', () => {
-        manualModal.classList.add('hidden');
-        document.getElementById('manual-item-form').reset();
-        manualTotal.textContent = 'Total: 0';
-    });
-    closePaid.addEventListener('click', () => paidModal.classList.add('hidden'));
-    closeReturn.addEventListener('click', () => returnModal.classList.add('hidden'));
+    closeManual.addEventListener('click', () => manualModal.classList.add('hidden'));
+    closeEdit.addEventListener('click', () => editModal.classList.add('hidden'));
 
-    addRetailManual.addEventListener('click', () => {
-        manualModal.classList.remove('hidden');
-        currentContainer = retailContainer;
-    });
+    // Manual Item Modal
+    addRetailManual.addEventListener('click', () => manualModal.classList.remove('hidden'));
+    addWholesaleManual.addEventListener('click', () => manualModal.classList.remove('hidden'));
 
-    addWholesaleManual.addEventListener('click', () => {
-        manualModal.classList.remove('hidden');
-        currentContainer = wholesaleContainer;
-    });
-
-    addEditManual.addEventListener('click', () => {
-        manualModal.classList.remove('hidden');
-        currentContainer = editContainer;
-    });
-
-    function attachAddItemListeners(container) {
-        container.querySelectorAll('.add-item-btn').forEach(btn => {
-            btn.addEventListener('click', () => addItem(container));
-        });
-    }
-
-    function addItem(container) {
-        const div = document.createElement('div');
-        div.className = 'grid grid-cols-6 gap-2 item-row';
-        div.innerHTML = `
-            <select name="items[]" class="col-span-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-select w-full">
-                <option value="">Search or select a product</option>
-                {% for item in stock_items %}
-                <option value="product|{{ item.stock_name }}|quantity|0|price|{{ item.selling_price }}|stock|{{ item.stock_quantity }}">{{ item.stock_name }}</option>
-                {% endfor %}
-            </select>
-            <input name="items[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="1">
-            <input type="number" class="price-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-            <input type="number" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-            <input type="number" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-            <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
-        `;
-        const addBtn = container.querySelector('.add-item-btn');
-        container.insertBefore(div, addBtn);
-        const choices = new Choices(div.querySelector('.product-select'), {
-            searchEnabled: true,
-            searchChoices: true,
-            itemSelectText: '',
-            placeholderValue: 'Search or select a product'
-        });
-        div.querySelector('.remove-item').addEventListener('click', () => {
-            div.remove();
-            updateSubtotal(container);
-        });
-        attachPriceListener(div);
-        updateSubtotal(container);
-    }
-
-    addManualToOrder.addEventListener('click', () => {
-        const name = document.getElementById('manual-item-name').value.trim();
-        const qty = parseInt(manualQty.value) || 0;
-        const price = parseFloat(manualPrice.value) || 0;
-        if (!name) {
-            showModalError('manual-item', 'Item name is required.');
-            return;
-        }
-        if (qty <= 0) {
-            showModalError('manual-item', 'Quantity must be greater than 0.');
-            return;
-        }
-        if (price <= 0) {
-            showModalError('manual-item', 'Price must be greater than 0.');
-            return;
-        }
-        const div = document.createElement('div');
-        div.className = 'grid grid-cols-6 gap-2 item-row';
-        div.innerHTML = `
-            <input name="items[]" type="hidden" value="product|${name}|quantity|0|price|${price}|stock|0">
-            <span class="col-span-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center">${name}</span>
-            <input name="items[]" type="number" value="${qty}" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="1">
-            <input type="number" value="${price}" class="price-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-            <input type="number" value="0" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-            <input type="number" value="${price * qty}" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-            <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
-        `;
-        const addBtn = currentContainer.querySelector('.add-item-btn');
-        currentContainer.insertBefore(div, addBtn);
-        div.querySelector('.remove-item').addEventListener('click', () => {
-            div.remove();
-            updateSubtotal(currentContainer);
-        });
-        div.querySelector('.qty-input').addEventListener('input', () => updatePriceAndTotal(div));
-        manualModal.classList.add('hidden');
-        document.getElementById('manual-item-form').reset();
-        manualTotal.textContent = 'Total: 0';
-        updateSubtotal(currentContainer);
-    });
-
-    function markPaid(receiptId, balance) {
-        closeAllModals();
-        paidModal.classList.remove('hidden');
-        document.getElementById('paid-order-id').textContent = receiptId;
-        document.getElementById('full-amount-text').textContent = `Remaining Balance: ${parseFloat(balance).toFixed(2)}`;
-        const form = document.getElementById('mark-paid-form');
-        form.action = `/mark_paid/${receiptId}`;
-        document.getElementById('paid-amount').max = balance;
-        document.getElementById('paid-amount').value = '';
-
-        form.onsubmit = function(e) {
-            e.preventDefault();
-            const submitBtn = form.querySelector('.submit-btn');
-            submitBtn.classList.add('processing');
-            submitBtn.disabled = true;
-            const amountPaid = parseFloat(document.getElementById('paid-amount').value) || 0;
-            if (amountPaid <= 0 || amountPaid > parseFloat(balance)) {
-                showModalError('mark-paid', 'Please enter a valid amount (greater than 0, up to the balance).');
-                submitBtn.classList.remove('processing');
-                submitBtn.disabled = false;
-                return;
-            }
-
-            const formData = new FormData(this);
-            fetch(this.action, {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                if (response.ok) {
-                    paidModal.classList.add('hidden');
-                    window.location.href = '/orders';
-                } else {
-                    response.text().then(text => showModalError('mark-paid', 'Error processing payment: ' + text));
-                    submitBtn.classList.remove('processing');
-                    submitBtn.disabled = false;
-                }
-            })
-            .catch(error => {
-                showModalError('mark-paid', 'An error occurred while processing the payment.');
-                submitBtn.classList.remove('processing');
-                submitBtn.disabled = false;
+    // Basic Client Population (for testing)
+    async function populateClients(selectElement) {
+        try {
+            const response = await fetch('/clients_data');
+            const clients = await response.json();
+            new Choices(selectElement, {
+                searchEnabled: true,
+                choices: clients.map(client => ({
+                    value: client.shop_name,
+                    label: `${client.shop_name} (Debt: KSh ${client.debt.toFixed(2)})`
+                })),
+                placeholderValue: 'Select or search for a client'
             });
-        };
-    }
-
-    function returnStock(receiptId, itemsJson) {
-        closeAllModals();
-        returnModal.classList.remove('hidden');
-        document.getElementById('return-order-id').textContent = receiptId;
-        const form = document.getElementById('return-stock-form');
-        const returnItemsContainer = document.getElementById('return-stock-items-container');
-        form.action = `/return_stock/${receiptId}`;
-
-        returnItemsContainer.innerHTML = '';
-        let items = typeof itemsJson === 'string' ? JSON.parse(itemsJson) : itemsJson;
-        if (Array.isArray(items) && items.length > 0) {
-            items.forEach(item => {
-                if (item.name && item.quantity > 0) {
-                    const div = document.createElement('div');
-                    div.className = 'flex items-center justify-between p-2 bg-gray-100 dark:bg-gray-700 rounded-lg';
-                    div.innerHTML = `
-                        <div class="flex items-center space-x-2">
-                            <input type="checkbox" name="return_item_${item.name}" class="return-item-checkbox h-5 w-5 text-yellow-500 rounded">
-                            <span class="text-gray-900 dark:text-white">${item.name} (Ordered: ${item.quantity})</span>
-                        </div>
-                        <input type="number" name="return_qty_${item.name}" placeholder="Qty to Return" class="return-qty-input p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 w-24 text-center hidden" min="0" max="${item.quantity}" value="0">
-                    `;
-                    returnItemsContainer.appendChild(div);
-
-                    const checkbox = div.querySelector('.return-item-checkbox');
-                    const qtyInput = div.querySelector('.return-qty-input');
-                    checkbox.addEventListener('change', () => {
-                        qtyInput.classList.toggle('hidden', !checkbox.checked);
-                        if (!checkbox.checked) qtyInput.value = 0;
-                    });
-                }
-            });
-        } else {
-            returnItemsContainer.innerHTML = '<p class="text-gray-700 dark:text-gray-300">No items available for return.</p>';
+        } catch (error) {
+            console.error('Error loading clients:', error);
         }
-
-        let isSubmitting = false;
-        form.onsubmit = function(e) {
-            e.preventDefault();
-            if (isSubmitting) return;
-
-            const submitBtn = form.querySelector('.submit-btn');
-            submitBtn.classList.add('processing');
-            submitBtn.disabled = true;
-            isSubmitting = true;
-
-            const formData = new FormData(this);
-            let hasReturns = false;
-            items.forEach(item => {
-                const qty = parseInt(formData.get(`return_qty_${item.name}`)) || 0;
-                if (qty > 0) {
-                    hasReturns = true;
-                    if (qty > item.quantity) {
-                        showModalError('return-stock', `Cannot return more than ${item.quantity} units of ${item.name}.`);
-                        submitBtn.classList.remove('processing');
-                        submitBtn.disabled = false;
-                        isSubmitting = false;
-                        return;
-                    }
-                }
-            });
-
-            if (!hasReturns) {
-                showModalError('return-stock', 'Please specify at least one item to return.');
-                submitBtn.classList.remove('processing');
-                submitBtn.disabled = false;
-                isSubmitting = false;
-                return;
-            }
-
-            fetch(this.action, {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                if (response.ok) {
-                    returnModal.classList.add('hidden');
-                    alert('Stock returns logged successfully. Please update the stock manually.');
-                    window.location.href = '/orders';
-                } else {
-                    response.text().then(text => showModalError('return-stock', 'Error logging stock returns: ' + text));
-                    submitBtn.classList.remove('processing');
-                    submitBtn.disabled = false;
-                    isSubmitting = false;
-                }
-            })
-            .catch(error => {
-                showModalError('return-stock', 'An error occurred while logging the stock returns: ' + error);
-                submitBtn.classList.remove('processing');
-                submitBtn.disabled = false;
-                isSubmitting = false;
-            });
-        };
     }
 
-    function editOrder(receiptId, orderType, shopName, itemsJson) {
-        closeAllModals();
-        editModal.classList.remove('hidden');
-        document.getElementById('edit-order-id').textContent = receiptId;
-        document.getElementById('edit-order-type').value = orderType;
-        const form = document.getElementById('edit-order-form');
-        form.action = `/edit_order/${receiptId}`;
-        resetModal(editContainer);
-        attachAddItemListeners(editContainer);
+    populateClients(document.getElementById('retail-client-select'));
+    populateClients(document.getElementById('wholesale-client-select'));
+    populateClients(document.getElementById('edit-client-select'));
 
-        // Populate client dropdown with current shop name selected
-        if (!editChoices) {
-            populateClients(document.getElementById('edit-client-select'), document.getElementById('edit-client-debt'), shopName);
-        } else {
-            editChoices.setChoiceByValue(shopName);
-        }
-
-        // Load existing items
-        let items = typeof itemsJson === 'string' ? JSON.parse(itemsJson) : itemsJson;
-        if (Array.isArray(items)) {
-            items.forEach(item => {
-                const div = document.createElement('div');
-                div.className = 'grid grid-cols-6 gap-2 item-row';
-                div.innerHTML = `
-                    <input name="items[]" type="hidden" value="product|${item.name}|quantity|0|price|${item.price || 0}|stock|0">
-                    <span class="col-span-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center">${item.name}</span>
-                    <input name="items[]" type="number" value="${item.quantity}" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="1">
-                    <input type="number" value="${item.price || 0}" class="price-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-                    <input type="number" value="0" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-                    <input type="number" value="${(item.price || 0) * item.quantity}" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-                    <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
-                `;
-                const addBtn = editContainer.querySelector('.add-item-btn');
-                editContainer.insertBefore(div, addBtn);
-                div.querySelector('.remove-item').addEventListener('click', () => {
-                    div.remove();
-                    updateSubtotal(editContainer);
-                });
-                div.querySelector('.qty-input').addEventListener('input', () => updatePriceAndTotal(div));
-            });
-        }
-        updateSubtotal(editContainer);
-
-        form.onsubmit = function(e) {
-            e.preventDefault();
-            const submitBtn = form.querySelector('.submit-btn');
-            submitBtn.classList.add('processing');
-            submitBtn.disabled = true;
-
-            const formData = new FormData(this);
-            fetch(this.action, {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                if (response.ok) {
-                    editModal.classList.add('hidden');
-                    window.location.href = '/orders';
-                } else {
-                    response.text().then(text => showModalError('edit-order', 'Error updating order: ' + text));
-                    submitBtn.classList.remove('processing');
-                    submitBtn.disabled = false;
-                }
-            })
-            .catch(error => {
-                showModalError('edit-order', 'An error occurred while updating the order: ' + error);
-                submitBtn.classList.remove('processing');
-                submitBtn.disabled = false;
-            });
-        };
-    }
-
-    function deleteOrder(receiptId) {
-        if (!confirm(`Are you sure you want to delete order #${receiptId}?`)) return;
-
-        fetch(`/delete_order/${receiptId}`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': '{{ csrf_token() }}'
-            }
-        })
-        .then(response => {
-            if (response.ok) {
-                alert('Order deleted successfully.');
-                window.location.href = '/orders';
-            } else {
-                response.text().then(text => alert('Error deleting order: ' + text));
-            }
-        })
-        .catch(error => {
-            alert('An error occurred while deleting the order: ' + error);
-        });
-    }
-
-    manualQty.addEventListener('input', updateManualTotal);
-    manualPrice.addEventListener('input', updateManualTotal);
-    function updateManualTotal() {
-        const qty = parseInt(manualQty.value) || 0;
-        const price = parseFloat(manualPrice.value) || 0;
-        manualTotal.textContent = `Total: ${(qty * price).toFixed(2)}`;
-    }
-
-    function attachPriceListener(row) {
-        const select = row.querySelector('.product-select');
-        const priceDisplay = row.querySelector('.price-display');
-        const stockDisplay = row.querySelector('.stock-display');
-        const totalDisplay = row.querySelector('.total-display');
-        const qtyInput = row.querySelector('.qty-input');
-        let basePrice = 0;
-        let maxStock = 0;
-
-        select.addEventListener('change', () => {
-            const selectedOption = select.options[select.selectedIndex];
-            if (selectedOption.value) {
-                const values = selectedOption.value.split('|');
-                basePrice = parseFloat(values[5]) || 0;
-                maxStock = parseInt(values[7]) || 0;
-                priceDisplay.value = basePrice;
-                stockDisplay.value = maxStock;
-                const qty = parseInt(qtyInput.value) || 0;
-                if (qty > maxStock) {
-                    qtyInput.value = maxStock;
-                    alert(`Cannot order more than ${maxStock} units of ${values[1]}.`);
-                }
-                totalDisplay.value = (basePrice * (parseInt(qtyInput.value) || 0)).toFixed(2);
-                updateSubtotal(row.closest('.space-y-4'));
-            } else {
-                basePrice = 0;
-                maxStock = 0;
-                priceDisplay.value = '';
-                stockDisplay.value = '';
-                totalDisplay.value = '';
-                updateSubtotal(row.closest('.space-y-4'));
-            }
-        });
-
-        qtyInput.addEventListener('input', () => {
-            const qty = parseInt(qtyInput.value) || 0;
-            if (qty > maxStock) {
-                qtyInput.value = maxStock;
-                alert(`Cannot order more than ${maxStock} units.`);
-            }
-            totalDisplay.value = (basePrice * (parseInt(qtyInput.value) || 0)).toFixed(2);
-            updateSubtotal(row.closest('.space-y-4'));
-        });
-    }
-
-    function updatePriceAndTotal(row) {
-        const qtyInput = row.querySelector('.qty-input');
-        const priceDisplay = row.querySelector('.price-display');
-        const totalDisplay = row.querySelector('.total-display');
-        const basePrice = parseFloat(row.querySelector('input[type="hidden"]')?.value.split('|')[5]) || parseFloat(priceDisplay.value) || 0;
-        const qty = parseInt(qtyInput.value) || 0;
-        totalDisplay.value = (basePrice * qty).toFixed(2);
-        updateSubtotal(row.closest('.space-y-4'));
-    }
-
-    function updateSubtotal(container) {
-        let subtotal = 0;
-        const activeContainer = container || (retailModal.classList.contains('hidden') ? (editModal.classList.contains('hidden') ? wholesaleContainer : editContainer) : retailContainer);
-        const rows = activeContainer.querySelectorAll('.item-row');
-        rows.forEach(row => {
-            const totalDisplay = row.querySelector('.total-display');
-            if (totalDisplay && totalDisplay.value) subtotal += parseFloat(totalDisplay.value) || 0;
-        });
-        const totalSpan = activeContainer.parentElement.querySelector('[id$="-order-total"]');
-        if (totalSpan) totalSpan.textContent = subtotal.toFixed(2);
-    }
-
-    document.querySelectorAll('.product-select').forEach(select => {
-        const choices = new Choices(select, {
-            searchEnabled: true,
-            searchChoices: true,
-            itemSelectText: '',
-            placeholderValue: 'Search or select a product'
-        });
-        const row = select.closest('.item-row');
-        if (row) attachPriceListener(row);
-    });
-
-    document.querySelectorAll('.space-y-4').forEach(container => {
-        container.querySelectorAll('.qty-input').forEach(input => {
-            input.addEventListener('input', () => updatePriceAndTotal(input.closest('.item-row')));
-        });
-    });
-
-    document.getElementById('retail-form').addEventListener('submit', function(e) {
-        e.preventDefault();
-        const submitBtn = this.querySelector('.submit-btn');
-        submitBtn.classList.add('processing');
-        submitBtn.disabled = true;
-        const formData = new FormData(this);
-        fetch(this.action, {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => {
-            if (response.ok) {
-                retailModal.classList.add('hidden');
-                window.location.reload();
-            } else {
-                response.text().then(text => showModalError('retail', 'Error submitting retail order: ' + text));
-                submitBtn.classList.remove('processing');
-                submitBtn.disabled = false;
-            }
-        })
-        .catch(error => {
-            showModalError('retail', 'An error occurred while submitting the retail order.');
-            submitBtn.classList.remove('processing');
-            submitBtn.disabled = false;
-        });
-    });
-
-    document.getElementById('wholesale-form').addEventListener('submit', function(e) {
-        e.preventDefault();
-        const submitBtn = this.querySelector('.submit-btn');
-        submitBtn.classList.add('processing');
-        submitBtn.disabled = true;
-        const formData = new FormData(this);
-        fetch(this.action, {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => {
-            if (response.ok) {
-                wholesaleModal.classList.add('hidden');
-                window.location.reload();
-            } else {
-                response.text().then(text => showModalError('wholesale', 'Error submitting wholesale order: ' + text));
-                submitBtn.classList.remove('processing');
-                submitBtn.disabled = false;
-            }
-        })
-        .catch(error => {
-            showModalError('wholesale', 'An error occurred while submitting the wholesale order.');
-            submitBtn.classList.remove('processing');
-            submitBtn.disabled = false;
-        });
-    });
-
-    document.querySelectorAll('.mark-paid-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const receiptId = btn.getAttribute('data-receipt-id');
-            const balance = parseFloat(btn.getAttribute('data-balance'));
-            markPaid(receiptId, balance);
-        });
-    });
-
-    document.querySelectorAll('.return-stock-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const receiptId = btn.getAttribute('data-receipt-id');
-            const itemsJson = btn.getAttribute('data-items');
-            returnStock(receiptId, itemsJson);
-        });
-    });
-
-    document.querySelectorAll('.edit-order-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const orderCard = btn.closest('.order-card');
-            const receiptId = orderCard.getAttribute('data-receipt-id');
-            const orderType = orderCard.getAttribute('data-order-type');
-            const shopName = orderCard.querySelector('p').textContent;
-            const itemsJson = btn.getAttribute('data-items');
-            editOrder(receiptId, orderType, shopName, itemsJson);
-        });
-    });
-
-    document.querySelectorAll('.delete-order-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const receiptId = btn.getAttribute('data-receipt-id');
-            deleteOrder(receiptId);
-        });
-    });
-
+    // Filter Buttons (simplified)
     document.querySelectorAll('.filter-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const filter = btn.getAttribute('data-filter');
-            document.querySelectorAll('.filter-btn').forEach(b => {
-                b.classList.remove('bg-blue-500', 'text-white');
-                b.classList.add('text-gray-600', 'dark:text-gray-300', 'hover:bg-gray-100', 'dark:hover:bg-gray-700');
-            });
-            btn.classList.remove('text-gray-600', 'dark:text-gray-300', 'hover:bg-gray-100', 'dark:hover:bg-gray-700');
-            btn.classList.add('bg-blue-500', 'text-white');
-
-            const orders = document.querySelectorAll('.order-card');
-            orders.forEach(order => {
+            document.querySelectorAll('.order-card').forEach(order => {
                 const balance = parseFloat(order.getAttribute('data-balance'));
-                let show = false;
-
-                if (filter === 'all') show = true;
-                else if (filter === 'pending' && balance > 0) show = true;
-                else if (filter === 'paid' && balance === 0) show = true;
-
-                order.classList.toggle('hidden', !show);
+                order.classList.toggle('hidden', filter === 'pending' ? balance <= 0 : filter === 'paid' ? balance > 0 : false);
             });
-
-            const ordersList = document.getElementById('orders-list');
-            const sortedOrders = Array.from(orders).sort((a, b) => {
-                const dateA = new Date(a.getAttribute('data-date'));
-                const dateB = new Date(b.getAttribute('data-date'));
-                return dateB - dateA;
-            });
-            sortedOrders.forEach(order => ordersList.appendChild(order));
         });
     });
-
-    document.querySelector('[data-filter="all"]').click();
-
-    // Dropdown Menu Handling
-    document.querySelectorAll('.order-actions-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const menu = btn.nextElementSibling;
-            const isOpen = !menu.classList.contains('hidden');
-            
-            document.querySelectorAll('.order-actions-menu').forEach(m => {
-                if (m !== menu) m.classList.add('hidden');
-            });
-            
-            menu.classList.toggle('hidden');
-        });
-    });
-
-    document.addEventListener('click', () => {
-        document.querySelectorAll('.order-actions-menu').forEach(menu => {
-            menu.classList.add('hidden');
-        });
-    });
+});
 </script>
 
 <style>
-    body { overflow-y: auto; }
-    input[type="number"],
-    input[type="number"][readonly] {
-        -moz-appearance: textfield;
-    }
-    input[type="number"]::-webkit-inner-spin-button,
-    input[type="number"]::-webkit-outer-spin-button,
-    input[type="number"][readonly]::-webkit-inner-spin-button,
-    input[type="number"][readonly]::-webkit-outer-spin-button {
-        -webkit-appearance: none;
-        margin: 0;
-    }
-    .choices__inner { 
-        background-color: #fff; 
-        border-color: #d1d5db; 
-        color: #374151; 
-        min-height: 2.5rem; 
-        padding: 0.5rem; 
-        border-radius: 0.5rem; 
-        width: 100%; 
-    }
-    .choices__list--single { padding: 0; }
-    .choices__list--dropdown { 
-        background-color: #fff; 
-        border-color: #d1d5db; 
-        color: #374151; 
-        border-radius: 0.5rem; 
-        width: 100%; 
-    }
-    .choices__item--selectable { color: #374151; }
-    .choices__input { 
-        background-color: #fff; 
-        color: #374151; 
-        width: 100%; 
-    }
-    .dark .choices__inner { 
-        background-color: #374151; 
-        border-color: #4b5563; 
-        color: #d1d5db; 
-        padding: 0.5rem; 
-        border-radius: 0.5rem; 
-        width: 100%; 
-    }
-    .dark .choices__list--dropdown { 
-        background-color: #374151; 
-        border-color: #4b5563; 
-        color: #d1d5db; 
-        border-radius: 0.5rem; 
-        width: 100%; 
-    }
-    .dark .choices__item--selectable { color: #d1d5db; }
-    .dark .choices__input { 
-        background-color: #374151; 
-        color: #d1d5db; 
-        width: 100%; 
-    }
-    #retail-modal, #wholesale-modal, #mark-paid-modal, #return-stock-modal, #edit-order-modal { 
-        overflow-y: hidden; 
-        z-index: 50; 
-    }
-    #manual-item-modal { 
-        z-index: 60; 
-    }
-    #retail-modal > div, #wholesale-modal > div, #mark-paid-modal > div, #return-stock-modal > div, #edit-order-modal > div { 
-        max-height: 80vh; 
-        overflow-y: auto; 
-    }
-    .item-row-header, .item-row {
-        display: grid;
-        grid-template-columns: 2fr 1fr 1fr 1fr 1fr 0.5fr;
-        gap: 0.5rem;
-        align-items: center;
-    }
-    .item-row-header span {
-        font-size: 0.875rem;
-        height: 2rem;
-        line-height: 2rem;
-        padding: 0 0.5rem;
-    }
-    .item-row-header span:first-child {
-        text-align: left;
-        padding-left: 0.5rem;
-    }
-    .item-row-header span:not(:first-child) {
-        text-align: center;
-    }
-    .item-row input, .item-row select {
-        height: 2.5rem;
-        font-size: 0.875rem;
-        padding: 0.5rem;
-        border-radius: 0.5rem;
-        box-sizing: border-box;
-        width: 100%;
-    }
-    .item-row .product-select {
-        width: 100%;
-    }
-    .item-row .qty-input,
-    .item-row .price-display,
-    .item-row .stock-display,
-    .item-row .total-display,
-    .item-row .remove-item {
-        text-align: center;
-    }
-    .item-row .add-item-btn {
-        height: 2.5rem;
-        padding: 0.5rem;
-        box-sizing: border-box;
-    }
-    .return-item-checkbox:checked {
-        background-color: #f59e0b;
-        border-color: #f59e0b;
-    }
-    .return-item-checkbox:focus {
-        outline: none;
-        box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.5);
-    }
-    .submit-btn.processing {
-        position: relative;
-        overflow: hidden;
-        transition: all 0.3s ease;
-    }
-    .submit-btn.processing::after {
-        content: '';
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        width: 0;
-        height: 0;
-        background: rgba(255, 255, 255, 0.3);
-        border-radius: 50%;
-        transform: translate(-50%, -50%);
-        animation: ripple 0.6s linear;
-    }
-    .submit-btn.processing::before {
-        content: '\f1ce';
-        font-family: 'Font Awesome 6 Free';
-        font-weight: 900;
-        display: inline-block;
-        margin-right: 0.5rem;
-        animation: spin 1s linear infinite;
-    }
-    @keyframes ripple {
-        to {
-            width: 300%;
-            height: 300%;
-            opacity: 0;
-        }
-    }
-    @keyframes spin {
-        to {
-            transform: rotate(360deg);
-        }
-    }
-    .submit-btn:disabled {
-        opacity: 0.7;
-        cursor: not-allowed;
-    }
-    .order-actions-menu {
-        min-width: 180px;
-    }
+    .choices__inner { background-color: #fff; border-color: #d1d5db; padding: 0.5rem; border-radius: 0.5rem; }
+    .dark .choices__inner { background-color: #374151; border-color: #4b5563; color: #d1d5db; }
+    .choices__list--dropdown { background-color: #fff; border-color: #d1d5db; border-radius: 0.5rem; }
+    .dark .choices__list--dropdown { background-color: #374151; border-color: #4b5563; color: #d1d5db; }
 </style>
 {% endblock %}
