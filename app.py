@@ -275,31 +275,32 @@ def login():
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
-# Placeholder for dashboard (ensure this exists)
+# Placeholder for dashboard (ensure this exists	
 @app.route('/dashboard', methods=['GET'])
 @no_cache
 @login_required
 def dashboard():
-    """Render the dashboard with stats cards showing only orders closed today."""
-    # Pagination and filter parameters
+    """Render the dashboard with stats cards and sales history."""
+    # Pagination parameters
     page = int(request.args.get('page', 1))
-    per_page = int(request.args.get('per_page', 50))
+    per_page = int(request.args.get('per_page', 50))  # Load 50 orders per page
     time_filter = request.args.get('time', 'all')
-    search_query = request.args.get('search', '').strip().lower()
+    search_query = request.args.get('search', '').strip()
 
     # Current time in Kenyan timezone
     now = datetime.now(KENYA_TZ)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     today_end = today_start + timedelta(days=1)
 
-    # Fetch all orders from Firestore for sales history
+    # Base query for orders with descending date order
     orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING)
     orders = []
 
-    # Apply server-side search if provided
+    # Apply server-side search if a query is provided
     if search_query:
-        salesperson_orders = db.collection('orders').where('salesperson_name_lower', '>=', search_query).where('salesperson_name_lower', '<=', search_query + '\uf8ff').order_by('salesperson_name_lower').order_by('date', direction=firestore.Query.DESCENDING).stream()
-        shop_orders = db.collection('orders').where('shop_name_lower', '>=', search_query).where('shop_name_lower', '<=', search_query + '\uf8ff').order_by('shop_name_lower').order_by('date', direction=firestore.Query.DESCENDING).stream()
+        search_lower = search_query.lower()
+        salesperson_orders = db.collection('orders').where('salesperson_name_lower', '>=', search_lower).where('salesperson_name_lower', '<=', search_lower + '\uf8ff').order_by('salesperson_name_lower').order_by('date', direction=firestore.Query.DESCENDING).stream()
+        shop_orders = db.collection('orders').where('shop_name_lower', '>=', search_lower).where('shop_name_lower', '<=', search_lower + '\uf8ff').order_by('shop_name_lower').order_by('date', direction=firestore.Query.DESCENDING).stream()
         matching_order_ids = set()
 
         for doc in salesperson_orders:
@@ -322,11 +323,15 @@ def dashboard():
                 order_dict = doc.to_dict()
                 balance = float(order_dict.get('balance', 0))
                 closed_date = process_date(order_dict.get('closed_date'))
+                # Validate: Pending orders (balance > 0) should not have a closed_date
+                if balance > 0 and closed_date:
+                    print(f"WARNING: Order {doc.id} has balance {balance} but closed_date {closed_date}")
+                    closed_date = None  # Forcefully unset closed_date for pending orders
                 orders.append({
                     'receipt_id': order_dict.get('receipt_id', doc.id),
                     'salesperson_name': order_dict.get('salesperson_name', 'N/A'),
                     'shop_name': order_dict.get('shop_name', 'Unknown Shop'),
-                    'items': json.dumps(order_dict.get('items', [])),
+                    'items': json.dumps(order_dict.get('items', [])),  # Serialize items for the template
                     'photoUrl': order_dict.get('photoUrl', ''),
                     'payment': float(order_dict.get('payment', 0)),
                     'balance': balance,
@@ -337,10 +342,13 @@ def dashboard():
                     'last_payment_date': process_date(order_dict.get('last_payment_date', order_dict.get('date')))
                 })
         else:
-            orders = []
+            orders_ref = []
             total_orders = 0
     else:
+        # Fetch total count for pagination without search
         total_orders = sum(1 for _ in db.collection('orders').stream())
+
+        # Pagination logic for non-search case
         if page > 1:
             last_page_start = (page - 2) * per_page
             last_doc = None
@@ -351,16 +359,21 @@ def dashboard():
             if last_doc:
                 orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).start_after(last_doc)
 
+        # Fetch paginated orders
         orders_query = orders_ref.limit(per_page).stream()
         for doc in orders_query:
             order_dict = doc.to_dict()
             balance = float(order_dict.get('balance', 0))
             closed_date = process_date(order_dict.get('closed_date'))
+            # Validate: Pending orders (balance > 0) should not have a closed_date
+            if balance > 0 and closed_date:
+                print(f"WARNING: Order {doc.id} has balance {balance} but closed_date {closed_date}")
+                closed_date = None  # Forcefully unset closed_date for pending orders
             orders.append({
                 'receipt_id': order_dict.get('receipt_id', doc.id),
                 'salesperson_name': order_dict.get('salesperson_name', 'N/A'),
                 'shop_name': order_dict.get('shop_name', 'Unknown Shop'),
-                'items': json.dumps(order_dict.get('items', [])),
+                'items': json.dumps(order_dict.get('items', [])),  # Serialize items for the template
                 'photoUrl': order_dict.get('photoUrl', ''),
                 'payment': float(order_dict.get('payment', 0)),
                 'balance': balance,
@@ -371,10 +384,11 @@ def dashboard():
                 'last_payment_date': process_date(order_dict.get('last_payment_date', order_dict.get('date')))
             })
 
-    # Apply time filter to sales history
+    # Apply time filter to fetched orders
     filtered_orders = orders.copy()
     if time_filter == 'day':
-        filtered_orders = [o for o in orders if o['date'] >= today_start]
+        start = today_start
+        filtered_orders = [o for o in orders if o['date'] >= start]
     elif time_filter == 'week':
         start = now - timedelta(days=now.weekday())
         start = start.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -386,7 +400,7 @@ def dashboard():
         start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
         filtered_orders = [o for o in orders if o['date'] >= start]
 
-    # Calculate dashboard stats (ONLY for orders closed today)
+    # Calculate dashboard stats
     retail_sales_today = 0.0
     wholesale_sales_today = 0.0
     total_debts = 0.0
@@ -397,68 +411,69 @@ def dashboard():
     wholesale_open_orders = 0
     wholesale_closed_orders = 0
 
+    # Fetch all orders for stats
     all_orders = db.collection('orders').stream()
     for order in all_orders:
         order_dict = order.to_dict()
         order_date = process_date(order_dict.get('date'))
-        closed_date = process_date(order_dict.get('closed_date'))
+        last_payment_date = process_date(order_dict.get('last_payment_date', order_dict.get('date')))
         order_type = order_dict.get('order_type', 'wholesale')
-        initial_payment = float(order_dict.get('payment', 0))
-        final_payment = float(order_dict.get('final_payment', 0))
+        initial_payment = float(order_dict.get('payment', 0))  # Total paid so far
+        final_payment = float(order_dict.get('final_payment', 0))  # Last payment amount
         balance = float(order_dict.get('balance', 0))
+        closed_date = process_date(order_dict.get('closed_date'))
 
-        # Count open and closed orders for today (for display purposes)
-        if order_date >= today_start and order_date < today_end:
-            if closed_date and closed_date >= today_start and closed_date < today_end:
-                closed_orders_count += 1
-                if order_type == 'retail':
-                    retail_closed_orders += 1
-                else:
-                    wholesale_closed_orders += 1
-            elif balance > 0:
-                open_orders_count += 1
-                if order_type == 'retail':
-                    retail_open_orders += 1
-                else:
-                    wholesale_open_orders += 1
+        # Validate: Pending orders (balance > 0) should not have a closed_date
+        if balance > 0 and closed_date:
+            print(f"WARNING: Order {order.id} has balance {balance} but closed_date {closed_date}")
+            closed_date = None  # Forcefully unset closed_date for pending orders
 
-        # Sales totals: ONLY include payments from orders closed today
-        if closed_date and closed_date >= today_start and closed_date < today_end:
-            payment_to_use = final_payment if final_payment > 0 else initial_payment
-            if payment_to_use > 0:
-                if order_type == 'retail':
-                    retail_sales_today += payment_to_use
-                else:
-                    wholesale_sales_today += payment_to_use
-
-        # Total debts across all orders (unchanged)
+        # Count open and closed orders
         if balance > 0:
+            open_orders_count += 1
+            if order_type == 'retail':
+                retail_open_orders += 1
+            else:
+                wholesale_open_orders += 1
             total_debts += balance
+        else:
+            closed_orders_count += 1
+            if order_type == 'retail':
+                retail_closed_orders += 1
+            else:
+                wholesale_closed_orders += 1
 
-    # Add retail collection sales closed today (if applicable)
+        # Today's sales: Count payments made today
+        if last_payment_date and last_payment_date >= today_start and last_payment_date < today_end:
+            if final_payment > 0:
+                if order_type == 'retail':
+                    retail_sales_today += final_payment
+                else:
+                    wholesale_sales_today += final_payment
+        # For new orders today with no subsequent payments, count initial payment
+        elif order_date >= today_start and order_date < today_end and (not last_payment_date or last_payment_date == order_date):
+            if initial_payment > 0:
+                if order_type == 'retail':
+                    retail_sales_today += initial_payment
+                else:
+                    wholesale_sales_today += initial_payment
+
+    # Add direct retail sales from 'retail' collection
     retail_sales_today += sum(
-        float(r.to_dict().get('amount', 0))
+        float(r.to_dict().get('amount', 0)) 
         for r in db.collection('retail')
         .where('date', '==', now.strftime('%Y-%m-%d'))
         .stream()
-        if process_date(r.to_dict().get('closed_date')) and process_date(r.to_dict().get('closed_date')) >= today_start and process_date(r.to_dict().get('closed_date')) < today_end
     )
 
+    # Calculate total sales today
     total_sales_today = retail_sales_today + wholesale_sales_today
 
     # Fetch expenses
-    expenses = [
-        {
-            'description': doc.to_dict().get('description', ''),
-            'amount': float(doc.to_dict().get('amount', 0)),
-            'category': doc.to_dict().get('category', ''),
-            'date': process_date(doc.to_dict().get('date'))
-        }
-        for doc in db.collection('expenses').order_by('date', direction=firestore.Query.DESCENDING).stream()
-    ]
-    total_expenses = sum(e['amount'] for e in expenses)
+    expenses = [doc.to_dict() for doc in db.collection('expenses').order_by('date', direction=firestore.Query.DESCENDING).stream()]
+    total_expenses = sum(float(e.get('amount', 0)) for e in expenses)
 
-    # Fetch notifications
+    # Fetch notifications for the current user
     user_id = session['user'].get('uid', '')
     notifications_ref = db.collection('notifications').where('recipient', '==', user_id).order_by('timestamp', direction=firestore.Query.DESCENDING).limit(10).stream()
     notifications = []
@@ -475,11 +490,11 @@ def dashboard():
             'read': notif_dict.get('read', False)
         })
 
+    # Pagination totals
     total_pages = (total_orders + per_page - 1) // per_page
 
-    # Debugging output
-    print(f"Total Sales Today: {total_sales_today}, Retail: {retail_sales_today}, Wholesale: {wholesale_sales_today}")
-    print(f"Open Orders: {open_orders_count}, Closed Orders: {closed_orders_count}")
+    # Debug print to verify stats
+    print(f"Total Debts: {total_debts}, Retail Today: {retail_sales_today}, Wholesale Today: {wholesale_sales_today}")
 
     return render_template(
         'dashboard.html',
@@ -506,7 +521,6 @@ def dashboard():
         wholesale_open_orders=wholesale_open_orders,
         wholesale_closed_orders=wholesale_closed_orders
     )
-
 @app.route('/mark_notification_read/<notification_id>', methods=['POST'])
 @no_cache
 @login_required
