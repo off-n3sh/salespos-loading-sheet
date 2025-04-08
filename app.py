@@ -411,7 +411,7 @@ def dashboard():
                 balance = float(order_dict.get('balance', 0))
                 closed_date = process_date(order_dict.get('closed_date'))
                 if balance > 0 and closed_date:
-                    print(f"WARNING: Order {doc.id} has balance {balance} but closed_date {closed_date}")
+                    # print(f"WARNING: Order {doc.id} has balance {balance} but closed_date {closed_date}")
                     closed_date = None
                 orders.append({
                     'receipt_id': order_dict.get('receipt_id', doc.id),
@@ -448,7 +448,7 @@ def dashboard():
             balance = float(order_dict.get('balance', 0))
             closed_date = process_date(order_dict.get('closed_date'))
             if balance > 0 and closed_date:
-                print(f"WARNING: Order {doc.id} has balance {balance} but closed_date {closed_date}")
+                # print(f"WARNING: Order {doc.id} has balance {balance} but closed_date {closed_date}")
                 closed_date = None
             orders.append({
                 'receipt_id': order_dict.get('receipt_id', doc.id),
@@ -506,7 +506,7 @@ def dashboard():
 
         # Validate: Pending orders (balance > 0) should not have a closed_date
         if balance > 0 and closed_date:
-            print(f"WARNING: Order {order.id} has balance {balance} but closed_date {closed_date}")
+            # print(f"WARNING: Order {order.id} has balance {balance} but closed_date {closed_date}")
             closed_date = None
 
         # Count open and closed orders (today only)
@@ -588,8 +588,8 @@ def dashboard():
     total_pages = (total_orders + per_page - 1) // per_page
 
     # Debug print to verify stats
-    print(f"Total Sales Today: {total_sales_today}, Retail Today: {retail_sales_today}, Wholesale Today: {wholesale_sales_today}")
-    print(f"Open Orders: {open_orders_count}, Closed Orders: {closed_orders_count}")
+    # print(f"Total Sales Today: {total_sales_today}, Retail Today: {retail_sales_today}, Wholesale Today: {wholesale_sales_today}")
+    # print(f"Open Orders: {open_orders_count}, Closed Orders: {closed_orders_count}")
 
     return render_template(
         'dashboard.html',
