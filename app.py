@@ -639,78 +639,100 @@ def mark_notification_read(notification_id):
         print(f"Error marking notification as read: {str(e)}")  # Log the error for debugging
         return f"Error marking notification as read: {str(e)}", 500
                
-@app.route('/orders', methods=['POST'])
+@app.route('/orders', methods=['GET', 'POST'])
 @no_cache
 @login_required
 def orders():
-    shop_name = request.form.get('shop_name', 'Retail Direct').strip()
-    salesperson_name = request.form.get('salesperson_name', 'N/A')
-    order_type = request.form.get('order_type', 'wholesale')
-    amount_paid = float(request.form.get('amount_paid', '0') or 0)
-    items_raw = request.form.getlist('items[]')
-    
-    if not shop_name:
-        return "Shop name cannot be empty", 400
-
-    items = []
-    total_amount = 0
-    
-    for i in range(0, len(items_raw), 2):
-        try:
-            product_data = items_raw[i].split('|')
-            if len(product_data) >= 6 and product_data[0] == 'product':
-                product_name = product_data[1]
-                qty_str = items_raw[i + 1] if i + 1 < len(items_raw) else '0'
-                quantity = int(qty_str) if qty_str.isdigit() else 0
-                price = float(product_data[5])  # Using stock_price for now
-                amount = quantity * price
-                if quantity > 0:
-                    total_amount += amount
-                    items.extend(['product', product_name, 'quantity', quantity, 'price', price])
-                    # Stock check (unchanged)
-                    stock_ref = db.collection('stock').where('stock_name', '==', product_name).limit(1).get()
-                    if stock_ref:
-                        stock_doc = stock_ref[0]
-                        current_quantity = stock_doc.to_dict().get('stock_quantity', 0)
-                        if current_quantity >= quantity:
-                            db.collection('stock').document(stock_doc.id).update({'stock_quantity': current_quantity - quantity})
-                        else:
-                            return f"Insufficient stock for {product_name}", 400
-        except (IndexError, ValueError):
-            continue
-    
-    if not items:
-        return "No valid items in order", 400
-    
-    # Add new client if not exists
-    client_ref = db.collection('clients').document(shop_name.replace('/', '-'))
-    if not client_ref.get().exists:
-        client_ref.set({
+    if request.method == 'POST':
+        shop_name = request.form.get('shop_name', 'Retail Direct')
+        salesperson_name = request.form.get('salesperson_name', 'N/A')
+        order_type = request.form.get('order_type', 'wholesale')
+        amount_paid = float(request.form.get('amount_paid', '0') or 0)
+        items_raw = request.form.getlist('items[]')
+        
+        items = []
+        total_amount = 0
+        
+        for i in range(0, len(items_raw), 2):
+            try:
+                product_data = items_raw[i].split('|')
+                if len(product_data) >= 6 and product_data[0] == 'product':
+                    product_name = product_data[1]
+                    qty_str = items_raw[i + 1] if i + 1 < len(items_raw) else '0'
+                    quantity = int(qty_str) if qty_str.isdigit() else 0
+                    price = float(product_data[5])
+                    amount = quantity * price
+                    if quantity > 0:
+                        total_amount += amount
+                        items.extend(['product', product_name, 'quantity', quantity, 'price', price])
+                        stock_ref = db.collection('stock').where('stock_name', '==', product_name).limit(1).get()
+                        if stock_ref:
+                            stock_doc = stock_ref[0]
+                            current_quantity = stock_doc.to_dict().get('stock_quantity', 0)
+                            if current_quantity >= quantity:
+                                db.collection('stock').document(stock_doc.id).update({'stock_quantity': current_quantity - quantity})
+                                log_stock_change(stock_doc.to_dict().get('category', 'Unknown'), product_name, 'order_reduction', -quantity, price)
+                            else:
+                                return f"Insufficient stock for {product_name}", 400
+            except (IndexError, ValueError):
+                continue
+        
+        if not items:
+            return "No valid items in order", 400
+        
+        receipt_id = get_next_receipt_id()
+        balance = max(total_amount - amount_paid, 0)
+        order_data = {
+            'receipt_id': receipt_id,
+            'salesperson_name': salesperson_name,
             'shop_name': shop_name,
-            'debt': 0.0,
-            'created_at': datetime.now(KENYA_TZ)
+            'salesperson_name_lower': salesperson_name.lower(),
+            'shop_name_lower': shop_name.lower(),
+            'items': items,
+            'payment': min(amount_paid, total_amount),
+            'balance': balance,
+            'date': datetime.now(KENYA_TZ),
+            'order_type': order_type,
+            'closed_date': datetime.now(KENYA_TZ) if balance == 0 else None
+        }
+        
+        db.collection('orders').add(order_data)
+        log_user_action('Opened Order', f"Order #{receipt_id} - {order_type} for {shop_name}")
+        return '', 200
+    
+    orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).stream()
+    orders = []
+    for doc in orders_ref:
+        order_dict = doc.to_dict()
+        items_raw = order_dict.get('items', [])
+        items_list = []
+        i = 0
+        while i < len(items_raw):
+            if items_raw[i] == 'product':
+                product_name = items_raw[i + 1]
+                quantity = items_raw[i + 3] if i + 2 < len(items_raw) and items_raw[i + 2] == 'quantity' else 0
+                price = items_raw[i + 5] if i + 4 < len(items_raw) and items_raw[i + 4] == 'price' else 0
+                items_list.append({'name': product_name, 'quantity': quantity, 'price': price})
+                i += 6
+            else:
+                i += 1
+        orders.append({
+            'receipt_id': order_dict.get('receipt_id', doc.id),
+            'salesperson_name': order_dict.get('salesperson_name', 'N/A'),
+            'salesperson_id': order_dict.get('salesperson_id', ''),
+            'shop_name': order_dict.get('shop_name', 'Unknown Shop'),
+            'total_items': process_items(order_dict.get('items')),
+            'items_list': items_list,
+            'payment': order_dict.get('payment', 0),
+            'balance': order_dict.get('balance', 0),
+            'date': process_date(order_dict.get('date')),
+            'closed_date': process_date(order_dict.get('closed_date', None)) if order_dict.get('closed_date') else None,
+            'order_type': order_dict.get('order_type', 'wholesale')
         })
-    
-    receipt_id = get_next_receipt_id()
-    balance = max(total_amount - amount_paid, 0)
-    order_data = {
-        'receipt_id': receipt_id,
-        'salesperson_name': salesperson_name,
-        'shop_name': shop_name,
-        'items': items,
-        'payment': min(amount_paid, total_amount),
-        'balance': balance,
-        'date': datetime.now(KENYA_TZ),
-        'order_type': order_type,
-        'closed_date': datetime.now(KENYA_TZ) if balance == 0 else None
-    }
-    
-    db.collection('orders').add(order_data)
-    
-    # Update client debt
-    client_ref.update({'debt': client_ref.get().to_dict().get('debt', 0.0) + balance})
-    
-    return '', 200
+    recent_activity = orders[:3]
+    stock_items = [doc.to_dict() for doc in db.collection('stock').order_by('stock_name').get()]
+    return render_template('orders.html', orders=orders, recent_activity=recent_activity, stock_items=stock_items)
+
 @app.route('/stock', methods=['GET', 'POST'])
 @no_cache
 @login_required
