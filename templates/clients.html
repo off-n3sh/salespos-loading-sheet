@@ -32,7 +32,7 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 p-5" id="client-list">
             {% if clients %}
             {% for client in clients %}
-            <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer" data-client-id="{{ client.shop_name }}" onclick="showClientModal('{{ client.shop_name | replace('\'', '\\\'') }}', '{{ client.debt | round(2) }}', '{{ client.last_order_date.strftime('%Y-%m-%d') if client.last_order_date else 'N/A' }}', '{{ client.recent_order_amount | round(2) if client.recent_order_amount else 'None' }}', '{{ client.recent_order_id | default('') }}')">
+            <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer" data-client-id="{{ client.shop_name }}" onclick="fetchClientDetails('{{ client.shop_name | replace('\'', '\\\'') }}')">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center space-x-3">
                         <div class="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
@@ -68,21 +68,34 @@
 
     <!-- Client Details Modal -->
     <div id="client-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
-            <div class="flex justify-between items-center">
-                <h3 id="modal-client-name" class="text-lg font-medium text-gray-900 dark:text-white">Client Details</h3>
+        <div class="relative top-20 mx-auto p-6 border w-full max-w-md shadow-lg rounded-md bg-white dark:bg-gray-800">
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="modal-client-name" class="text-xl font-semibold text-gray-900 dark:text-white">Client Details</h3>
                 <button id="close-client-modal" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                 </button>
             </div>
-            <div class="mt-4">
-                <p class="text-sm text-gray-700 dark:text-gray-300"><strong>Debt:</strong> <span id="modal-client-debt"></span></p>
-                <p class="text-sm text-gray-700 dark:text-gray-300 mt-2"><strong>Last Order Date:</strong> <span id="modal-last-order-date"></span></p>
-                <p class="text-sm text-gray-700 dark:text-gray-300 mt-2"><strong>Recent Order Amount:</strong> <span id="modal-recent-order-amount"></span></p>
-                <div class="mt-4 flex justify-between">
-                    <a id="modal-view-receipt" href="#" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">View Recent Receipt</a>
+            <div class="space-y-4">
+                <!-- Contact Info -->
+                <div class="border-b border-gray-200 dark:border-gray-700 pb-4">
+                    <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">Contact Information</h4>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-1"><strong>Location:</strong> <span id="modal-client-location">Loading...</span></p>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-1"><strong>Phone:</strong> <span id="modal-client-phone">Loading...</span></p>
+                </div>
+                <!-- Debt Summary -->
+                <div class="border-b border-gray-200 dark:border-gray-700 pb-4">
+                    <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">Debt Summary</h4>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-1"><strong>Total Debt:</strong> <span id="modal-client-debt">KSh 0.00</span></p>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-1"><strong>Last Order Date:</strong> <span id="modal-last-order-date">N/A</span></p>
+                </div>
+                <!-- Debt Orders -->
+                <div>
+                    <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">Outstanding Orders</h4>
+                    <ul id="modal-debt-orders" class="mt-2 space-y-2 max-h-40 overflow-y-auto">
+                        <li class="text-sm text-gray-600 dark:text-gray-400">Loading orders...</li>
+                    </ul>
                 </div>
             </div>
         </div>
@@ -95,6 +108,7 @@
         const clientModal = document.getElementById('client-modal');
         const closeClientModal = document.getElementById('close-client-modal');
 
+        // Search functionality
         searchInput.addEventListener('input', () => {
             const query = searchInput.value.toLowerCase();
             clientCards.forEach(card => {
@@ -103,21 +117,63 @@
             });
         });
 
-        function showClientModal(shopName, debt, lastOrderDate, recentOrderAmount, recentOrderId) {
-            document.getElementById('modal-client-name').textContent = shopName;
-            document.getElementById('modal-client-debt').textContent = `KSh ${parseFloat(debt).toFixed(2)}`;
-            document.getElementById('modal-last-order-date').textContent = lastOrderDate === 'N/A' ? 'N/A' : new Date(lastOrderDate).toLocaleDateString('en-GB');
-            document.getElementById('modal-recent-order-amount').textContent = recentOrderAmount === 'None' ? 'None' : `KSh ${parseFloat(recentOrderAmount).toFixed(2)}`;
-            const viewReceiptLink = document.getElementById('modal-view-receipt');
-            if (recentOrderId) {
-                viewReceiptLink.href = `/receipt/${recentOrderId}`;
-                viewReceiptLink.classList.remove('hidden');
-            } else {
-                viewReceiptLink.classList.add('hidden');
+        // Fetch and display client details
+        async function fetchClientDetails(shopName) {
+            try {
+                // Fetch client contact info from /clients_data (assuming it includes location and phone in the future)
+                const response = await fetch(`/clients_data?search=${encodeURIComponent(shopName)}`);
+                const clients = await response.json();
+                const client = clients.find(c => c.shop_name === shopName) || {};
+
+                // Fetch orders for debt details
+                const ordersResponse = await fetch('/orders');
+                const ordersHtml = await ordersResponse.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(ordersHtml, 'text/html');
+                const orders = Array.from(doc.querySelectorAll('script'))
+                    .filter(script => script.textContent.includes('orders ='))
+                    .map(script => {
+                        const match = script.textContent.match(/orders = (\[.*?\]);/s);
+                        return match ? JSON.parse(match[1]) : [];
+                    })[0] || [];
+
+                // Filter orders with debt for this client
+                const debtOrders = orders.filter(order => 
+                    order.shop_name === shopName && order.balance > 0
+                );
+
+                // Update modal content
+                document.getElementById('modal-client-name').textContent = shopName;
+                document.getElementById('modal-client-debt').textContent = `KSh ${parseFloat(client.debt || 0).toFixed(2)}`;
+                document.getElementById('modal-last-order-date').textContent = client.last_order_date ? new Date(client.last_order_date).toLocaleDateString('en-GB') : 'N/A';
+                document.getElementById('modal-client-location').textContent = client.location || 'Not available';
+                document.getElementById('modal-client-phone').textContent = client.phone || 'Not available';
+
+                // Populate debt orders
+                const debtOrdersList = document.getElementById('modal-debt-orders');
+                debtOrdersList.innerHTML = '';
+                if (debtOrders.length > 0) {
+                    debtOrders.forEach(order => {
+                        const li = document.createElement('li');
+                        li.className = 'text-sm text-gray-600 dark:text-gray-400 flex justify-between items-center';
+                        li.innerHTML = `
+                            <span>Order #${order.receipt_id} - KSh ${parseFloat(order.balance).toFixed(2)}</span>
+                            <a href="/receipt/${order.receipt_id}" class="text-blue-600 dark:text-blue-400 hover:underline">View Receipt</a>
+                        `;
+                        debtOrdersList.appendChild(li);
+                    });
+                } else {
+                    debtOrdersList.innerHTML = '<li class="text-sm text-gray-600 dark:text-gray-400">No outstanding debts</li>';
+                }
+
+                clientModal.classList.remove('hidden');
+            } catch (error) {
+                console.error('Error fetching client details:', error);
+                alert('Failed to load client details. Please try again.');
             }
-            clientModal.classList.remove('hidden');
         }
 
+        // Close modal
         closeClientModal.addEventListener('click', () => {
             clientModal.classList.add('hidden');
         });
