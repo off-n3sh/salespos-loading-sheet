@@ -122,57 +122,6 @@ def log_stock_change(product_type, subtype, change_type, quantity, price_per_uni
     })
 
 # Login required decorator
-@app.route('/init_clients', methods=['GET'])
-@no_cache
-@login_required
-def init_clients():
-    """
-    One-time route to initialize the 'clients' collection by migrating shop_names from 'orders'.
-    Only accessible to logged-in users. Run once, then disable or remove.
-    """
-    try:
-        # Check if 'clients' collection already has data
-        existing_clients = db.collection('clients').limit(1).get()
-        if existing_clients:
-            return jsonify({"status": "error", "message": "Clients collection already exists. Aborting initialization."}), 400
-
-        # Fetch all orders to aggregate unique shop_names
-        orders_ref = db.collection('orders').stream()
-        clients_dict = {}
-
-        for doc in orders_ref:
-            order_dict = doc.to_dict()
-            shop_name = order_dict.get('shop_name', 'Unknown Shop')
-            balance = float(order_dict.get('balance', 0))
-            date = process_date(order_dict.get('date'))
-
-            if shop_name not in clients_dict:
-                clients_dict[shop_name] = {
-                    'shop_name': shop_name,
-                    'debt': 0.0,
-                    'created_at': date  # Use the earliest order date as created_at
-                }
-            # Add balance to debt
-            clients_dict[shop_name]['debt'] += balance
-            # Update created_at if this order is earlier
-            if date < clients_dict[shop_name]['created_at']:
-                clients_dict[shop_name]['created_at'] = date
-
-        # Write to Firestore 'clients' collection
-        batch = db.batch()
-        for client in clients_dict.values():
-            client_ref = db.collection('clients').document(client['shop_name'].replace('/', '-'))  # Replace '/' to avoid path issues
-            batch.set(client_ref, client)
-
-        batch.commit()
-        
-        log_user_action('Initialized Clients', f"Created {len(clients_dict)} clients from orders")
-        return jsonify({"status": "success", "message": f"Initialized {len(clients_dict)} clients successfully"}), 200
-
-    except Exception as e:
-        return jsonify({"status": "error", "error": f"Failed to initialize clients: {str(e)}"}), 500
-        
-
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
