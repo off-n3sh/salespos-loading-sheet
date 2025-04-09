@@ -206,7 +206,6 @@ def clients():
         if search_query and search_query.lower() not in shop_name.lower():
             continue
 
-        # Fetch latest order for additional details
         latest_order = db.collection('orders')\
             .where('shop_name', '==', shop_name)\
             .order_by('date', direction=firestore.Query.DESCENDING)\
@@ -232,7 +231,6 @@ def clients():
             'location': client_dict.get('location')
         })
 
-    # Sort by last order date (None goes last)
     clients_list.sort(
         key=lambda x: x['last_order_date'] or datetime.min.replace(tzinfo=KENYA_TZ),
         reverse=True
@@ -244,7 +242,6 @@ def clients():
         search=search_query,
         firebase_config=firebase_config
     )
-
                                                   
 @app.route('/add_client', methods=['POST'])
 @no_cache
