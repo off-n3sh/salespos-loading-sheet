@@ -172,13 +172,18 @@ def clients_data():
         if latest_order:
             order_dict = latest_order[0].to_dict()
             last_order_date = process_date(order_dict.get('date'))
-            # Calculate total amount from items
             items = order_dict.get('items', [])
-            recent_order_amount = sum(
-                float(item[5]) * float(item[3]) 
-                for item in items 
-                if len(item) > 5 and item[0] == 'product'
-            )
+            # Handle inconsistent items data
+            try:
+                recent_order_amount = sum(
+                    float(item[5]) * float(item[3])
+                    for item in items
+                    if isinstance(item, (list, tuple)) and len(item) > 5 and item[0] == 'product'
+                )
+            except (TypeError, IndexError, ValueError) as e:
+                # Log the error for debugging, but don't fail the entire request
+                logging.error(f"Error calculating recent_order_amount for shop {shop_name}: {e}")
+                recent_order_amount = 0.0
 
         clients_list.append({
             'shop_name': shop_name,
@@ -190,7 +195,7 @@ def clients_data():
         })
 
     return jsonify(clients_list)
-
+    
 @app.route('/clients', methods=['GET'])
 @no_cache
 @login_required
@@ -206,6 +211,7 @@ def clients():
         if search_query and search_query.lower() not in shop_name.lower():
             continue
 
+        # Fetch latest order for additional details
         latest_order = db.collection('orders')\
             .where('shop_name', '==', shop_name)\
             .order_by('date', direction=firestore.Query.DESCENDING)\
@@ -216,11 +222,16 @@ def clients():
             order_dict = latest_order[0].to_dict()
             last_order_date = process_date(order_dict.get('date'))
             items = order_dict.get('items', [])
-            recent_order_amount = sum(
-                float(item[5]) * float(item[3]) 
-                for item in items 
-                if len(item) > 5 and item[0] == 'product'
-            )
+            # Handle inconsistent items data
+            try:
+                recent_order_amount = sum(
+                    float(item[5]) * float(item[3])
+                    for item in items
+                    if isinstance(item, (list, tuple)) and len(item) > 5 and item[0] == 'product'
+                )
+            except (TypeError, IndexError, ValueError) as e:
+                logging.error(f"Error calculating recent_order_amount for shop {shop_name}: {e}")
+                recent_order_amount = 0.0
 
         clients_list.append({
             'shop_name': shop_name,
@@ -231,6 +242,7 @@ def clients():
             'location': client_dict.get('location')
         })
 
+    # Sort by last order date (None goes last)
     clients_list.sort(
         key=lambda x: x['last_order_date'] or datetime.min.replace(tzinfo=KENYA_TZ),
         reverse=True
@@ -241,8 +253,7 @@ def clients():
         clients=clients_list,
         search=search_query,
         firebase_config=firebase_config
-    )
-                                                  
+    )                                                 
 @app.route('/add_client', methods=['POST'])
 @no_cache
 @login_required
