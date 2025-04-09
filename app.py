@@ -2193,9 +2193,3 @@ def export_report():
         mimetype='application/pdf',
         headers={"Content-Disposition": f"attachment;filename={filename}"}
     )
-
-app.py
-Displaying app.py.
-
-app.txt
-Displaying app.txt.
