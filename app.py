@@ -204,89 +204,159 @@ def health_check():
 @no_cache
 @login_required
 def clients_data():
-    # Fetch all orders from Firestore
-    orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).stream()
-    clients_dict = {}
+    search_query = request.args.get('search', '').lower()
+    clients_ref = db.collection('clients').order_by('created_at', direction=firestore.Query.DESCENDING).stream()
+    clients_list = []
     
-    for doc in orders_ref:
-        order_dict = doc.to_dict()
-        shop_name = order_dict.get('shop_name', 'Unknown Shop')
-        balance = float(order_dict.get('balance', 0))
-        date = process_date(order_dict.get('date'))
-        items = order_dict.get('items', [])
-        total_amount = sum(float(items[i + 5]) * float(items[i + 3]) 
-                          for i in range(0, len(items), 6) if i + 5 < len(items) and items[i] == 'product')
-
-        if shop_name not in clients_dict:
-            clients_dict[shop_name] = {
-                'shop_name': shop_name,
-                'debt': 0.0,
-                'last_order_date': None,
-                'recent_order_amount': None,
-                'recent_order_id': None
-            }
+    for doc in clients_ref:
+        client_dict = doc.to_dict()
+        shop_name = client_dict.get('shop_name', 'Unknown Shop')
+        if search_query and search_query not in shop_name.lower():
+            continue
+            
+        # Fetch latest order for additional details
+        latest_order = db.collection('orders').where('shop_name', '==', shop_name).order_by('date', direction=firestore.Query.DESCENDING).limit(1).get()
+        last_order_date = None
+        recent_order_amount = None
+        recent_order_id = None
+        if latest_order:
+            order_dict = latest_order[0].to_dict()
+            last_order_date = process_date(order_dict.get('date'))
+            recent_order_amount = sum(float(item[5]) * float(item[3]) for item in order_dict.get('items', []) if len(item) > 5 and item[0] == 'product')
+            recent_order_id = order_dict.get('receipt_id', latest_order[0].id)
         
-        client = clients_dict[shop_name]
-        client['debt'] += balance
-        if not client['last_order_date'] or date > client['last_order_date']:
-            client['last_order_date'] = date
-            client['recent_order_amount'] = total_amount
-            client['recent_order_id'] = order_dict.get('receipt_id', doc.id)
-
-    clients_list = list(clients_dict.values())
-    clients_list.sort(key=lambda x: x['last_order_date'] or datetime.min.replace(tzinfo=KENYA_TZ), reverse=True)
+        clients_list.append({
+            'shop_name': shop_name,
+            'debt': float(client_dict.get('debt', 0)),
+            'last_order_date': last_order_date,
+            'recent_order_amount': recent_order_amount,
+            'recent_order_id': recent_order_id,
+            'phone': client_dict.get('phone'),
+            'location': client_dict.get('location'),
+            'created_at': process_date(client_dict.get('created_at'))
+        })
     
-    # Return only the necessary data for the dropdown
-    return jsonify([{'shop_name': c['shop_name'], 'debt': c['debt']} for c in clients_list])
+    clients_list.sort(key=lambda x: x['last_order_date'] or datetime.min.replace(tzinfo=KENYA_TZ), reverse=True)
+    return jsonify([{
+        'shop_name': c['shop_name'],
+        'debt': c['debt'],
+        'last_order_date': c['last_order_date'].strftime('%Y-%m-%d') if c['last_order_date'] else None,
+        'recent_order_amount': c['recent_order_amount'],
+        'recent_order_id': c['recent_order_id'],
+        'phone': c['phone'],
+        'location': c['location']
+    } for c in clients_list])
 
 @app.route('/clients', methods=['GET'])
 @no_cache
 @login_required
 def clients():
     search_query = request.args.get('search', '').lower()
-    
-    # Fetch all orders from Firestore
-    orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).stream()
+    clients_ref = db.collection('clients').order_by('created_at', direction=firestore.Query.DESCENDING).stream()
     clients_dict = {}
     
-    for doc in orders_ref:
-        order_dict = doc.to_dict()
-        shop_name = order_dict.get('shop_name', 'Unknown Shop')
+    for doc in clients_ref:
+        client_dict = doc.to_dict()
+        shop_name = client_dict.get('shop_name', 'Unknown Shop')
         if search_query and search_query not in shop_name.lower():
             continue
             
-        balance = float(order_dict.get('balance', 0))
-        payment = float(order_dict.get('payment', 0))
-        date = process_date(order_dict.get('date'))
-        items = order_dict.get('items', [])
-        total_amount = sum(float(items[i + 5]) * float(items[i + 3]) 
-                          for i in range(0, len(items), 6) if i + 5 < len(items) and items[i] == 'product')
-
-        if shop_name not in clients_dict:
-            clients_dict[shop_name] = {
-                'shop_name': shop_name,
-                'debt': 0.0,
-                'last_order_date': None,
-                'recent_order_amount': None,
-                'recent_order_id': None
-            }
+        latest_order = db.collection('orders').where('shop_name', '==', shop_name).order_by('date', direction=firestore.Query.DESCENDING).limit(1).get()
+        last_order_date = None
+        recent_order_amount = None
+        recent_order_id = None
+        if latest_order:
+            order_dict = latest_order[0].to_dict()
+            last_order_date = process_date(order_dict.get('date'))
+            recent_order_amount = sum(float(item[5]) * float(item[3]) for item in order_dict.get('items', []) if len(item) > 5 and item[0] == 'product')
+            recent_order_id = order_dict.get('receipt_id', latest_order[0].id)
         
-        client = clients_dict[shop_name]
-        client['debt'] += balance
-        if not client['last_order_date'] or date > client['last_order_date']:
-            client['last_order_date'] = date
-            client['recent_order_amount'] = total_amount
-            client['recent_order_id'] = order_dict.get('receipt_id', doc.id)
-
+        clients_dict[shop_name] = {
+            'shop_name': shop_name,
+            'debt': float(client_dict.get('debt', 0)),
+            'last_order_date': last_order_date,
+            'recent_order_amount': recent_order_amount,
+            'recent_order_id': recent_order_id,
+            'phone': client_dict.get('phone'),
+            'location': client_dict.get('location'),
+            'created_at': process_date(client_dict.get('created_at'))
+        }
+    
     clients_list = list(clients_dict.values())
     clients_list.sort(key=lambda x: x['last_order_date'] or datetime.min.replace(tzinfo=KENYA_TZ), reverse=True)
-
-    # Use the globally loaded firebase_config from app startup
+    
+    clients_json = json.dumps([{
+        'shop_name': c['shop_name'],
+        'debt': c['debt'],
+        'last_order_date': c['last_order_date'].strftime('%Y-%m-%d') if c['last_order_date'] else None,
+        'recent_order_amount': c['recent_order_amount'],
+        'recent_order_id': c['recent_order_id'],
+        'phone': c['phone'],
+        'location': c['location']
+    } for c in clients_list])
+    
     return render_template('clients.html', 
                          clients=clients_list, 
+                         clients_json=clients_json,
                          search=search_query,
-                         firebase_config=firebase_config)  # firebase_config is global from app.py
-                         
+                         firebase_config=firebase_config)
+                                                  
+@app.route('/add_client', methods=['POST'])
+@no_cache
+@login_required
+def add_client():
+    shop_name = request.form.get('shop_name')
+    phone = request.form.get('phone', None)
+    location = request.form.get('location', None)
+    
+    if not shop_name:
+        return jsonify({'error': 'Shop name is required'}), 400
+    
+    # Check if client already exists
+    client_ref = db.collection('clients').where('shop_name', '==', shop_name).limit(1).get()
+    if client_ref:
+        return jsonify({'error': 'Client already exists'}), 400
+    
+    client_data = {
+        'shop_name': shop_name,
+        'debt': 0.0,
+        'created_at': datetime.now(KENYA_TZ),
+        'phone': phone if phone else None,
+        'location': location if location else None
+    }
+    
+    db.collection('clients').add(client_data)
+    log_user_action('Added Client', f"Manually added client: {shop_name}")
+    return jsonify({'status': 'success'}), 200
+    
+@app.route('/edit_client', methods=['POST'])
+@no_cache
+@login_required
+def edit_client():
+    shop_name = request.form.get('shop_name')
+    phone = request.form.get('phone', None)
+    location = request.form.get('location', None)
+    
+    if not shop_name:
+        return jsonify({'error': 'Shop name is required'}), 400
+    
+    client_ref = db.collection('clients').where('shop_name', '==', shop_name).limit(1).get()
+    if not client_ref:
+        return jsonify({'error': 'Client not found'}), 404
+    
+    client_doc = client_ref[0]
+    update_data = {}
+    if phone is not None:
+        update_data['phone'] = phone
+    if location is not None:
+        update_data['location'] = location
+    
+    if update_data:
+        db.collection('clients').document(client_doc.id).update(update_data)
+        log_user_action('Edited Client', f"Updated client {shop_name} with phone: {phone}, location: {location}")
+    
+    return jsonify({'status': 'success'}), 200
+
 @app.route('/auth', methods=['GET', 'POST'])
 def auth_route():
     if 'user' in session:
@@ -649,6 +719,7 @@ def orders():
         order_type = request.form.get('order_type', 'wholesale')
         amount_paid = float(request.form.get('amount_paid', '0') or 0)
         items_raw = request.form.getlist('items[]')
+        phone = request.form.get('phone', None)  # Optional phone field
         
         items = []
         total_amount = 0
@@ -696,10 +767,29 @@ def orders():
             'closed_date': datetime.now(KENYA_TZ) if balance == 0 else None
         }
         
+        # Write order to Firestore
         db.collection('orders').add(order_data)
+        
+        # Upsert client in clients collection
+        client_ref = db.collection('clients').where('shop_name', '==', shop_name).limit(1).get()
+        if client_ref:
+            client_doc = client_ref[0]
+            client_data = client_doc.to_dict()
+            new_debt = client_data.get('debt', 0) + balance
+            db.collection('clients').document(client_doc.id).update({'debt': new_debt})
+        else:
+            db.collection('clients').add({
+                'shop_name': shop_name,
+                'debt': balance,
+                'created_at': datetime.now(KENYA_TZ),
+                'phone': phone if phone else None,
+                'location': None
+            })
+        
         log_user_action('Opened Order', f"Order #{receipt_id} - {order_type} for {shop_name}")
         return '', 200
     
+    # GET method remains unchanged
     orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).stream()
     orders = []
     for doc in orders_ref:
@@ -732,7 +822,7 @@ def orders():
     recent_activity = orders[:3]
     stock_items = [doc.to_dict() for doc in db.collection('stock').order_by('stock_name').get()]
     return render_template('orders.html', orders=orders, recent_activity=recent_activity, stock_items=stock_items)
-
+    
 @app.route('/stock', methods=['GET', 'POST'])
 @no_cache
 @login_required

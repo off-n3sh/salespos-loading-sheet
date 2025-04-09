@@ -79,6 +79,10 @@
                 <input type="text" name="shop_name" id="retail-client-input" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Search or type a client name" required>
                 <div id="retail-client-debt" class="mt-1 text-sm text-gray-600 dark:text-gray-400 hidden">Debt: KSh 0.00</div>
             </div>
+            <div>
+                <label for="retail-phone-input" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone Number (Optional)</label>
+                <input type="tel" name="phone" id="retail-phone-input" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter phone number">
+            </div>
             <div id="retail-items-container" class="space-y-4">
                 <div class="grid grid-cols-6 gap-2 items-center text-sm font-semibold item-row-header">
                     <span>Item</span>
@@ -116,6 +120,10 @@
                 <label for="wholesale-client-input" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Shop Name</label>
                 <input type="text" name="shop_name" id="wholesale-client-input" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Search or type a shop name" required>
                 <div id="wholesale-client-debt" class="mt-1 text-sm text-gray-600 dark:text-gray-400 hidden">Debt: KSh 0.00</div>
+            </div>
+            <div>
+                <label for="wholesale-phone-input" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone Number (Optional)</label>
+                <input type="tel" name="phone" id="wholesale-phone-input" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter phone number">
             </div>
             <div id="wholesale-items-container" class="space-y-4">
                 <div class="grid grid-cols-6 gap-2 items-center text-sm font-semibold item-row-header">
@@ -172,6 +180,10 @@
                 <label for="edit-client-input" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Shop Name</label>
                 <input type="text" name="shop_name" id="edit-client-input" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Search or type a shop name" required>
                 <div id="edit-client-debt" class="mt-1 text-sm text-gray-600 dark:text-gray-400 hidden">Debt: KSh 0.00</div>
+            </div>
+            <div>
+                <label for="edit-phone-input" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone Number (Optional)</label>
+                <input type="tel" name="phone" id="edit-phone-input" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter phone number">
             </div>
             <div id="edit-items-container" class="space-y-4">
                 <div class="grid grid-cols-6 gap-2 items-center text-sm font-semibold item-row-header">
@@ -352,19 +364,39 @@
                 searchEnabled: true,
                 allowHTML: false,
                 placeholderValue: 'Search or type a client name',
-                noResultsText: 'No clients found - type to add a new one',
-                addItems: true,  // Allows manual entry
+                noResultsText: 'No clients found - type a name to add a new one',
+                removeItemButton: false,  // Prevents multiple selections
+                maxItemCount: 1,         // Limits to one selection
+                duplicateItemsAllowed: false,
                 choices: clients.map(client => ({
                     value: client.shop_name,
                     label: `${client.shop_name} (Debt: KSh ${client.debt.toFixed(2)})`
                 }))
             });
-            inputElement.addEventListener('change', () => {
-                const selectedClient = clients.find(c => c.shop_name === inputElement.value);
+
+            // Handle custom input for new clients
+            inputElement.addEventListener('addItem', (event) => {
+                const value = event.detail.value;
+                const selectedClient = clients.find(c => c.shop_name === value);
                 if (selectedClient) {
                     debtElement.textContent = `Debt: KSh ${selectedClient.debt.toFixed(2)}`;
                     debtElement.classList.remove('hidden');
-                } else if (inputElement.value) {
+                } else if (value) {
+                    debtElement.textContent = 'Debt: KSh 0.00 (New Client)';
+                    debtElement.classList.remove('hidden');
+                    choices.setValue([{ value: value, label: value }]); // Set the new client name directly
+                } else {
+                    debtElement.classList.add('hidden');
+                }
+            });
+
+            inputElement.addEventListener('change', () => {
+                const value = inputElement.value;
+                const selectedClient = clients.find(c => c.shop_name === value);
+                if (selectedClient) {
+                    debtElement.textContent = `Debt: KSh ${selectedClient.debt.toFixed(2)}`;
+                    debtElement.classList.remove('hidden');
+                } else if (value) {
                     debtElement.textContent = 'Debt: KSh 0.00 (New Client)';
                     debtElement.classList.remove('hidden');
                 } else {
