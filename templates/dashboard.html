@@ -51,23 +51,8 @@
                     </svg>
                 </button>
             </div>
-            <div class="mt-4 max-h-96 overflow-y-auto">
-                {% if notifications %}
-                {% for notification in notifications %}
-                <div class="p-4 mb-2 border-b border-gray-200 dark:border-gray-700 {% if not notification.read %}bg-blue-50 dark:bg-blue-900{% endif %}">
-                    <p class="text-sm text-gray-700 dark:text-gray-300">{{ notification.message }}</p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ notification.timestamp.strftime('%d/%m/%Y %H:%M:%S') }}</p>
-                    <div class="mt-2 flex justify-between items-center">
-                        <a href="{{ url_for('receipt', order_id=notification.order_id) }}" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">View Order</a>
-                        {% if not notification.read %}
-                        <button onclick="markNotificationRead('{{ notification.id }}')" class="text-sm text-green-600 dark:text-green-400 hover:underline">Mark as Read</button>
-                        {% endif %}
-                    </div>
-                </div>
-                {% endfor %}
-                {% else %}
-                <p class="text-sm text-gray-500 dark:text-gray-400">No notifications found.</p>
-                {% endif %}
+            <div id="notification-content" class="mt-4 max-h-96 overflow-y-auto">
+                <!-- Notifications will be loaded dynamically -->
             </div>
         </div>
     </div>
@@ -339,6 +324,7 @@
         const notificationBell = document.getElementById('notification-bell');
         const notificationModal = document.getElementById('notification-modal');
         const closeNotificationModal = document.getElementById('close-notification-modal');
+        const notificationContent = document.getElementById('notification-content');
         const allBtn = document.getElementById('all-btn');
         const pendingBtn = document.getElementById('pending-btn');
         const completedBtn = document.getElementById('completed-btn');
@@ -361,6 +347,7 @@
         let currentPage = {{ page }};
         const allSalesRows = Array.from(document.querySelectorAll('#sales-history-body tr'));
         const allExpensesRows = Array.from(document.querySelectorAll('#expenses-body tr'));
+        const today = new Date('2025-04-10'); // Hardcoded as per your date (April 10, 2025)
 
         function updateTime() {
             const now = new Date();
@@ -369,11 +356,57 @@
         setInterval(updateTime, 1000);
         updateTime();
 
-        notificationBell.addEventListener('click', () => notificationModal.classList.toggle('hidden'));
+        notificationBell.addEventListener('click', () => {
+            notificationModal.classList.toggle('hidden');
+            loadNotifications();
+        });
         closeNotificationModal.addEventListener('click', () => notificationModal.classList.add('hidden'));
 
         function showLoading() { loadingOverlay.classList.remove('hidden'); }
         function hideLoading() { loadingOverlay.classList.add('hidden'); }
+
+        function loadNotifications() {
+            fetch('/notifications') // Assuming an endpoint exists to fetch notifications
+                .then(response => response.json())
+                .then(data => {
+                    notificationContent.innerHTML = '';
+                    if (data.length > 0) {
+                        data.forEach(notification => {
+                            const div = document.createElement('div');
+                            div.className = `p-4 mb-2 border-b border-gray-200 dark:border-gray-700 ${notification.read ? '' : 'bg-blue-50 dark:bg-blue-900'}`;
+                            div.innerHTML = `
+                                <p class="text-sm text-gray-700 dark:text-gray-300">${notification.message}</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">${new Date(notification.timestamp).toLocaleString('en-GB')}</p>
+                                <div class="mt-2 flex justify-between items-center">
+                                    <a href="/receipt?order_id=${notification.order_id}" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">View Order</a>
+                                    ${notification.read ? '' : `<button onclick="markNotificationRead('${notification.id}')" class="text-sm text-green-600 dark:text-green-400 hover:underline">Mark as Read</button>`}
+                                </div>
+                            `;
+                            notificationContent.appendChild(div);
+                        });
+                    } else {
+                        notificationContent.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400">No notifications found.</p>';
+                    }
+                    const unreadCount = data.filter(n => !n.read).length;
+                    const badge = notificationBell.querySelector('span');
+                    if (unreadCount > 0) {
+                        if (!badge) {
+                            const newBadge = document.createElement('span');
+                            newBadge.className = 'absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full';
+                            newBadge.textContent = unreadCount;
+                            notificationBell.appendChild(newBadge);
+                        } else {
+                            badge.textContent = unreadCount;
+                        }
+                    } else if (badge) {
+                        badge.remove();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading notifications:', error);
+                    notificationContent.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400">Error loading notifications.</p>';
+                });
+        }
 
         function getWeekRange(date) {
             const start = new Date(date);
@@ -395,7 +428,12 @@
             rows.forEach(row => {
                 const date = new Date(row.getAttribute('data-date'));
                 let key, label, startDate, endDate;
-                if (period === 'week') {
+                if (period === 'day') {
+                    key = date.toISOString().split('T')[0];
+                    label = `${date.getDate()} ${date.toLocaleString('default', { month: 'long' })} ${date.getFullYear()}`;
+                    startDate = new Date(date);
+                    endDate = new Date(date);
+                } else if (period === 'week') {
                     const { start, end } = getWeekRange(date);
                     startDate = start;
                     endDate = end;
@@ -409,6 +447,13 @@
                     startDate = monthStart;
                     endDate = monthEnd;
                     label = `${monthStart.toLocaleString('default', { month: 'long' })} ${date.getFullYear()}: ${monthStart.getDate()} – ${monthEnd.getDate()}`;
+                } else if (period === 'year') {
+                    key = `${date.getFullYear()}`;
+                    const yearStart = new Date(date.getFullYear(), 0, 1);
+                    const yearEnd = new Date(date.getFullYear(), 11, 31);
+                    startDate = yearStart;
+                    endDate = yearEnd;
+                    label = `${date.getFullYear()}: ${formatDateRange(yearStart, yearEnd)}`;
                 } else {
                     key = 'all';
                     label = 'All Orders';
@@ -435,16 +480,22 @@
             filteredRows = filteredRows.filter(row => {
                 const balance = parseFloat(row.getAttribute('data-balance')) || 0;
                 const searchText = row.getAttribute('data-search').toLowerCase();
+                const date = new Date(row.getAttribute('data-date'));
                 const matchesStatus = currentStatusFilter === 'all' ||
                                      (currentStatusFilter === 'pending' && balance > 0) ||
                                      (currentStatusFilter === 'completed' && balance === 0) ||
                                      (currentStatusFilter === 'expenses');
                 const matchesSearch = searchTerm === '' || searchText.includes(searchTerm);
-                return matchesStatus && matchesSearch;
+                const matchesTime = currentFilter === 'all' ||
+                                   (currentFilter === 'day' && date.toDateString() === today.toDateString()) ||
+                                   (currentFilter === 'week' && date >= getWeekRange(today).start && date <= getWeekRange(today).end) ||
+                                   (currentFilter === 'month' && date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear()) ||
+                                   (currentFilter === 'year' && date.getFullYear() === today.getFullYear());
+                return matchesStatus && matchesSearch && matchesTime;
             });
 
             filteredRows.sort((a, b) => new Date(b.getAttribute('data-date')) - new Date(a.getAttribute('data-date')));
-            const grouped = groupRows(filteredRows, currentFilter === 'week' || currentFilter === 'month' ? currentFilter : 'all');
+            const grouped = groupRows(filteredRows, currentFilter);
             const tbody = currentStatusFilter === 'expenses' ? expensesTbody : salesTbody;
             tbody.innerHTML = '';
 
@@ -458,17 +509,15 @@
 
             groupKeys.forEach((key, index) => {
                 const group = grouped[key];
-                if (currentFilter === 'week' || currentFilter === 'month' || (currentFilter === 'all' && totalItems > 0)) {
-                    const headerRow = document.createElement('tr');
-                    headerRow.className = 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white font-semibold';
-                    headerRow.innerHTML = `
-                        <td colspan="7" class="px-6 py-2">${group.label} (Total: KSh ${group.total.toFixed(2)}, Debt: KSh ${group.debt.toFixed(2)})</td>
-                    `;
-                    if (renderedCount >= start && renderedCount < end) {
-                        tbody.appendChild(headerRow);
-                    }
-                    renderedCount++;
+                const headerRow = document.createElement('tr');
+                headerRow.className = 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white font-semibold';
+                headerRow.innerHTML = `
+                    <td colspan="7" class="px-6 py-2">${group.label} (Total: KSh ${group.total.toFixed(2)}, Debt: KSh ${group.debt.toFixed(2)})</td>
+                `;
+                if (renderedCount >= start && renderedCount < end) {
+                    tbody.appendChild(headerRow);
                 }
+                renderedCount++;
                 group.rows.forEach(row => {
                     if (renderedCount >= start && renderedCount < end) {
                         tbody.appendChild(row.cloneNode(true));
@@ -482,7 +531,7 @@
             prevPageBtn.disabled = currentPage === 1;
             nextPageBtn.disabled = currentPage === totalPages || totalItems === 0;
 
-            if (renderedCount === 0) {
+            if (totalItems === 0) {
                 emptyState.classList.remove('hidden');
             }
         }
@@ -498,11 +547,18 @@
             const filteredRows = (currentStatusFilter === 'expenses' ? allExpensesRows : allSalesRows).filter(row => {
                 const balance = parseFloat(row.getAttribute('data-balance')) || 0;
                 const searchText = row.getAttribute('data-search').toLowerCase();
+                const date = new Date(row.getAttribute('data-date'));
                 const matchesStatus = currentStatusFilter === 'all' ||
                                      (currentStatusFilter === 'pending' && balance > 0) ||
                                      (currentStatusFilter === 'completed' && balance === 0) ||
                                      (currentStatusFilter === 'expenses');
-                return matchesStatus && (searchInput.value.toLowerCase() === '' || searchText.includes(searchInput.value.toLowerCase()));
+                const matchesSearch = searchInput.value.toLowerCase() === '' || searchText.includes(searchInput.value.toLowerCase());
+                const matchesTime = currentFilter === 'all' ||
+                                   (currentFilter === 'day' && date.toDateString() === today.toDateString()) ||
+                                   (currentFilter === 'week' && date >= getWeekRange(today).start && date <= getWeekRange(today).end) ||
+                                   (currentFilter === 'month' && date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear()) ||
+                                   (currentFilter === 'year' && date.getFullYear() === today.getFullYear());
+                return matchesStatus && matchesSearch && matchesTime;
             });
             const totalPages = Math.ceil(filteredRows.length / itemsPerPage);
             if (currentPage < totalPages) {
@@ -571,15 +627,11 @@
             })
             .then(response => {
                 if (response.ok) {
-                    const notificationDiv = document.querySelector(`button[onclick="markNotificationRead('${notificationId}')"]`).parentElement.parentElement;
-                    notificationDiv.classList.remove('bg-blue-50', 'dark:bg-blue-900');
-                    notificationDiv.querySelector('button').remove();
-                    const unreadBadge = notificationBell.querySelector('span');
-                    const unreadCount = parseInt(unreadBadge?.textContent || '0') - 1;
-                    if (unreadCount > 0) unreadBadge.textContent = unreadCount;
-                    else unreadBadge?.remove();
-                    updateDisplay();
-                } else alert('Error marking notification as read');
+                    loadNotifications(); // Refresh notifications
+                    updateDisplay(); // Refresh dashboard
+                } else {
+                    alert('Error marking notification as read');
+                }
             })
             .catch(error => {
                 console.error('Error:', error);
