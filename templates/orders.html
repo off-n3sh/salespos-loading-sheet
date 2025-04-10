@@ -50,9 +50,13 @@
                     data-receipt-id="{{ order.receipt_id }}"
                     data-balance="{{ order.balance }}"
                     data-date="{{ order.date.strftime('%Y-%m-%d') }}"
-                    data-search="{{ order.receipt_id ~ ' ' ~ (order.shop_name or 'Retail Sale') }}">
+                    data-search="{{ order.receipt_id ~ ' ' ~ (order.shop_name or 'Retail Sale') ~ ' ' ~ order.order_type }}">
                     <td class="py-3 px-6 text-left whitespace-nowrap">{{ order.receipt_id }}</td>
-                    <td class="py-3 px-6 text-left">{{ order.shop_name or 'Retail Sale' }}</td>
+                    <td class="py-3 px-6 text-left">
+                        {{ order.shop_name or 'Retail Sale' }}
+                        <br>
+                        <span class="text-xs text-gray-500 dark:text-gray-400">{{ order.order_type|capitalize }}</span>
+                    </td>
                     <td class="py-3 px-6 text-center">{{ order.total_items }}</td>
                     <td class="py-3 px-6 text-center">{{ order.date.strftime('%d/%m/%Y') }}</td>
                     <td class="py-3 px-6 text-center">{{ order.payment | round(2) }}</td>
@@ -261,7 +265,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
 
 <script>
-    // Modal Management
+    // Modal Management (unchanged)
     const retailModal = document.getElementById('retail-modal');
     const wholesaleModal = document.getElementById('wholesale-modal');
     const editModal = document.getElementById('edit-order-modal');
@@ -365,7 +369,7 @@
         currentContainer = editContainer;
     });
 
-    // Enhanced Client Population with Choices.js
+    // Enhanced Client Population with Choices.js (unchanged)
     async function populateClients(inputElement, debtElement) {
         try {
             const response = await fetch('/clients_data');
@@ -388,9 +392,8 @@
                 shouldSort: false,
             });
 
-            // Handle adding new clients and updating debt
             inputElement.addEventListener('change', () => {
-                const value = choices.getValue(true); // Get the raw value
+                const value = choices.getValue(true);
                 const selectedClient = clients.find(c => c.shop_name === value);
                 if (selectedClient) {
                     debtElement.textContent = `Debt: KSh ${selectedClient.debt.toFixed(2)}`;
@@ -398,7 +401,6 @@
                 } else if (value) {
                     debtElement.textContent = 'Debt: KSh 0.00 (New Client)';
                     debtElement.classList.remove('hidden');
-                    // Add the new client to the dropdown if not already present
                     if (!choices.getChoiceByValue(value)) {
                         choices.setChoices([{ value: value, label: value }], 'value', 'label', false);
                         choices.setChoiceByValue(value);
@@ -436,42 +438,49 @@
     populateClients(document.getElementById('wholesale-client-input'), document.getElementById('wholesale-client-debt'));
     populateClients(document.getElementById('edit-client-input'), document.getElementById('edit-client-debt'));
 
-    // Pagination and Orders Search
+    // Fixed Pagination and Filtering
     const ordersPerPage = 10;
     let currentPage = 1;
-    const ordersTable = document.getElementById('orders-table');
     const ordersTbody = document.getElementById('orders-tbody');
     const prevPageBtn = document.getElementById('prev-page');
     const nextPageBtn = document.getElementById('next-page');
     const pageInfo = document.getElementById('page-info');
     const orderSearch = document.getElementById('order-search');
+    let currentFilter = 'all'; // Track the active filter
 
     function updateOrdersDisplay() {
-        const rows = Array.from(ordersTbody.querySelectorAll('.order-row'));
-        const filter = document.querySelector('.filter-btn.bg-blue-500')?.getAttribute('data-filter') || 'all';
+        const allRows = Array.from(document.querySelectorAll('.order-row')); // Get all rows initially
         const searchTerm = orderSearch.value.toLowerCase();
 
-        let filteredRows = rows.filter(row => {
+        // Filter rows based on current filter and search
+        let filteredRows = allRows.filter(row => {
             const balance = parseFloat(row.getAttribute('data-balance'));
             const searchText = row.getAttribute('data-search').toLowerCase();
-            let matchesFilter = filter === 'all' || (filter === 'pending' && balance > 0) || (filter === 'paid' && balance === 0);
-            let matchesSearch = searchTerm === '' || searchText.includes(searchTerm);
+            const matchesFilter = currentFilter === 'all' || 
+                                (currentFilter === 'pending' && balance > 0) || 
+                                (currentFilter === 'paid' && balance === 0);
+            const matchesSearch = searchTerm === '' || searchText.includes(searchTerm);
             return matchesFilter && matchesSearch;
         });
 
+        // Sort by date descending
         filteredRows.sort((a, b) => new Date(b.getAttribute('data-date')) - new Date(a.getAttribute('data-date')));
 
-        const totalPages = Math.ceil(filteredRows.length / ordersPerPage);
+        // Paginate
+        const totalPages = Math.ceil(filteredRows.length / ordersPerPage) || 1;
+        if (currentPage > totalPages) currentPage = totalPages; // Adjust page if out of bounds
         const start = (currentPage - 1) * ordersPerPage;
         const end = start + ordersPerPage;
         const visibleRows = filteredRows.slice(start, end);
 
+        // Update table
         ordersTbody.innerHTML = '';
         visibleRows.forEach(row => ordersTbody.appendChild(row));
 
+        // Update pagination controls
         pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
         prevPageBtn.disabled = currentPage === 1;
-        nextPageBtn.disabled = currentPage === totalPages || totalPages === 0;
+        nextPageBtn.disabled = currentPage === totalPages;
     }
 
     prevPageBtn.addEventListener('click', () => {
@@ -482,7 +491,14 @@
     });
 
     nextPageBtn.addEventListener('click', () => {
-        const totalPages = Math.ceil(ordersTbody.querySelectorAll('.order-row').length / ordersPerPage);
+        const allRows = Array.from(document.querySelectorAll('.order-row'));
+        const filteredRows = allRows.filter(row => {
+            const balance = parseFloat(row.getAttribute('data-balance'));
+            return currentFilter === 'all' || 
+                   (currentFilter === 'pending' && balance > 0) || 
+                   (currentFilter === 'paid' && balance === 0);
+        });
+        const totalPages = Math.ceil(filteredRows.length / ordersPerPage);
         if (currentPage < totalPages) {
             currentPage++;
             updateOrdersDisplay();
@@ -502,6 +518,7 @@
             });
             btn.classList.remove('text-gray-600', 'dark:text-gray-300', 'hover:bg-gray-100', 'dark:hover:bg-gray-700');
             btn.classList.add('bg-blue-500', 'text-white');
+            currentFilter = btn.getAttribute('data-filter');
             currentPage = 1;
             updateOrdersDisplay();
         });
@@ -510,7 +527,7 @@
     // Initial display
     document.querySelector('[data-filter="all"]').click();
 
-    // Remaining Functions (unchanged from your original code)
+    // Remaining Functions (unchanged)
     function attachAddItemListeners(container) {
         container.querySelectorAll('.add-item-btn').forEach(btn => {
             btn.addEventListener('click', () => addItem(container));
@@ -986,7 +1003,7 @@
             const orderRow = btn.closest('.order-row');
             const receiptId = orderRow.getAttribute('data-receipt-id');
             const orderType = orderRow.getAttribute('data-order-type');
-            const shopName = orderRow.querySelector('td:nth-child(2)').textContent;
+            const shopName = orderRow.querySelector('td:nth-child(2)').textContent.split('\n')[0].trim();
             const itemsJson = btn.getAttribute('data-items');
             editOrder(receiptId, orderType, shopName, itemsJson);
         });
@@ -1021,6 +1038,7 @@
 </script>
 
 <style>
+    /* Unchanged styles except for minor tweak for client column */
     body { overflow-y: auto; }
     input[type="number"], input[type="number"][readonly] {
         -moz-appearance: textfield;
