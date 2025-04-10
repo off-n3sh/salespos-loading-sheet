@@ -55,7 +55,9 @@
                     <td class="py-3 px-6 text-left">
                         {{ order.shop_name or 'Retail Sale' }}
                         <br>
-                        <span class="text-xs text-gray-500 dark:text-gray-400">{{ order.order_type|capitalize }}</span>
+                        <span class="text-xs font-medium {{ 'text-blue-500' if order.order_type == 'retail' else 'text-green-500' }}">
+                            {{ order.order_type|capitalize }}
+                        </span>
                     </td>
                     <td class="py-3 px-6 text-center">{{ order.total_items }}</td>
                     <td class="py-3 px-6 text-center">{{ order.date.strftime('%d/%m/%Y') }}</td>
@@ -265,7 +267,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
 
 <script>
-    // Modal Management (unchanged)
+    // Modal Management
     const retailModal = document.getElementById('retail-modal');
     const wholesaleModal = document.getElementById('wholesale-modal');
     const editModal = document.getElementById('edit-order-modal');
@@ -369,7 +371,7 @@
         currentContainer = editContainer;
     });
 
-    // Enhanced Client Population with Choices.js (unchanged)
+    // Enhanced Client Population with Choices.js
     async function populateClients(inputElement, debtElement) {
         try {
             const response = await fetch('/clients_data');
@@ -447,9 +449,9 @@
     const pageInfo = document.getElementById('page-info');
     const orderSearch = document.getElementById('order-search');
     let currentFilter = 'all'; // Track the active filter
+    const allRows = Array.from(document.querySelectorAll('.order-row')); // Store all rows statically
 
     function updateOrdersDisplay() {
-        const allRows = Array.from(document.querySelectorAll('.order-row')); // Get all rows initially
         const searchTerm = orderSearch.value.toLowerCase();
 
         // Filter rows based on current filter and search
@@ -457,8 +459,8 @@
             const balance = parseFloat(row.getAttribute('data-balance'));
             const searchText = row.getAttribute('data-search').toLowerCase();
             const matchesFilter = currentFilter === 'all' || 
-                                (currentFilter === 'pending' && balance > 0) || 
-                                (currentFilter === 'paid' && balance === 0);
+                                 (currentFilter === 'pending' && balance > 0) || 
+                                 (currentFilter === 'paid' && balance === 0);
             const matchesSearch = searchTerm === '' || searchText.includes(searchTerm);
             return matchesFilter && matchesSearch;
         });
@@ -468,19 +470,19 @@
 
         // Paginate
         const totalPages = Math.ceil(filteredRows.length / ordersPerPage) || 1;
-        if (currentPage > totalPages) currentPage = totalPages; // Adjust page if out of bounds
+        if (currentPage > totalPages) currentPage = totalPages; // Adjust if out of bounds
         const start = (currentPage - 1) * ordersPerPage;
         const end = start + ordersPerPage;
         const visibleRows = filteredRows.slice(start, end);
 
-        // Update table
+        // Update table with fresh DOM nodes
         ordersTbody.innerHTML = '';
-        visibleRows.forEach(row => ordersTbody.appendChild(row));
+        visibleRows.forEach(row => ordersTbody.appendChild(row.cloneNode(true))); // Clone to avoid moving original nodes
 
         // Update pagination controls
         pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
         prevPageBtn.disabled = currentPage === 1;
-        nextPageBtn.disabled = currentPage === totalPages;
+        nextPageBtn.disabled = currentPage === totalPages || filteredRows.length === 0;
     }
 
     prevPageBtn.addEventListener('click', () => {
@@ -491,12 +493,13 @@
     });
 
     nextPageBtn.addEventListener('click', () => {
-        const allRows = Array.from(document.querySelectorAll('.order-row'));
         const filteredRows = allRows.filter(row => {
             const balance = parseFloat(row.getAttribute('data-balance'));
-            return currentFilter === 'all' || 
-                   (currentFilter === 'pending' && balance > 0) || 
-                   (currentFilter === 'paid' && balance === 0);
+            const searchText = row.getAttribute('data-search').toLowerCase();
+            const matchesFilter = currentFilter === 'all' || 
+                                 (currentFilter === 'pending' && balance > 0) || 
+                                 (currentFilter === 'paid' && balance === 0);
+            return matchesFilter && (orderSearch.value.toLowerCase() === '' || searchText.includes(orderSearch.value.toLowerCase()));
         });
         const totalPages = Math.ceil(filteredRows.length / ordersPerPage);
         if (currentPage < totalPages) {
@@ -527,7 +530,7 @@
     // Initial display
     document.querySelector('[data-filter="all"]').click();
 
-    // Remaining Functions (unchanged)
+    // Remaining Functions
     function attachAddItemListeners(container) {
         container.querySelectorAll('.add-item-btn').forEach(btn => {
             btn.addEventListener('click', () => addItem(container));
@@ -1038,7 +1041,6 @@
 </script>
 
 <style>
-    /* Unchanged styles except for minor tweak for client column */
     body { overflow-y: auto; }
     input[type="number"], input[type="number"][readonly] {
         -moz-appearance: textfield;
@@ -1206,5 +1208,9 @@
         border: 1px solid #e5e7eb;
         dark:border-gray-700;
     }
+    .text-blue-500 { color: #3b82f6; } /* Matches retail button */
+    .text-green-500 { color: #10b981; } /* Matches wholesale button */
+    .dark .text-blue-500 { color: #3b82f6; }
+    .dark .text-green-500 { color: #10b981; }
 </style>
 {% endblock %}
