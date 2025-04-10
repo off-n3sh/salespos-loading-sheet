@@ -723,7 +723,6 @@ def orders():
         order_type = request.form.get('order_type', 'wholesale')
         amount_paid = float(request.form.get('amount_paid', '0') or 0)
         items_raw = request.form.getlist('items[]')
-        phone = request.form.get('phone', None)  # Optional phone field
         
         items = []
         total_amount = 0
@@ -774,7 +773,7 @@ def orders():
         # Write order to Firestore
         db.collection('orders').add(order_data)
         
-        # Upsert client in clients collection
+        # Check if client exists in the clients collection
         client_ref = db.collection('clients').where('shop_name', '==', shop_name).limit(1).get()
         if client_ref:
             client_doc = client_ref[0]
@@ -782,11 +781,11 @@ def orders():
             new_debt = client_data.get('debt', 0) + balance
             db.collection('clients').document(client_doc.id).update({'debt': new_debt})
         else:
-            db.collection('clients').add({
+            # If client doesn't exist, create a new client entry without phone
+            db.collection('clients').document(shop_name.replace('/', '-')).set({
                 'shop_name': shop_name,
                 'debt': balance,
                 'created_at': datetime.now(KENYA_TZ),
-                'phone': phone if phone else None,
                 'location': None
             })
         
@@ -826,7 +825,7 @@ def orders():
     recent_activity = orders[:3]
     stock_items = [doc.to_dict() for doc in db.collection('stock').order_by('stock_name').get()]
     return render_template('orders.html', orders=orders, recent_activity=recent_activity, stock_items=stock_items)
-    
+        
 @app.route('/stock', methods=['GET', 'POST'])
 @no_cache
 @login_required
