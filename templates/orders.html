@@ -352,39 +352,19 @@
                 searchEnabled: true,
                 allowHTML: false,
                 placeholderValue: 'Search or type a client name',
-                noResultsText: 'No clients found - type a name to add a new one',
-                removeItemButton: false,  // Prevents multiple selections
-                maxItemCount: 1,         // Limits to one selection
-                duplicateItemsAllowed: false,
+                noResultsText: 'No clients found - type to add a new one',
+                addItems: true,  // Allows manual entry
                 choices: clients.map(client => ({
                     value: client.shop_name,
                     label: `${client.shop_name} (Debt: KSh ${client.debt.toFixed(2)})`
                 }))
             });
-
-            // Handle custom input for new clients
-            inputElement.addEventListener('addItem', (event) => {
-                const value = event.detail.value;
-                const selectedClient = clients.find(c => c.shop_name === value);
-                if (selectedClient) {
-                    debtElement.textContent = `Debt: KSh ${selectedClient.debt.toFixed(2)}`;
-                    debtElement.classList.remove('hidden');
-                } else if (value) {
-                    debtElement.textContent = 'Debt: KSh 0.00 (New Client)';
-                    debtElement.classList.remove('hidden');
-                    choices.setValue([{ value: value, label: value }]); // Set the new client name directly
-                } else {
-                    debtElement.classList.add('hidden');
-                }
-            });
-
             inputElement.addEventListener('change', () => {
-                const value = inputElement.value;
-                const selectedClient = clients.find(c => c.shop_name === value);
+                const selectedClient = clients.find(c => c.shop_name === inputElement.value);
                 if (selectedClient) {
                     debtElement.textContent = `Debt: KSh ${selectedClient.debt.toFixed(2)}`;
                     debtElement.classList.remove('hidden');
-                } else if (value) {
+                } else if (inputElement.value) {
                     debtElement.textContent = 'Debt: KSh 0.00 (New Client)';
                     debtElement.classList.remove('hidden');
                 } else {
