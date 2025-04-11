@@ -69,7 +69,7 @@
                                 <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
                             </svg>
                         </button>
-                        <div class="order-actions-menu hidden absolute right-0 mt-2 w-48 bg-white dark:bg-gray-700 rounded-lg shadow-lg z-10 py-1">
+                        <div class="order-actions-menu hidden absolute right-6 top-12 w-48 bg-white dark:bg-gray-700 rounded-lg shadow-lg z-20 py-1">
                             <a href="{{ url_for('receipt', order_id=order.receipt_id) }}" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600">View Receipt</a>
                             <button class="edit-order-btn w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600" data-receipt-id="{{ order.receipt_id }}" data-order-type="{{ order.order_type }}" data-shop-name="{{ order.shop_name }}" data-items='{{ order.items_list|tojson|safe }}'>Edit Order</button>
                             <button class="delete-order-btn w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-600" data-receipt-id="{{ order.receipt_id }}">Delete Order</button>
@@ -267,724 +267,220 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
 
 <script>
-    // Modal Management
-    const retailModal = document.getElementById('retail-modal');
-    const wholesaleModal = document.getElementById('wholesale-modal');
-    const editModal = document.getElementById('edit-order-modal');
-    const manualModal = document.getElementById('manual-item-modal');
-    const paidModal = document.getElementById('mark-paid-modal');
-    const returnModal = document.getElementById('return-stock-modal');
-    const openRetail = document.getElementById('open-retail-modal');
-    const openWholesale = document.getElementById('open-wholesale-modal');
-    const closeRetail = document.getElementById('close-retail-modal');
-    const closeWholesale = document.getElementById('close-wholesale-modal');
-    const closeEdit = document.getElementById('close-edit-modal');
-    const closeManual = document.getElementById('close-manual-modal');
-    const closePaid = document.getElementById('close-paid-modal');
-    const closeReturn = document.getElementById('close-return-modal');
-    const addRetailManual = document.getElementById('add-retail-manual');
-    const addWholesaleManual = document.getElementById('add-wholesale-manual');
-    const addEditManual = document.getElementById('add-edit-manual');
-    const addManualToOrder = document.getElementById('add-manual-to-order');
-    const retailContainer = document.getElementById('retail-items-container');
-    const wholesaleContainer = document.getElementById('wholesale-items-container');
-    const editContainer = document.getElementById('edit-items-container');
-    const manualQty = document.getElementById('manual-item-qty');
-    const manualPrice = document.getElementById('manual-item-price');
-    const manualTotal = document.getElementById('manual-total');
+// Modal Management
+const retailModal = document.getElementById('retail-modal');
+const wholesaleModal = document.getElementById('wholesale-modal');
+const editModal = document.getElementById('edit-order-modal');
+const manualModal = document.getElementById('manual-item-modal');
+const paidModal = document.getElementById('mark-paid-modal');
+const returnModal = document.getElementById('return-stock-modal');
+const openRetail = document.getElementById('open-retail-modal');
+const openWholesale = document.getElementById('open-wholesale-modal');
+const closeRetail = document.getElementById('close-retail-modal');
+const closeWholesale = document.getElementById('close-wholesale-modal');
+const closeEdit = document.getElementById('close-edit-modal');
+const closeManual = document.getElementById('close-manual-modal');
+const closePaid = document.getElementById('close-paid-modal');
+const closeReturn = document.getElementById('close-return-modal');
+const addRetailManual = document.getElementById('add-retail-manual');
+const addWholesaleManual = document.getElementById('add-wholesale-manual');
+const addEditManual = document.getElementById('add-edit-manual');
+const addManualToOrder = document.getElementById('add-manual-to-order');
+const retailContainer = document.getElementById('retail-items-container');
+const wholesaleContainer = document.getElementById('wholesale-items-container');
+const editContainer = document.getElementById('edit-items-container');
+const manualQty = document.getElementById('manual-item-qty');
+const manualPrice = document.getElementById('manual-item-price');
+const manualTotal = document.getElementById('manual-total');
 
-    let currentContainer;
+let currentContainer;
 
-    function closeAllModals() {
-        retailModal.classList.add('hidden');
-        wholesaleModal.classList.add('hidden');
-        editModal.classList.add('hidden');
-        manualModal.classList.add('hidden');
-        paidModal.classList.add('hidden');
-        returnModal.classList.add('hidden');
-    }
+function closeAllModals() {
+    retailModal.classList.add('hidden');
+    wholesaleModal.classList.add('hidden');
+    editModal.classList.add('hidden');
+    manualModal.classList.add('hidden');
+    paidModal.classList.add('hidden');
+    returnModal.classList.add('hidden');
+}
 
-    function showModalError(modalId, message) {
-        const errorDiv = document.getElementById(`${modalId}-error`);
-        errorDiv.textContent = message;
-        errorDiv.classList.remove('hidden');
-        setTimeout(() => errorDiv.classList.add('hidden'), 5000);
-    }
+function showModalError(modalId, message) {
+    const errorDiv = document.getElementById(`${modalId}-error`);
+    errorDiv.textContent = message;
+    errorDiv.classList.remove('hidden');
+    setTimeout(() => errorDiv.classList.add('hidden'), 5000);
+}
 
-    function resetModal(container) {
-        const header = container.querySelector('.item-row-header');
-        const initialAddBtn = container.querySelector('.add-item-btn');
-        container.innerHTML = '';
-        container.appendChild(header);
-        container.appendChild(initialAddBtn);
-        updateSubtotal(container);
-    }
+function resetModal(container) {
+    const header = container.querySelector('.item-row-header');
+    const initialAddBtn = container.querySelector('.add-item-btn');
+    container.innerHTML = '';
+    container.appendChild(header);
+    container.appendChild(initialAddBtn);
+    updateSubtotal(container);
+}
 
-    openRetail.addEventListener('click', () => {
-        closeAllModals();
-        resetModal(retailContainer);
-        retailModal.classList.remove('hidden');
-        currentContainer = retailContainer;
-        attachAddItemListeners(retailContainer);
-    });
+openRetail.addEventListener('click', () => {
+    closeAllModals();
+    resetModal(retailContainer);
+    retailModal.classList.remove('hidden');
+    currentContainer = retailContainer;
+    attachAddItemListeners(retailContainer);
+});
 
-    openWholesale.addEventListener('click', () => {
-        closeAllModals();
-        resetModal(wholesaleContainer);
-        wholesaleModal.classList.remove('hidden');
-        currentContainer = wholesaleContainer;
-        attachAddItemListeners(wholesaleContainer);
-    });
+openWholesale.addEventListener('click', () => {
+    closeAllModals();
+    resetModal(wholesaleContainer);
+    wholesaleModal.classList.remove('hidden');
+    currentContainer = wholesaleContainer;
+    attachAddItemListeners(wholesaleContainer);
+});
 
-    closeRetail.addEventListener('click', () => {
-        resetModal(retailContainer);
-        retailModal.classList.add('hidden');
-    });
-    closeWholesale.addEventListener('click', () => {
-        resetModal(wholesaleContainer);
-        wholesaleModal.classList.add('hidden');
-    });
-    closeEdit.addEventListener('click', () => {
-        resetModal(editContainer);
-        editModal.classList.add('hidden');
-    });
-    closeManual.addEventListener('click', () => {
-        manualModal.classList.add('hidden');
-        document.getElementById('manual-item-form').reset();
-        manualTotal.textContent = 'Total: 0';
-    });
-    closePaid.addEventListener('click', () => paidModal.classList.add('hidden'));
-    closeReturn.addEventListener('click', () => returnModal.classList.add('hidden'));
+closeRetail.addEventListener('click', () => {
+    resetModal(retailContainer);
+    retailModal.classList.add('hidden');
+});
+closeWholesale.addEventListener('click', () => {
+    resetModal(wholesaleContainer);
+    wholesaleModal.classList.add('hidden');
+});
+closeEdit.addEventListener('click', () => {
+    resetModal(editContainer);
+    editModal.classList.add('hidden');
+});
+closeManual.addEventListener('click', () => {
+    manualModal.classList.add('hidden');
+    document.getElementById('manual-item-form').reset();
+    manualTotal.textContent = 'Total: 0';
+});
+closePaid.addEventListener('click', () => paidModal.classList.add('hidden'));
+closeReturn.addEventListener('click', () => returnModal.classList.add('hidden'));
 
-    addRetailManual.addEventListener('click', () => {
-        manualModal.classList.remove('hidden');
-        currentContainer = retailContainer;
-    });
+addRetailManual.addEventListener('click', () => {
+    manualModal.classList.remove('hidden');
+    currentContainer = retailContainer;
+});
 
-    addWholesaleManual.addEventListener('click', () => {
-        manualModal.classList.remove('hidden');
-        currentContainer = wholesaleContainer;
-    });
+addWholesaleManual.addEventListener('click', () => {
+    manualModal.classList.remove('hidden');
+    currentContainer = wholesaleContainer;
+});
 
-    addEditManual.addEventListener('click', () => {
-        manualModal.classList.remove('hidden');
-        currentContainer = editContainer;
-    });
+addEditManual.addEventListener('click', () => {
+    manualModal.classList.remove('hidden');
+    currentContainer = editContainer;
+});
 
-    // Enhanced Client Population with Choices.js
-    async function populateClients(inputElement, debtElement) {
-        try {
-            const response = await fetch('/clients_data');
-            const clients = await response.json();
-            const choices = new Choices(inputElement, {
-                searchEnabled: true,
-                allowHTML: false,
-                placeholderValue: 'Search or type a client name',
-                noResultsText: 'No clients found - type to add a new client',
-                addItems: true,
-                removeItemButton: false,
-                maxItemCount: 1,
-                duplicateItemsAllowed: false,
-                choices: clients.map(client => ({
+// Enhanced Client Population with Choices.js
+async function populateClients(inputElement, debtElement) {
+    try {
+        const response = await fetch('/clients_data');
+        const clients = await response.json();
+        const choices = new Choices(inputElement, {
+            searchEnabled: true,
+            allowHTML: false,
+            placeholderValue: 'Search or type a client name',
+            noResultsText: 'No clients found - type to add a new client',
+            addItems: true,
+            removeItemButton: false,
+            maxItemCount: 1,
+            duplicateItemsAllowed: false,
+            choices: clients.map(client => ({
+                value: client.shop_name,
+                label: `${client.shop_name} (Debt: KSh ${client.debt.toFixed(2)})`
+            })),
+            searchFloor: 1,
+            searchResultLimit: 10,
+            shouldSort: false,
+        });
+
+        inputElement.addEventListener('change', () => {
+            const value = choices.getValue(true);
+            const selectedClient = clients.find(c => c.shop_name === value);
+            if (selectedClient) {
+                debtElement.textContent = `Debt: KSh ${selectedClient.debt.toFixed(2)}`;
+                debtElement.classList.remove('hidden');
+            } else if (value) {
+                debtElement.textContent = 'Debt: KSh 0.00 (New Client)';
+                debtElement.classList.remove('hidden');
+                if (!choices.getChoiceByValue(value)) {
+                    choices.setChoices([{ value: value, label: value }], 'value', 'label', false);
+                    choices.setChoiceByValue(value);
+                }
+            } else {
+                debtElement.classList.add('hidden');
+            }
+        });
+
+        inputElement.addEventListener('search', (event) => {
+            const searchTerm = event.detail.value.toLowerCase();
+            const filteredClients = clients.filter(client => 
+                client.shop_name.toLowerCase().includes(searchTerm)
+            );
+            choices.setChoices(
+                filteredClients.map(client => ({
                     value: client.shop_name,
                     label: `${client.shop_name} (Debt: KSh ${client.debt.toFixed(2)})`
                 })),
-                searchFloor: 1,
-                searchResultLimit: 10,
-                shouldSort: false,
-            });
-
-            inputElement.addEventListener('change', () => {
-                const value = choices.getValue(true);
-                const selectedClient = clients.find(c => c.shop_name === value);
-                if (selectedClient) {
-                    debtElement.textContent = `Debt: KSh ${selectedClient.debt.toFixed(2)}`;
-                    debtElement.classList.remove('hidden');
-                } else if (value) {
-                    debtElement.textContent = 'Debt: KSh 0.00 (New Client)';
-                    debtElement.classList.remove('hidden');
-                    if (!choices.getChoiceByValue(value)) {
-                        choices.setChoices([{ value: value, label: value }], 'value', 'label', false);
-                        choices.setChoiceByValue(value);
-                    }
-                } else {
-                    debtElement.classList.add('hidden');
-                }
-            });
-
-            inputElement.addEventListener('search', (event) => {
-                const searchTerm = event.detail.value.toLowerCase();
-                const filteredClients = clients.filter(client => 
-                    client.shop_name.toLowerCase().includes(searchTerm)
-                );
-                choices.setChoices(
-                    filteredClients.map(client => ({
-                        value: client.shop_name,
-                        label: `${client.shop_name} (Debt: KSh ${client.debt.toFixed(2)})`
-                    })),
-                    'value',
-                    'label',
-                    true
-                );
-                if (searchTerm && !filteredClients.some(c => c.shop_name.toLowerCase() === searchTerm)) {
-                    choices.setChoices([{ value: searchTerm, label: `${searchTerm} (New)` }], 'value', 'label', false);
-                }
-            });
-        } catch (error) {
-            console.error('Error loading clients:', error);
-            showModalError(inputElement.closest('form').id.replace('-form', ''), 'Failed to load clients.');
-        }
-    }
-
-    populateClients(document.getElementById('retail-client-input'), document.getElementById('retail-client-debt'));
-    populateClients(document.getElementById('wholesale-client-input'), document.getElementById('wholesale-client-debt'));
-    populateClients(document.getElementById('edit-client-input'), document.getElementById('edit-client-debt'));
-
-    // Fixed Pagination and Filtering
-    const ordersPerPage = 10;
-    let currentPage = 1;
-    const ordersTbody = document.getElementById('orders-tbody');
-    const prevPageBtn = document.getElementById('prev-page');
-    const nextPageBtn = document.getElementById('next-page');
-    const pageInfo = document.getElementById('page-info');
-    const orderSearch = document.getElementById('order-search');
-    let currentFilter = 'all'; // Track the active filter
-    const allRows = Array.from(document.querySelectorAll('.order-row')); // Store all rows statically
-
-    function updateOrdersDisplay() {
-        const searchTerm = orderSearch.value.toLowerCase();
-
-        // Filter rows based on current filter and search
-        let filteredRows = allRows.filter(row => {
-            const balance = parseFloat(row.getAttribute('data-balance'));
-            const searchText = row.getAttribute('data-search').toLowerCase();
-            const matchesFilter = currentFilter === 'all' || 
-                                 (currentFilter === 'pending' && balance > 0) || 
-                                 (currentFilter === 'paid' && balance === 0);
-            const matchesSearch = searchTerm === '' || searchText.includes(searchTerm);
-            return matchesFilter && matchesSearch;
-        });
-
-        // Sort by date descending
-        filteredRows.sort((a, b) => new Date(b.getAttribute('data-date')) - new Date(a.getAttribute('data-date')));
-
-        // Paginate
-        const totalPages = Math.ceil(filteredRows.length / ordersPerPage) || 1;
-        if (currentPage > totalPages) currentPage = totalPages; // Adjust if out of bounds
-        const start = (currentPage - 1) * ordersPerPage;
-        const end = start + ordersPerPage;
-        const visibleRows = filteredRows.slice(start, end);
-
-        // Update table with fresh DOM nodes
-        ordersTbody.innerHTML = '';
-        visibleRows.forEach(row => ordersTbody.appendChild(row.cloneNode(true))); // Clone to avoid moving original nodes
-
-        // Update pagination controls
-        pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
-        prevPageBtn.disabled = currentPage === 1;
-        nextPageBtn.disabled = currentPage === totalPages || filteredRows.length === 0;
-    }
-
-    prevPageBtn.addEventListener('click', () => {
-        if (currentPage > 1) {
-            currentPage--;
-            updateOrdersDisplay();
-        }
-    });
-
-    nextPageBtn.addEventListener('click', () => {
-        const filteredRows = allRows.filter(row => {
-            const balance = parseFloat(row.getAttribute('data-balance'));
-            const searchText = row.getAttribute('data-search').toLowerCase();
-            const matchesFilter = currentFilter === 'all' || 
-                                 (currentFilter === 'pending' && balance > 0) || 
-                                 (currentFilter === 'paid' && balance === 0);
-            return matchesFilter && (orderSearch.value.toLowerCase() === '' || searchText.includes(orderSearch.value.toLowerCase()));
-        });
-        const totalPages = Math.ceil(filteredRows.length / ordersPerPage);
-        if (currentPage < totalPages) {
-            currentPage++;
-            updateOrdersDisplay();
-        }
-    });
-
-    orderSearch.addEventListener('input', () => {
-        currentPage = 1;
-        updateOrdersDisplay();
-    });
-
-    document.querySelectorAll('.filter-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.filter-btn').forEach(b => {
-                b.classList.remove('bg-blue-500', 'text-white');
-                b.classList.add('text-gray-600', 'dark:text-gray-300', 'hover:bg-gray-100', 'dark:hover:bg-gray-700');
-            });
-            btn.classList.remove('text-gray-600', 'dark:text-gray-300', 'hover:bg-gray-100', 'dark:hover:bg-gray-700');
-            btn.classList.add('bg-blue-500', 'text-white');
-            currentFilter = btn.getAttribute('data-filter');
-            currentPage = 1;
-            updateOrdersDisplay();
-        });
-    });
-
-    // Initial display
-    document.querySelector('[data-filter="all"]').click();
-
-    // Remaining Functions
-    function attachAddItemListeners(container) {
-        container.querySelectorAll('.add-item-btn').forEach(btn => {
-            btn.addEventListener('click', () => addItem(container));
-        });
-    }
-
-    function addItem(container) {
-        const div = document.createElement('div');
-        div.className = 'grid grid-cols-6 gap-2 item-row';
-        div.innerHTML = `
-            <select name="items[]" class="col-span-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-select w-full">
-                <option value="">Search or select a product</option>
-                {% for item in stock_items %}
-                <option value="product|{{ item.stock_name }}|quantity|0|price|{{ item.selling_price }}|stock|{{ item.stock_quantity }}">{{ item.stock_name }}</option>
-                {% endfor %}
-            </select>
-            <input name="items[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="1">
-            <input type="number" class="price-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-            <input type="number" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-            <input type="number" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-            <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
-        `;
-        const addBtn = container.querySelector('.add-item-btn');
-        container.insertBefore(div, addBtn);
-        const choices = new Choices(div.querySelector('.product-select'), {
-            searchEnabled: true,
-            searchChoices: true,
-            itemSelectText: '',
-            placeholderValue: 'Search or select a product'
-        });
-        div.querySelector('.remove-item').addEventListener('click', () => {
-            div.remove();
-            updateSubtotal(container);
-        });
-        attachPriceListener(div);
-        updateSubtotal(container);
-    }
-
-    addManualToOrder.addEventListener('click', () => {
-        const name = document.getElementById('manual-item-name').value.trim();
-        const qty = parseInt(manualQty.value) || 0;
-        const price = parseFloat(manualPrice.value) || 0;
-        if (!name) {
-            showModalError('manual-item', 'Item name is required.');
-            return;
-        }
-        if (qty <= 0) {
-            showModalError('manual-item', 'Quantity must be greater than 0.');
-            return;
-        }
-        if (price <= 0) {
-            showModalError('manual-item', 'Price must be greater than 0.');
-            return;
-        }
-        const div = document.createElement('div');
-        div.className = 'grid grid-cols-6 gap-2 item-row';
-        div.innerHTML = `
-            <input name="items[]" type="hidden" value="product|${name}|quantity|0|price|${price}|stock|0">
-            <span class="col-span-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center">${name}</span>
-            <input name="items[]" type="number" value="${qty}" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="1">
-            <input type="number" value="${price}" class="price-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-            <input type="number" value="0" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-            <input type="number" value="${price * qty}" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-            <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
-        `;
-        const addBtn = currentContainer.querySelector('.add-item-btn');
-        currentContainer.insertBefore(div, addBtn);
-        div.querySelector('.remove-item').addEventListener('click', () => {
-            div.remove();
-            updateSubtotal(currentContainer);
-        });
-        div.querySelector('.qty-input').addEventListener('input', () => updatePriceAndTotal(div));
-        manualModal.classList.add('hidden');
-        document.getElementById('manual-item-form').reset();
-        manualTotal.textContent = 'Total: 0';
-        updateSubtotal(currentContainer);
-    });
-
-    function markPaid(receiptId, balance) {
-        closeAllModals();
-        paidModal.classList.remove('hidden');
-        document.getElementById('paid-order-id').textContent = receiptId;
-        document.getElementById('full-amount-text').textContent = `Remaining Balance: ${parseFloat(balance).toFixed(2)}`;
-        const form = document.getElementById('mark-paid-form');
-        form.action = `/mark_paid/${receiptId}`;
-        document.getElementById('paid-amount').max = balance;
-        document.getElementById('paid-amount').value = '';
-
-        form.onsubmit = function(e) {
-            e.preventDefault();
-            const submitBtn = form.querySelector('.submit-btn');
-            submitBtn.classList.add('processing');
-            submitBtn.disabled = true;
-            const amountPaid = parseFloat(document.getElementById('paid-amount').value) || 0;
-            if (amountPaid <= 0 || amountPaid > parseFloat(balance)) {
-                showModalError('mark-paid', 'Please enter a valid amount (greater than 0, up to the balance).');
-                submitBtn.classList.remove('processing');
-                submitBtn.disabled = false;
-                return;
+                'value',
+                'label',
+                true
+            );
+            if (searchTerm && !filteredClients.some(c => c.shop_name.toLowerCase() === searchTerm)) {
+                choices.setChoices([{ value: searchTerm, label: `${searchTerm} (New)` }], 'value', 'label', false);
             }
-
-            const formData = new FormData(this);
-            fetch(this.action, {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                if (response.ok) {
-                    paidModal.classList.add('hidden');
-                    window.location.href = '/orders';
-                } else {
-                    response.text().then(text => showModalError('mark-paid', 'Error processing payment: ' + text));
-                    submitBtn.classList.remove('processing');
-                    submitBtn.disabled = false;
-                }
-            })
-            .catch(error => {
-                showModalError('mark-paid', 'An error occurred while processing the payment.');
-                submitBtn.classList.remove('processing');
-                submitBtn.disabled = false;
-            });
-        };
+        });
+    } catch (error) {
+        console.error('Error loading clients:', error);
+        showModalError(inputElement.closest('form').id.replace('-form', ''), 'Failed to load clients.');
     }
+}
 
-    function returnStock(receiptId, itemsJson) {
-        closeAllModals();
-        returnModal.classList.remove('hidden');
-        document.getElementById('return-order-id').textContent = receiptId;
-        const form = document.getElementById('return-stock-form');
-        const returnItemsContainer = document.getElementById('return-stock-items-container');
-        form.action = `/return_stock/${receiptId}`;
+populateClients(document.getElementById('retail-client-input'), document.getElementById('retail-client-debt'));
+populateClients(document.getElementById('wholesale-client-input'), document.getElementById('wholesale-client-debt'));
+populateClients(document.getElementById('edit-client-input'), document.getElementById('edit-client-debt'));
 
-        returnItemsContainer.innerHTML = '';
-        let items = typeof itemsJson === 'string' ? JSON.parse(itemsJson) : itemsJson;
-        if (Array.isArray(items) && items.length > 0) {
-            items.forEach(item => {
-                if (item.name && item.quantity > 0) {
-                    const div = document.createElement('div');
-                    div.className = 'flex items-center justify-between p-2 bg-gray-100 dark:bg-gray-700 rounded-lg';
-                    div.innerHTML = `
-                        <div class="flex items-center space-x-2">
-                            <input type="checkbox" name="return_item_${item.name}" class="return-item-checkbox h-5 w-5 text-yellow-500 rounded">
-                            <span class="text-gray-900 dark:text-white">${item.name} (Ordered: ${item.quantity})</span>
-                        </div>
-                        <input type="number" name="return_qty_${item.name}" placeholder="Qty to Return" class="return-qty-input p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 w-24 text-center hidden" min="0" max="${item.quantity}" value="0">
-                    `;
-                    returnItemsContainer.appendChild(div);
-
-                    const checkbox = div.querySelector('.return-item-checkbox');
-                    const qtyInput = div.querySelector('.return-qty-input');
-                    checkbox.addEventListener('change', () => {
-                        qtyInput.classList.toggle('hidden', !checkbox.checked);
-                        if (!checkbox.checked) qtyInput.value = 0;
-                    });
-                }
+// Function to attach action button listeners
+function attachActionButtonListeners() {
+    document.querySelectorAll('.order-actions-btn').forEach(btn => {
+        // Remove existing listeners to prevent duplicates
+        const newBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(newBtn, btn);
+        
+        newBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const menu = newBtn.nextElementSibling;
+            const isOpen = !menu.classList.contains('hidden');
+            
+            // Close all other menus
+            document.querySelectorAll('.order-actions-menu').forEach(m => {
+                if (m !== menu) m.classList.add('hidden');
             });
-        } else {
-            returnItemsContainer.innerHTML = '<p class="text-gray-700 dark:text-gray-300">No items available for return.</p>';
-        }
+            
+            // Toggle the current menu
+            menu.classList.toggle('hidden');
 
-        let isSubmitting = false;
-        form.onsubmit = function(e) {
-            e.preventDefault();
-            if (isSubmitting) return;
-
-            const submitBtn = form.querySelector('.submit-btn');
-            submitBtn.classList.add('processing');
-            submitBtn.disabled = true;
-            isSubmitting = true;
-
-            const formData = new FormData(this);
-            let hasReturns = false;
-            items.forEach(item => {
-                const qty = parseInt(formData.get(`return_qty_${item.name}`)) || 0;
-                if (qty > 0) {
-                    hasReturns = true;
-                    if (qty > item.quantity) {
-                        showModalError('return-stock', `Cannot return more than ${item.quantity} units of ${item.name}.`);
-                        submitBtn.classList.remove('processing');
-                        submitBtn.disabled = false;
-                        isSubmitting = false;
-                        return;
-                    }
-                }
-            });
-
-            if (!hasReturns) {
-                showModalError('return-stock', 'Please specify at least one item to return.');
-                submitBtn.classList.remove('processing');
-                submitBtn.disabled = false;
-                isSubmitting = false;
-                return;
-            }
-
-            fetch(this.action, {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                if (response.ok) {
-                    returnModal.classList.add('hidden');
-                    alert('Stock returns logged successfully. Please update the stock manually.');
-                    window.location.href = '/orders';
-                } else {
-                    response.text().then(text => showModalError('return-stock', 'Error logging stock returns: ' + text));
-                    submitBtn.classList.remove('processing');
-                    submitBtn.disabled = false;
-                    isSubmitting = false;
-                }
-            })
-            .catch(error => {
-                showModalError('return-stock', 'An error occurred while logging the stock returns: ' + error);
-                submitBtn.classList.remove('processing');
-                submitBtn.disabled = false;
-                isSubmitting = false;
-            });
-        };
-    }
-
-    function editOrder(receiptId, orderType, shopName, itemsJson) {
-        closeAllModals();
-        editModal.classList.remove('hidden');
-        document.getElementById('edit-order-id').textContent = receiptId;
-        document.getElementById('edit-order-type').value = orderType;
-        const editClientInput = document.getElementById('edit-client-input');
-        const choices = Choices.getInstance(editClientInput);
-        choices.setChoiceByValue(shopName || '');
-        const form = document.getElementById('edit-order-form');
-        form.action = `/edit_order/${receiptId}`;
-        resetModal(editContainer);
-        attachAddItemListeners(editContainer);
-
-        let items = typeof itemsJson === 'string' ? JSON.parse(itemsJson) : itemsJson;
-        if (Array.isArray(items)) {
-            items.forEach(item => {
-                const div = document.createElement('div');
-                div.className = 'grid grid-cols-6 gap-2 item-row';
-                div.innerHTML = `
-                    <input name="items[]" type="hidden" value="product|${item.name}|quantity|0|price|${item.price || 0}|stock|0">
-                    <span class="col-span-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center">${item.name}</span>
-                    <input name="items[]" type="number" value="${item.quantity}" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="1">
-                    <input type="number" value="${item.price || 0}" class="price-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-                    <input type="number" value="0" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-                    <input type="number" value="${(item.price || 0) * item.quantity}" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-                    <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
-                `;
-                const addBtn = editContainer.querySelector('.add-item-btn');
-                editContainer.insertBefore(div, addBtn);
-                div.querySelector('.remove-item').addEventListener('click', () => {
-                    div.remove();
-                    updateSubtotal(editContainer);
-                });
-                div.querySelector('.qty-input').addEventListener('input', () => updatePriceAndTotal(div));
-            });
-        }
-        updateSubtotal(editContainer);
-
-        form.onsubmit = function(e) {
-            e.preventDefault();
-            const submitBtn = form.querySelector('.submit-btn');
-            submitBtn.classList.add('processing');
-            submitBtn.disabled = true;
-
-            const formData = new FormData(this);
-            fetch(this.action, {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                if (response.ok) {
-                    editModal.classList.add('hidden');
-                    window.location.href = '/orders';
-                } else {
-                    response.text().then(text => showModalError('edit-order', 'Error updating order: ' + text));
-                    submitBtn.classList.remove('processing');
-                    submitBtn.disabled = false;
-                }
-            })
-            .catch(error => {
-                showModalError('edit-order', 'An error occurred while updating the order: ' + error);
-                submitBtn.classList.remove('processing');
-                submitBtn.disabled = false;
-            });
-        };
-    }
-
-    function deleteOrder(receiptId) {
-        if (!confirm(`Are you sure you want to delete order #${receiptId}?`)) return;
-
-        fetch(`/delete_order/${receiptId}`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': '{{ csrf_token() }}'
-            }
-        })
-        .then(response => {
-            if (response.ok) {
-                alert('Order deleted successfully.');
-                window.location.href = '/orders';
+            // Adjust menu position to prevent cut-off
+            const menuRect = menu.getBoundingClientRect();
+            const tableRect = document.getElementById('orders-table').getBoundingClientRect();
+            if (menuRect.bottom > tableRect.bottom) {
+                menu.style.top = 'auto';
+                menu.style.bottom = '40px';
             } else {
-                response.text().then(text => alert('Error deleting order: ' + text));
+                menu.style.top = '12px';
+                menu.style.bottom = 'auto';
             }
-        })
-        .catch(error => {
-            alert('An error occurred while deleting the order: ' + error);
-        });
-    }
-
-    manualQty.addEventListener('input', updateManualTotal);
-    manualPrice.addEventListener('input', updateManualTotal);
-    function updateManualTotal() {
-        const qty = parseInt(manualQty.value) || 0;
-        const price = parseFloat(manualPrice.value) || 0;
-        manualTotal.textContent = `Total: ${(qty * price).toFixed(2)}`;
-    }
-
-    function attachPriceListener(row) {
-        const select = row.querySelector('.product-select');
-        const priceDisplay = row.querySelector('.price-display');
-        const stockDisplay = row.querySelector('.stock-display');
-        const totalDisplay = row.querySelector('.total-display');
-        const qtyInput = row.querySelector('.qty-input');
-        let basePrice = 0;
-        let maxStock = 0;
-
-        select.addEventListener('change', () => {
-            const selectedOption = select.options[select.selectedIndex];
-            if (selectedOption.value) {
-                const values = selectedOption.value.split('|');
-                basePrice = parseFloat(values[5]) || 0;
-                maxStock = parseInt(values[7]) || 0;
-                priceDisplay.value = basePrice;
-                stockDisplay.value = maxStock;
-                const qty = parseInt(qtyInput.value) || 0;
-                if (qty > maxStock) {
-                    qtyInput.value = maxStock;
-                    alert(`Cannot order more than ${maxStock} units of ${values[1]}.`);
-                }
-                totalDisplay.value = (basePrice * (parseInt(qtyInput.value) || 0)).toFixed(2);
-                updateSubtotal(row.closest('.space-y-4'));
+            if (menuRect.right > tableRect.right) {
+                menu.style.right = '0';
+                menu.style.left = 'auto';
             } else {
-                basePrice = 0;
-                maxStock = 0;
-                priceDisplay.value = '';
-                stockDisplay.value = '';
-                totalDisplay.value = '';
-                updateSubtotal(row.closest('.space-y-4'));
+                menu.style.right = '6px';
+                menu.style.left = 'auto';
             }
-        });
-
-        qtyInput.addEventListener('input', () => {
-            const qty = parseInt(qtyInput.value) || 0;
-            if (qty > maxStock) {
-                qtyInput.value = maxStock;
-                alert(`Cannot order more than ${maxStock} units.`);
-            }
-            totalDisplay.value = (basePrice * (parseInt(qtyInput.value) || 0)).toFixed(2);
-            updateSubtotal(row.closest('.space-y-4'));
-        });
-    }
-
-    function updatePriceAndTotal(row) {
-        const qtyInput = row.querySelector('.qty-input');
-        const priceDisplay = row.querySelector('.price-display');
-        const totalDisplay = row.querySelector('.total-display');
-        const basePrice = parseFloat(row.querySelector('input[type="hidden"]')?.value.split('|')[5]) || parseFloat(priceDisplay.value) || 0;
-        const qty = parseInt(qtyInput.value) || 0;
-        totalDisplay.value = (basePrice * qty).toFixed(2);
-        updateSubtotal(row.closest('.space-y-4'));
-    }
-
-    function updateSubtotal(container) {
-        let subtotal = 0;
-        const activeContainer = container || (retailModal.classList.contains('hidden') ? (editModal.classList.contains('hidden') ? wholesaleContainer : editContainer) : retailContainer);
-        const rows = activeContainer.querySelectorAll('.item-row');
-        rows.forEach(row => {
-            const totalDisplay = row.querySelector('.total-display');
-            if (totalDisplay && totalDisplay.value) subtotal += parseFloat(totalDisplay.value) || 0;
-        });
-        const totalSpan = activeContainer.parentElement.querySelector('[id$="-order-total"]');
-        if (totalSpan) totalSpan.textContent = subtotal.toFixed(2);
-    }
-
-    document.querySelectorAll('.product-select').forEach(select => {
-        const choices = new Choices(select, {
-            searchEnabled: true,
-            searchChoices: true,
-            itemSelectText: '',
-            placeholderValue: 'Search or select a product'
-        });
-        const row = select.closest('.item-row');
-        if (row) attachPriceListener(row);
-    });
-
-    document.querySelectorAll('.space-y-4').forEach(container => {
-        container.querySelectorAll('.qty-input').forEach(input => {
-            input.addEventListener('input', () => updatePriceAndTotal(input.closest('.item-row')));
         });
     });
 
-    document.getElementById('retail-form').addEventListener('submit', function(e) {
-        e.preventDefault();
-        const submitBtn = this.querySelector('.submit-btn');
-        submitBtn.classList.add('processing');
-        submitBtn.disabled = true;
-        const formData = new FormData(this);
-        fetch(this.action, {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => {
-            if (response.ok) {
-                retailModal.classList.add('hidden');
-                window.location.reload();
-            } else {
-                response.text().then(text => showModalError('retail', 'Error submitting retail order: ' + text));
-                submitBtn.classList.remove('processing');
-                submitBtn.disabled = false;
-            }
-        })
-        .catch(error => {
-            showModalError('retail', 'An error occurred while submitting the retail order.');
-            submitBtn.classList.remove('processing');
-            submitBtn.disabled = false;
-        });
-    });
-
-    document.getElementById('wholesale-form').addEventListener('submit', function(e) {
-        e.preventDefault();
-        const submitBtn = this.querySelector('.submit-btn');
-        submitBtn.classList.add('processing');
-        submitBtn.disabled = true;
-        const formData = new FormData(this);
-        fetch(this.action, {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => {
-            if (response.ok) {
-                wholesaleModal.classList.add('hidden');
-                window.location.reload();
-            } else {
-                response.text().then(text => showModalError('wholesale', 'Error submitting wholesale order: ' + text));
-                submitBtn.classList.remove('processing');
-                submitBtn.disabled = false;
-            }
-        })
-        .catch(error => {
-            showModalError('wholesale', 'An error occurred while submitting the wholesale order.');
-            submitBtn.classList.remove('processing');
-            submitBtn.disabled = false;
-        });
-    });
-
+    // Reattach other button listeners
     document.querySelectorAll('.mark-paid-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const receiptId = btn.getAttribute('data-receipt-id');
@@ -1018,199 +514,732 @@
             deleteOrder(receiptId);
         });
     });
+}
 
-    document.querySelectorAll('.order-actions-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const menu = btn.nextElementSibling;
-            const isOpen = !menu.classList.contains('hidden');
-            
-            document.querySelectorAll('.order-actions-menu').forEach(m => {
-                if (m !== menu) m.classList.add('hidden');
-            });
-            
-            menu.classList.toggle('hidden');
-        });
+// Fixed Pagination and Filtering
+const ordersPerPage = 10;
+let currentPage = 1;
+const ordersTbody = document.getElementById('orders-tbody');
+const prevPageBtn = document.getElementById('prev-page');
+const nextPageBtn = document.getElementById('next-page');
+const pageInfo = document.getElementById('page-info');
+const orderSearch = document.getElementById('order-search');
+let currentFilter = 'all';
+const allRows = Array.from(document.querySelectorAll('.order-row'));
+
+function updateOrdersDisplay() {
+    const searchTerm = orderSearch.value.toLowerCase();
+
+    let filteredRows = allRows.filter(row => {
+        const balance = parseFloat(row.getAttribute('data-balance'));
+        const searchText = row.getAttribute('data-search').toLowerCase();
+        const matchesFilter = currentFilter === 'all' || 
+                             (currentFilter === 'pending' && balance > 0) || 
+                             (currentFilter === 'paid' && balance === 0);
+        const matchesSearch = searchTerm === '' || searchText.includes(searchTerm);
+        return matchesFilter && matchesSearch;
     });
 
-    document.addEventListener('click', () => {
+    filteredRows.sort((a, b) => new Date(b.getAttribute('data-date')) - new Date(a.getAttribute('data-date')));
+
+    const totalPages = Math.ceil(filteredRows.length / ordersPerPage) || 1;
+    if (currentPage > totalPages) currentPage = totalPages;
+    const start = (currentPage - 1) * ordersPerPage;
+    const end = start + ordersPerPage;
+    const visibleRows = filteredRows.slice(start, end);
+
+    ordersTbody.innerHTML = '';
+    visibleRows.forEach(row => ordersTbody.appendChild(row.cloneNode(true)));
+
+    pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+    prevPageBtn.disabled = currentPage === 1;
+    nextPageBtn.disabled = currentPage === totalPages || filteredRows.length === 0;
+
+    // Reattach listeners after updating the table
+    attachActionButtonListeners();
+}
+
+prevPageBtn.addEventListener('click', () => {
+    if (currentPage > 1) {
+        currentPage--;
+        updateOrdersDisplay();
+    }
+});
+
+nextPageBtn.addEventListener('click', () => {
+    const filteredRows = allRows.filter(row => {
+        const balance = parseFloat(row.getAttribute('data-balance'));
+        const searchText = row.getAttribute('data-search').toLowerCase();
+        const matchesFilter = currentFilter === 'all' || 
+                             (currentFilter === 'pending' && balance > 0) || 
+                             (currentFilter === 'paid' && balance === 0);
+        return matchesFilter && (orderSearch.value.toLowerCase() === '' || searchText.includes(orderSearch.value.toLowerCase()));
+    });
+    const totalPages = Math.ceil(filteredRows.length / ordersPerPage);
+    if (currentPage < totalPages) {
+        currentPage++;
+        updateOrdersDisplay();
+    }
+});
+
+orderSearch.addEventListener('input', () => {
+    currentPage = 1;
+    updateOrdersDisplay();
+});
+
+document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.filter-btn').forEach(b => {
+            b.classList.remove('bg-blue-500', 'text-white');
+            b.classList.add('text-gray-600', 'dark:text-gray-300', 'hover:bg-gray-100', 'dark:hover:bg-gray-700');
+        });
+        btn.classList.remove('text-gray-600', 'dark:text-gray-300', 'hover:bg-gray-100', 'dark:hover:bg-gray-700');
+        btn.classList.add('bg-blue-500', 'text-white');
+        currentFilter = btn.getAttribute('data-filter');
+        currentPage = 1;
+        updateOrdersDisplay();
+    });
+});
+
+// Initial display
+document.querySelector('[data-filter="all"]').click();
+
+// Remaining Functions
+function attachAddItemListeners(container) {
+    container.querySelectorAll('.add-item-btn').forEach(btn => {
+        btn.addEventListener('click', () => addItem(container));
+    });
+}
+
+function addItem(container) {
+    const div = document.createElement('div');
+    div.className = 'grid grid-cols-6 gap-2 item-row';
+    div.innerHTML = `
+        <select name="items[]" class="col-span-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-select w-full">
+            <option value="">Search or select a product</option>
+            {% for item in stock_items %}
+            <option value="product|{{ item.stock_name }}|quantity|0|price|{{ item.selling_price }}|stock|{{ item.stock_quantity }}">{{ item.stock_name }}</option>
+            {% endfor %}
+        </select>
+        <input name="items[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="1">
+        <input type="number" class="price-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+        <input type="number" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+        <input type="number" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+        <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
+    `;
+    const addBtn = container.querySelector('.add-item-btn');
+    container.insertBefore(div, addBtn);
+    const choices = new Choices(div.querySelector('.product-select'), {
+        searchEnabled: true,
+        searchChoices: true,
+        itemSelectText: '',
+        placeholderValue: 'Search or select a product'
+    });
+    div.querySelector('.remove-item').addEventListener('click', () => {
+        div.remove();
+        updateSubtotal(container);
+    });
+    attachPriceListener(div);
+    updateSubtotal(container);
+}
+
+addManualToOrder.addEventListener('click', () => {
+    const name = document.getElementById('manual-item-name').value.trim();
+    const qty = parseInt(manualQty.value) || 0;
+    const price = parseFloat(manualPrice.value) || 0;
+    if (!name) {
+        showModalError('manual-item', 'Item name is required.');
+        return;
+    }
+    if (qty <= 0) {
+        showModalError('manual-item', 'Quantity must be greater than 0.');
+        return;
+    }
+    if (price <= 0) {
+        showModalError('manual-item', 'Price must be greater than 0.');
+        return;
+    }
+    const div = document.createElement('div');
+    div.className = 'grid grid-cols-6 gap-2 item-row';
+    div.innerHTML = `
+        <input name="items[]" type="hidden" value="product|${name}|quantity|0|price|${price}|stock|0">
+        <span class="col-span-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center">${name}</span>
+        <input name="items[]" type="number" value="${qty}" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="1">
+        <input type="number" value="${price}" class="price-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+        <input type="number" value="0" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+        <input type="number" value="${price * qty}" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+        <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
+    `;
+    const addBtn = currentContainer.querySelector('.add-item-btn');
+    currentContainer.insertBefore(div, addBtn);
+    div.querySelector('.remove-item').addEventListener('click', () => {
+        div.remove();
+        updateSubtotal(currentContainer);
+    });
+    div.querySelector('.qty-input').addEventListener('input', () => updatePriceAndTotal(div));
+    manualModal.classList.add('hidden');
+    document.getElementById('manual-item-form').reset();
+    manualTotal.textContent = 'Total: 0';
+    updateSubtotal(currentContainer);
+});
+
+function markPaid(receiptId, balance) {
+    closeAllModals();
+    paidModal.classList.remove('hidden');
+    document.getElementById('paid-order-id').textContent = receiptId;
+    document.getElementById('full-amount-text').textContent = `Remaining Balance: ${parseFloat(balance).toFixed(2)}`;
+    const form = document.getElementById('mark-paid-form');
+    form.action = `/mark_paid/${receiptId}`;
+    document.getElementById('paid-amount').max = balance;
+    document.getElementById('paid-amount').value = '';
+
+    form.onsubmit = function(e) {
+        e.preventDefault();
+        const submitBtn = form.querySelector('.submit-btn');
+        submitBtn.classList.add('processing');
+        submitBtn.disabled = true;
+        const amountPaid = parseFloat(document.getElementById('paid-amount').value) || 0;
+        if (amountPaid <= 0 || amountPaid > parseFloat(balance)) {
+            showModalError('mark-paid', 'Please enter a valid amount (greater than 0, up to the balance).');
+            submitBtn.classList.remove('processing');
+            submitBtn.disabled = false;
+            return;
+        }
+
+        const formData = new FormData(this);
+        fetch(this.action, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (response.ok) {
+                paidModal.classList.add('hidden');
+                window.location.href = '/orders';
+            } else {
+                response.text().then(text => showModalError('mark-paid', 'Error processing payment: ' + text));
+                submitBtn.classList.remove('processing');
+                submitBtn.disabled = false;
+            }
+        })
+        .catch(error => {
+            showModalError('mark-paid', 'An error occurred while processing the payment.');
+            submitBtn.classList.remove('processing');
+            submitBtn.disabled = false;
+        });
+    };
+}
+
+function returnStock(receiptId, itemsJson) {
+    closeAllModals();
+    returnModal.classList.remove('hidden');
+    document.getElementById('return-order-id').textContent = receiptId;
+    const form = document.getElementById('return-stock-form');
+    const returnItemsContainer = document.getElementById('return-stock-items-container');
+    form.action = `/return_stock/${receiptId}`;
+
+    returnItemsContainer.innerHTML = '';
+    let items = typeof itemsJson === 'string' ? JSON.parse(itemsJson) : itemsJson;
+    if (Array.isArray(items) && items.length > 0) {
+        items.forEach(item => {
+            if (item.name && item.quantity > 0) {
+                const div = document.createElement('div');
+                div.className = 'flex items-center justify-between p-2 bg-gray-100 dark:bg-gray-700 rounded-lg';
+                div.innerHTML = `
+                    <div class="flex items-center space-x-2">
+                        <input type="checkbox" name="return_item_${item.name}" class="return-item-checkbox h-5 w-5 text-yellow-500 rounded">
+                        <span class="text-gray-900 dark:text-white">${item.name} (Ordered: ${item.quantity})</span>
+                    </div>
+                    <input type="number" name="return_qty_${item.name}" placeholder="Qty to Return" class="return-qty-input p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 w-24 text-center hidden" min="0" max="${item.quantity}" value="0">
+                `;
+                returnItemsContainer.appendChild(div);
+
+                const checkbox = div.querySelector('.return-item-checkbox');
+                const qtyInput = div.querySelector('.return-qty-input');
+                checkbox.addEventListener('change', () => {
+                    qtyInput.classList.toggle('hidden', !checkbox.checked);
+                    if (!checkbox.checked) qtyInput.value = 0;
+                });
+            }
+        });
+    } else {
+        returnItemsContainer.innerHTML = '<p class="text-gray-700 dark:text-gray-300">No items available for return.</p>';
+    }
+
+    let isSubmitting = false;
+    form.onsubmit = function(e) {
+        e.preventDefault();
+        if (isSubmitting) return;
+
+        const submitBtn = form.querySelector('.submit-btn');
+        submitBtn.classList.add('processing');
+        submitBtn.disabled = true;
+        isSubmitting = true;
+
+        const formData = new FormData(this);
+        let hasReturns = false;
+        items.forEach(item => {
+            const qty = parseInt(formData.get(`return_qty_${item.name}`)) || 0;
+            if (qty > 0) {
+                hasReturns = true;
+                if (qty > item.quantity) {
+                    showModalError('return-stock', `Cannot return more than ${item.quantity} units of ${item.name}.`);
+                    submitBtn.classList.remove('processing');
+                    submitBtn.disabled = false;
+                    isSubmitting = false;
+                    return;
+                }
+            }
+        });
+
+        if (!hasReturns) {
+            showModalError('return-stock', 'Please specify at least one item to return.');
+            submitBtn.classList.remove('processing');
+            submitBtn.disabled = false;
+            isSubmitting = false;
+            return;
+        }
+
+        fetch(this.action, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (response.ok) {
+                returnModal.classList.add('hidden');
+                alert('Stock returns logged successfully. Please update the stock manually.');
+                window.location.href = '/orders';
+            } else {
+                response.text().then(text => showModalError('return-stock', 'Error logging stock returns: ' + text));
+                submitBtn.classList.remove('processing');
+                submitBtn.disabled = false;
+                isSubmitting = false;
+            }
+        })
+        .catch(error => {
+            showModalError('return-stock', 'An error occurred while logging the stock returns: ' + error);
+            submitBtn.classList.remove('processing');
+            submitBtn.disabled = false;
+            isSubmitting = false;
+        });
+    };
+}
+
+function editOrder(receiptId, orderType, shopName, itemsJson) {
+    closeAllModals();
+    editModal.classList.remove('hidden');
+    document.getElementById('edit-order-id').textContent = receiptId;
+    document.getElementById('edit-order-type').value = orderType;
+    const editClientInput = document.getElementById('edit-client-input');
+    const choices = Choices.getInstance(editClientInput);
+    choices.setChoiceByValue(shopName || '');
+    const form = document.getElementById('edit-order-form');
+    form.action = `/edit_order/${receiptId}`;
+    resetModal(editContainer);
+    attachAddItemListeners(editContainer);
+
+    let items = typeof itemsJson === 'string' ? JSON.parse(itemsJson) : itemsJson;
+    if (Array.isArray(items)) {
+        items.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'grid grid-cols-6 gap-2 item-row';
+            div.innerHTML = `
+                <input name="items[]" type="hidden" value="product|${item.name}|quantity|0|price|${item.price || 0}|stock|0">
+                <span class="col-span-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center">${item.name}</span>
+                <input name="items[]" type="number" value="${item.quantity}" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="1">
+                <input type="number" value="${item.price || 0}" class="price-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+                <input type="number" value="0" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+                <input type="number" value="${(item.price || 0) * item.quantity}" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+                <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
+            `;
+            const addBtn = editContainer.querySelector('.add-item-btn');
+            editContainer.insertBefore(div, addBtn);
+            div.querySelector('.remove-item').addEventListener('click', () => {
+                div.remove();
+                updateSubtotal(editContainer);
+            });
+            div.querySelector('.qty-input').addEventListener('input', () => updatePriceAndTotal(div));
+        });
+    }
+    updateSubtotal(editContainer);
+
+    form.onsubmit = function(e) {
+        e.preventDefault();
+        const submitBtn = form.querySelector('.submit-btn');
+        submitBtn.classList.add('processing');
+        submitBtn.disabled = true;
+
+        const formData = new FormData(this);
+        fetch(this.action, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (response.ok) {
+                editModal.classList.add('hidden');
+                window.location.href = '/orders';
+            } else {
+                response.text().then(text => showModalError('edit-order', 'Error updating order: ' + text));
+                submitBtn.classList.remove('processing');
+                submitBtn.disabled = false;
+            }
+        })
+        .catch(error => {
+            showModalError('edit-order', 'An error occurred while updating the order: ' + error);
+            submitBtn.classList.remove('processing');
+            submitBtn.disabled = false;
+        });
+    };
+}
+
+function deleteOrder(receiptId) {
+    if (!confirm(`Are you sure you want to delete order #${receiptId}?`)) return;
+
+    fetch(`/delete_order/${receiptId}`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token() }}'
+        }
+    })
+    .then(response => {
+        if (response.ok) {
+            alert('Order deleted successfully.');
+            window.location.href = '/orders';
+        } else {
+            response.text().then(text => alert('Error deleting order: ' + text));
+        }
+    })
+    .catch(error => {
+        alert('An error occurred while deleting the order: ' + error);
+    });
+}
+
+manualQty.addEventListener('input', updateManualTotal);
+manualPrice.addEventListener('input', updateManualTotal);
+function updateManualTotal() {
+    const qty = parseInt(manualQty.value) || 0;
+    const price = parseFloat(manualPrice.value) || 0;
+    manualTotal.textContent = `Total: ${(qty * price).toFixed(2)}`;
+}
+
+function attachPriceListener(row) {
+    const select = row.querySelector('.product-select');
+    const priceDisplay = row.querySelector('.price-display');
+    const stockDisplay = row.querySelector('.stock-display');
+    const totalDisplay = row.querySelector('.total-display');
+    const qtyInput = row.querySelector('.qty-input');
+    let basePrice = 0;
+    let maxStock = 0;
+
+    select.addEventListener('change', () => {
+        const selectedOption = select.options[select.selectedIndex];
+        if (selectedOption.value) {
+            const values = selectedOption.value.split('|');
+            basePrice = parseFloat(values[5]) || 0;
+            maxStock = parseInt(values[7]) || 0;
+            priceDisplay.value = basePrice;
+            stockDisplay.value = maxStock;
+            const qty = parseInt(qtyInput.value) || 0;
+            if (qty > maxStock) {
+                qtyInput.value = maxStock;
+                alert(`Cannot order more than ${maxStock} units of ${values[1]}.`);
+            }
+            totalDisplay.value = (basePrice * (parseInt(qtyInput.value) || 0)).toFixed(2);
+            updateSubtotal(row.closest('.space-y-4'));
+        } else {
+            basePrice = 0;
+            maxStock = 0;
+            priceDisplay.value = '';
+            stockDisplay.value = '';
+            totalDisplay.value = '';
+            updateSubtotal(row.closest('.space-y-4'));
+        }
+    });
+
+    qtyInput.addEventListener('input', () => {
+        const qty = parseInt(qtyInput.value) || 0;
+        if (qty > maxStock) {
+            qtyInput.value = maxStock;
+            alert(`Cannot order more than ${maxStock} units.`);
+        }
+        totalDisplay.value = (basePrice * (parseInt(qtyInput.value) || 0)).toFixed(2);
+        updateSubtotal(row.closest('.space-y-4'));
+    });
+}
+
+function updatePriceAndTotal(row) {
+    const qtyInput = row.querySelector('.qty-input');
+    const priceDisplay = row.querySelector('.price-display');
+    const totalDisplay = row.querySelector('.total-display');
+    const basePrice = parseFloat(row.querySelector('input[type="hidden"]')?.value.split('|')[5]) || parseFloat(priceDisplay.value) || 0;
+    const qty = parseInt(qtyInput.value) || 0;
+    totalDisplay.value = (basePrice * qty).toFixed(2);
+    updateSubtotal(row.closest('.space-y-4'));
+}
+
+function updateSubtotal(container) {
+    let subtotal = 0;
+    const activeContainer = container || (retailModal.classList.contains('hidden') ? (editModal.classList.contains('hidden') ? wholesaleContainer : editContainer) : retailContainer);
+    const rows = activeContainer.querySelectorAll('.item-row');
+    rows.forEach(row => {
+        const totalDisplay = row.querySelector('.total-display');
+        if (totalDisplay && totalDisplay.value) subtotal += parseFloat(totalDisplay.value) || 0;
+    });
+    const totalSpan = activeContainer.parentElement.querySelector('[id$="-order-total"]');
+    if (totalSpan) totalSpan.textContent = subtotal.toFixed(2);
+}
+
+document.querySelectorAll('.product-select').forEach(select => {
+    const choices = new Choices(select, {
+        searchEnabled: true,
+        searchChoices: true,
+        itemSelectText: '',
+        placeholderValue: 'Search or select a product'
+    });
+    const row = select.closest('.item-row');
+    if (row) attachPriceListener(row);
+});
+
+document.querySelectorAll('.space-y-4').forEach(container => {
+    container.querySelectorAll('.qty-input').forEach(input => {
+        input.addEventListener('input', () => updatePriceAndTotal(input.closest('.item-row')));
+    });
+});
+
+document.getElementById('retail-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const submitBtn = this.querySelector('.submit-btn');
+    submitBtn.classList.add('processing');
+    submitBtn.disabled = true;
+    const formData = new FormData(this);
+    fetch(this.action, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (response.ok) {
+            retailModal.classList.add('hidden');
+            window.location.reload();
+        } else {
+            response.text().then(text => showModalError('retail', 'Error submitting retail order: ' + text));
+            submitBtn.classList.remove('processing');
+            submitBtn.disabled = false;
+        }
+    })
+    .catch(error => {
+        showModalError('retail', 'An error occurred while submitting the retail order.');
+        submitBtn.classList.remove('processing');
+        submitBtn.disabled = false;
+    });
+});
+
+document.getElementById('wholesale-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const submitBtn = this.querySelector('.submit-btn');
+    submitBtn.classList.add('processing');
+    submitBtn.disabled = true;
+    const formData = new FormData(this);
+    fetch(this.action, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (response.ok) {
+            wholesaleModal.classList.add('hidden');
+            window.location.reload();
+        } else {
+            response.text().then(text => showModalError('wholesale', 'Error submitting wholesale order: ' + text));
+            submitBtn.classList.remove('processing');
+            submitBtn.disabled = false;
+        }
+    })
+    .catch(error => {
+        showModalError('wholesale', 'An error occurred while submitting the wholesale order.');
+        submitBtn.classList.remove('processing');
+        submitBtn.disabled = false;
+    });
+});
+
+// Close all menus when clicking outside
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.order-actions-btn') && !e.target.closest('.order-actions-menu')) {
         document.querySelectorAll('.order-actions-menu').forEach(menu => {
             menu.classList.add('hidden');
         });
-    });
+    }
+});
 </script>
 
 <style>
-    body { overflow-y: auto; }
-    input[type="number"], input[type="number"][readonly] {
-        -moz-appearance: textfield;
+body { overflow-y: auto; }
+input[type="number"], input[type="number"][readonly] {
+    -moz-appearance: textfield;
+}
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"][readonly]::-webkit-inner-spin-button,
+input[type="number"][readonly]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+.choices__inner { 
+    background-color: #fff; 
+    border-color: #d1d5db; 
+    color: #374151; 
+    min-height: 2.5rem; 
+    padding: 0.5rem; 
+    border-radius: 0.5rem; 
+    width: 100%; 
+}
+.choices__list--single { padding: 0; }
+.choices__list--dropdown { 
+    background-color: #fff; 
+    border-color: #d1d5db; 
+    color: #374151; 
+    border-radius: 0.5rem; 
+    width: 100%; 
+    max-height: 200px; 
+    overflow-y: auto;
+}
+.choices__item--selectable { color: #374151; }
+.choices__input { 
+    background-color: #fff; 
+    color: #374151; 
+    width: 100%; 
+}
+.dark .choices__inner { 
+    background-color: #374151; 
+    border-color: #4b5563; 
+    color: #d1d5db; 
+    padding: 0.5rem; 
+    border-radius: 0.5rem; 
+    width: 100%; 
+}
+.dark .choices__list--dropdown { 
+    background-color: #374151; 
+    border-color: #4b5563; 
+    color: #d1d5db; 
+    border-radius: 0.5rem; 
+    width: 100%; 
+    max-height: 200px; 
+    overflow-y: auto;
+}
+.dark .choices__item--selectable { color: #d1d5db; }
+.dark .choices__input { 
+    background-color: #374151; 
+    color: #d1d5db; 
+    width: 100%; 
+}
+#retail-modal, #wholesale-modal, #mark-paid-modal, #return-stock-modal, #edit-order-modal { 
+    overflow-y: hidden; 
+    z-index: 50; 
+}
+#manual-item-modal { 
+    z-index: 60; 
+}
+#retail-modal > div, #wholesale-modal > div, #mark-paid-modal > div, #return-stock-modal > div, #edit-order-modal > div { 
+    max-height: 80vh; 
+    overflow-y: auto; 
+}
+.item-row-header, .item-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr 1fr 0.5fr;
+    gap: 0.5rem;
+    align-items: center;
+}
+.item-row-header span {
+    font-size: 0.875rem;
+    height: 2rem;
+    line-height: 2rem;
+    padding: 0 0.5rem;
+}
+.item-row-header span:first-child {
+    text-align: left;
+    padding-left: 0.5rem;
+}
+.item-row-header span:not(:first-child) {
+    text-align: center;
+}
+.item-row input, .item-row select {
+    height: 2.5rem;
+    font-size: 0.875rem;
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    box-sizing: border-box;
+    width: 100%;
+}
+.item-row .product-select {
+    width: 100%;
+}
+.item-row .qty-input,
+.item-row .price-display,
+.item-row .stock-display,
+.item-row .total-display,
+.item-row .remove-item {
+    text-align: center;
+}
+.return-item-checkbox:checked {
+    background-color: #f59e0b;
+    border-color: #f59e0b;
+}
+.return-item-checkbox:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.5);
+}
+.submit-btn.processing {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+.submit-btn.processing::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    animation: ripple 0.6s linear;
+}
+.submit-btn.processing::before {
+    content: '\f1ce'; /* FontAwesome spinner icon */
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 900;
+    display: inline-block;
+    margin-right: 0.5rem;
+    animation: spin 1s linear infinite;
+}
+@keyframes ripple {
+    to {
+        width: 300%;
+        height: 300%;
+        opacity: 0;
     }
-    input[type="number"]::-webkit-inner-spin-button,
-    input[type="number"]::-webkit-outer-spin-button,
-    input[type="number"][readonly]::-webkit-inner-spin-button,
-    input[type="number"][readonly]::-webkit-outer-spin-button {
-        -webkit-appearance: none;
-        margin: 0;
+}
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
     }
-    .choices__inner { 
-        background-color: #fff; 
-        border-color: #d1d5db; 
-        color: #374151; 
-        min-height: 2.5rem; 
-        padding: 0.5rem; 
-        border-radius: 0.5rem; 
-        width: 100%; 
-    }
-    .choices__list--single { padding: 0; }
-    .choices__list--dropdown { 
-        background-color: #fff; 
-        border-color: #d1d5db; 
-        color: #374151; 
-        border-radius: 0.5rem; 
-        width: 100%; 
-        max-height: 200px; 
-        overflow-y: auto;
-    }
-    .choices__item--selectable { color: #374151; }
-    .choices__input { 
-        background-color: #fff; 
-        color: #374151; 
-        width: 100%; 
-    }
-    .dark .choices__inner { 
-        background-color: #374151; 
-        border-color: #4b5563; 
-        color: #d1d5db; 
-        padding: 0.5rem; 
-        border-radius: 0.5rem; 
-        width: 100%; 
-    }
-    .dark .choices__list--dropdown { 
-        background-color: #374151; 
-        border-color: #4b5563; 
-        color: #d1d5db; 
-        border-radius: 0.5rem; 
-        width: 100%; 
-        max-height: 200px; 
-        overflow-y: auto;
-    }
-    .dark .choices__item--selectable { color: #d1d5db; }
-    .dark .choices__input { 
-        background-color: #374151; 
-        color: #d1d5db; 
-        width: 100%; 
-    }
-    #retail-modal, #wholesale-modal, #mark-paid-modal, #return-stock-modal, #edit-order-modal { 
-        overflow-y: hidden; 
-        z-index: 50; 
-    }
-    #manual-item-modal { 
-        z-index: 60; 
-    }
-    #retail-modal > div, #wholesale-modal > div, #mark-paid-modal > div, #return-stock-modal > div, #edit-order-modal > div { 
-        max-height: 80vh; 
-        overflow-y: auto; 
-    }
-    .item-row-header, .item-row {
-        display: grid;
-        grid-template-columns: 2fr 1fr 1fr 1fr 1fr 0.5fr;
-        gap: 0.5rem;
-        align-items: center;
-    }
-    .item-row-header span {
-        font-size: 0.875rem;
-        height: 2rem;
-        line-height: 2rem;
-        padding: 0 0.5rem;
-    }
-    .item-row-header span:first-child {
-        text-align: left;
-        padding-left: 0.5rem;
-    }
-    .item-row-header span:not(:first-child) {
-        text-align: center;
-    }
-    .item-row input, .item-row select {
-        height: 2.5rem;
-        font-size: 0.875rem;
-        padding: 0.5rem;
-        border-radius: 0.5rem;
-        box-sizing: border-box;
-        width: 100%;
-    }
-    .item-row .product-select {
-        width: 100%;
-    }
-    .item-row .qty-input,
-    .item-row .price-display,
-    .item-row .stock-display,
-    .item-row .total-display,
-    .item-row .remove-item {
-        text-align: center;
-    }
-    .return-item-checkbox:checked {
-        background-color: #f59e0b;
-        border-color: #f59e0b;
-    }
-    .return-item-checkbox:focus {
-        outline: none;
-        box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.5);
-    }
-    .submit-btn.processing {
-        position: relative;
-        overflow: hidden;
-        transition: all 0.3s ease;
-    }
-    .submit-btn.processing::after {
-        content: '';
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        width: 0;
-        height: 0;
-        background: rgba(255, 255, 255, 0.3);
-        border-radius: 50%;
-        transform: translate(-50%, -50%);
-        animation: ripple 0.6s linear;
-    }
-    .submit-btn.processing::before {
-        content: '\f1ce'; /* FontAwesome spinner icon */
-        font-family: 'Font Awesome 6 Free';
-        font-weight: 900;
-        display: inline-block;
-        margin-right: 0.5rem;
-        animation: spin 1s linear infinite;
-    }
-    @keyframes ripple {
-        to {
-            width: 300%;
-            height: 300%;
-            opacity: 0;
-        }
-    }
-    @keyframes spin {
-        to {
-            transform: rotate(360deg);
-        }
-    }
-    .submit-btn:disabled {
-        opacity: 0.7;
-        cursor: not-allowed;
-    }
-    .order-actions-menu {
-        min-width: 180px;
-    }
-    table {
-        border-collapse: collapse;
-        width: 100%;
-    }
-    th, td {
-        border: 1px solid #e5e7eb;
-        dark:border-gray-700;
-    }
-    .text-blue-500 { color: #3b82f6; } /* Matches retail button */
-    .text-green-500 { color: #10b981; } /* Matches wholesale button */
-    .dark .text-blue-500 { color: #3b82f6; }
-    .dark .text-green-500 { color: #10b981; }
+}
+.submit-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+.order-actions-menu {
+    min-width: 180px;
+}
+table {
+    border-collapse: collapse;
+    width: 100%;
+}
+th, td {
+    border: 1px solid #e5e7eb;
+    dark:border-gray-700;
+}
+.text-blue-500 { color: #3b82f6; }
+.text-green-500 { color: #10b981; }
+.dark .text-blue-500 { color: #3b82f6; }
+.dark .text-green-500 { color: #10b981; }
 </style>
 {% endblock %}
