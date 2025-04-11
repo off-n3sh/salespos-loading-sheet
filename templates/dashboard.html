@@ -320,341 +320,353 @@
     </div>
 
     <!-- JavaScript -->
-    <script>
-        const notificationBell = document.getElementById('notification-bell');
-        const notificationModal = document.getElementById('notification-modal');
-        const closeNotificationModal = document.getElementById('close-notification-modal');
-        const notificationContent = document.getElementById('notification-content');
-        const allBtn = document.getElementById('all-btn');
-        const pendingBtn = document.getElementById('pending-btn');
-        const completedBtn = document.getElementById('completed-btn');
-        const expensesBtn = document.getElementById('expenses-btn');
-        const salesHistory = document.getElementById('sales-history');
-        const expensesList = document.getElementById('expenses-list');
-        const salesTbody = document.getElementById('sales-history-body');
-        const expensesTbody = document.getElementById('expenses-body');
-        const emptyState = document.getElementById('empty-state');
-        const loadingOverlay = document.getElementById('loading-overlay');
-        const searchInput = document.getElementById('search-input');
-        const timeFilter = document.getElementById('time-filter');
-        const prevPageBtn = document.getElementById('prev-page');
-        const nextPageBtn = document.getElementById('next-page');
-        const pageInfo = document.getElementById('page-info');
-        const pageEntries = document.getElementById('page-entries');
-        let currentFilter = '{{ time_filter }}';
-        let currentStatusFilter = 'all';
-        const itemsPerPage = {{ per_page }};
-        let currentPage = {{ page }};
-        const allSalesRows = Array.from(document.querySelectorAll('#sales-history-body tr'));
-        const allExpensesRows = Array.from(document.querySelectorAll('#expenses-body tr'));
-        const today = new Date('2025-04-10'); // Hardcoded as per your date (April 10, 2025)
+    <!-- Replace only the <script> section in your original template with this -->
+<script>
+    const notificationBell = document.getElementById('notification-bell');
+    const notificationModal = document.getElementById('notification-modal');
+    const closeNotificationModal = document.getElementById('close-notification-modal');
+    const notificationContent = document.getElementById('notification-content');
+    const allBtn = document.getElementById('all-btn');
+    const pendingBtn = document.getElementById('pending-btn');
+    const completedBtn = document.getElementById('completed-btn');
+    const expensesBtn = document.getElementById('expenses-btn');
+    const salesHistory = document.getElementById('sales-history');
+    const expensesList = document.getElementById('expenses-list');
+    const salesTbody = document.getElementById('sales-history-body');
+    const expensesTbody = document.getElementById('expenses-body');
+    const emptyState = document.getElementById('empty-state');
+    const loadingOverlay = document.getElementById('loading-overlay');
+    const searchInput = document.getElementById('search-input');
+    const timeFilter = document.getElementById('time-filter');
+    const prevPageBtn = document.getElementById('prev-page');
+    const nextPageBtn = document.getElementById('next-page');
+    const pageInfo = document.getElementById('page-info');
+    const pageEntries = document.getElementById('page-entries');
+    let currentFilter = '{{ time_filter }}';
+    let currentStatusFilter = 'all';
+    const itemsPerPage = {{ per_page }};
+    let currentPage = {{ page }};
+    const allSalesRows = Array.from(document.querySelectorAll('#sales-history-body tr'));
+    const allExpensesRows = Array.from(document.querySelectorAll('#expenses-body tr'));
+    const today = new Date('2025-04-11'); // Updated to current date per your system (April 11, 2025)
 
-        function updateTime() {
-            const now = new Date();
-            document.getElementById('time-display').textContent = now.toLocaleString('en-US', { timeZone: 'Africa/Nairobi' });
-        }
-        setInterval(updateTime, 1000);
-        updateTime();
+    function updateTime() {
+        const now = new Date();
+        document.getElementById('time-display').textContent = now.toLocaleString('en-US', { timeZone: 'Africa/Nairobi' });
+    }
+    setInterval(updateTime, 1000);
+    updateTime();
 
-        notificationBell.addEventListener('click', () => {
-            notificationModal.classList.toggle('hidden');
-            loadNotifications();
-        });
-        closeNotificationModal.addEventListener('click', () => notificationModal.classList.add('hidden'));
+    notificationBell.addEventListener('click', () => {
+        notificationModal.classList.toggle('hidden');
+        loadNotifications();
+    });
+    closeNotificationModal.addEventListener('click', () => notificationModal.classList.add('hidden'));
 
-        function showLoading() { loadingOverlay.classList.remove('hidden'); }
-        function hideLoading() { loadingOverlay.classList.add('hidden'); }
+    function showLoading() { loadingOverlay.classList.remove('hidden'); }
+    function hideLoading() { loadingOverlay.classList.add('hidden'); }
 
-        function loadNotifications() {
-            fetch('/notifications') // Assuming an endpoint exists to fetch notifications
-                .then(response => response.json())
-                .then(data => {
-                    notificationContent.innerHTML = '';
-                    if (data.length > 0) {
-                        data.forEach(notification => {
-                            const div = document.createElement('div');
-                            div.className = `p-4 mb-2 border-b border-gray-200 dark:border-gray-700 ${notification.read ? '' : 'bg-blue-50 dark:bg-blue-900'}`;
-                            div.innerHTML = `
-                                <p class="text-sm text-gray-700 dark:text-gray-300">${notification.message}</p>
-                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">${new Date(notification.timestamp).toLocaleString('en-GB')}</p>
-                                <div class="mt-2 flex justify-between items-center">
-                                    <a href="/receipt?order_id=${notification.order_id}" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">View Order</a>
-                                    ${notification.read ? '' : `<button onclick="markNotificationRead('${notification.id}')" class="text-sm text-green-600 dark:text-green-400 hover:underline">Mark as Read</button>`}
-                                </div>
-                            `;
-                            notificationContent.appendChild(div);
-                        });
-                    } else {
-                        notificationContent.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400">No notifications found.</p>';
-                    }
-                    const unreadCount = data.filter(n => !n.read).length;
-                    const badge = notificationBell.querySelector('span');
-                    if (unreadCount > 0) {
-                        if (!badge) {
-                            const newBadge = document.createElement('span');
-                            newBadge.className = 'absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full';
-                            newBadge.textContent = unreadCount;
-                            notificationBell.appendChild(newBadge);
-                        } else {
-                            badge.textContent = unreadCount;
-                        }
-                    } else if (badge) {
-                        badge.remove();
-                    }
-                })
-                .catch(error => {
-                    console.error('Error loading notifications:', error);
-                    notificationContent.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400">Error loading notifications.</p>';
-                });
-        }
-
-        function getWeekRange(date) {
-            const start = new Date(date);
-            const day = start.getDay();
-            const diff = start.getDate() - day + (day === 0 ? -6 : 1); // Adjust to Monday
-            start.setDate(diff);
-            const end = new Date(start);
-            end.setDate(start.getDate() + 6);
-            return { start, end };
-        }
-
-        function formatDateRange(start, end) {
-            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-            return `${start.getDate()} ${months[start.getMonth()]} – ${end.getDate()} ${months[end.getMonth()]} ${end.getFullYear()}`;
-        }
-
-        function groupRows(rows, period) {
-            const grouped = {};
-            rows.forEach(row => {
-                const date = new Date(row.getAttribute('data-date'));
-                let key, label, startDate, endDate;
-                if (period === 'day') {
-                    key = date.toISOString().split('T')[0];
-                    label = `${date.getDate()} ${date.toLocaleString('default', { month: 'long' })} ${date.getFullYear()}`;
-                    startDate = new Date(date);
-                    endDate = new Date(date);
-                } else if (period === 'week') {
-                    const { start, end } = getWeekRange(date);
-                    startDate = start;
-                    endDate = end;
-                    const weekNum = Math.ceil((date.getDate() - start.getDate() + 1 + (start.getDay() === 0 ? 6 : start.getDay() - 1)) / 7);
-                    key = `${date.getFullYear()}-${start.getMonth()}-${weekNum}`;
-                    label = `Week ${weekNum}: ${formatDateRange(start, end)}`;
-                } else if (period === 'month') {
-                    key = `${date.getFullYear()}-${date.getMonth()}`;
-                    const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
-                    const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-                    startDate = monthStart;
-                    endDate = monthEnd;
-                    label = `${monthStart.toLocaleString('default', { month: 'long' })} ${date.getFullYear()}: ${monthStart.getDate()} – ${monthEnd.getDate()}`;
-                } else if (period === 'year') {
-                    key = `${date.getFullYear()}`;
-                    const yearStart = new Date(date.getFullYear(), 0, 1);
-                    const yearEnd = new Date(date.getFullYear(), 11, 31);
-                    startDate = yearStart;
-                    endDate = yearEnd;
-                    label = `${date.getFullYear()}: ${formatDateRange(yearStart, yearEnd)}`;
+    function loadNotifications() {
+        fetch('/notifications')
+            .then(response => response.json())
+            .then(data => {
+                notificationContent.innerHTML = '';
+                if (data.length > 0) {
+                    data.forEach(notification => {
+                        const div = document.createElement('div');
+                        div.className = `p-4 mb-2 border-b border-gray-200 dark:border-gray-700 ${notification.read ? '' : 'bg-blue-50 dark:bg-blue-900'}`;
+                        div.innerHTML = `
+                            <p class="text-sm text-gray-700 dark:text-gray-300">${notification.message}</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">${new Date(notification.timestamp).toLocaleString('en-GB')}</p>
+                            <div class="mt-2 flex justify-between items-center">
+                                <a href="/receipt?order_id=${notification.order_id}" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">View Order</a>
+                                ${notification.read ? '' : `<button onclick="markNotificationRead('${notification.id}')" class="text-sm text-green-600 dark:text-green-400 hover:underline">Mark as Read</button>`}
+                            </div>
+                        `;
+                        notificationContent.appendChild(div);
+                    });
                 } else {
-                    key = 'all';
-                    label = 'All Orders';
+                    notificationContent.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400">No notifications found.</p>';
                 }
-                if (!grouped[key]) {
-                    grouped[key] = { rows: [], total: 0, debt: 0, label, startDate, endDate };
+                const unreadCount = data.filter(n => !n.read).length;
+                const badge = notificationBell.querySelector('span');
+                if (unreadCount > 0) {
+                    if (!badge) {
+                        const newBadge = document.createElement('span');
+                        newBadge.className = 'absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full';
+                        newBadge.textContent = unreadCount;
+                        notificationBell.appendChild(newBadge);
+                    } else {
+                        badge.textContent = unreadCount;
+                    }
+                } else if (badge) {
+                    badge.remove();
                 }
-                const totalAmount = parseFloat(row.getAttribute('data-initial-payment')) + parseFloat(row.getAttribute('data-balance'));
-                const debt = parseFloat(row.getAttribute('data-balance'));
-                grouped[key].rows.push(row);
-                grouped[key].total += totalAmount;
-                grouped[key].debt += debt;
+            })
+            .catch(error => {
+                console.error('Error loading notifications:', error);
+                notificationContent.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400">Error loading notifications.</p>';
             });
-            return grouped;
-        }
+    }
 
-        function updateDisplay() {
-            const searchTerm = searchInput.value.toLowerCase();
-            emptyState.classList.add('hidden');
-            salesHistory.classList.toggle('hidden', currentStatusFilter === 'expenses');
-            expensesList.classList.toggle('hidden', currentStatusFilter !== 'expenses');
+    function getWeekRange(date) {
+        const start = new Date(date);
+        const day = start.getDay();
+        const diff = start.getDate() - day + (day === 0 ? -6 : 1); // Start on Monday
+        start.setDate(diff);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(start);
+        end.setDate(start.getDate() + 6);
+        end.setHours(23, 59, 59, 999);
+        return { start, end };
+    }
 
-            let filteredRows = currentStatusFilter === 'expenses' ? allExpensesRows : allSalesRows;
-            filteredRows = filteredRows.filter(row => {
-                const balance = parseFloat(row.getAttribute('data-balance')) || 0;
-                const searchText = row.getAttribute('data-search').toLowerCase();
-                const date = new Date(row.getAttribute('data-date'));
-                const matchesStatus = currentStatusFilter === 'all' ||
-                                     (currentStatusFilter === 'pending' && balance > 0) ||
-                                     (currentStatusFilter === 'completed' && balance === 0) ||
-                                     (currentStatusFilter === 'expenses');
-                const matchesSearch = searchTerm === '' || searchText.includes(searchTerm);
-                const matchesTime = currentFilter === 'all' ||
-                                   (currentFilter === 'day' && date.toDateString() === today.toDateString()) ||
-                                   (currentFilter === 'week' && date >= getWeekRange(today).start && date <= getWeekRange(today).end) ||
-                                   (currentFilter === 'month' && date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear()) ||
-                                   (currentFilter === 'year' && date.getFullYear() === today.getFullYear());
-                return matchesStatus && matchesSearch && matchesTime;
-            });
+    function formatDateRange(start, end) {
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        return `${start.getDate()} ${months[start.getMonth()]} – ${end.getDate()} ${months[end.getMonth()]} ${end.getFullYear()}`;
+    }
 
-            filteredRows.sort((a, b) => new Date(b.getAttribute('data-date')) - new Date(a.getAttribute('data-date')));
-            const grouped = groupRows(filteredRows, currentFilter);
-            const tbody = currentStatusFilter === 'expenses' ? expensesTbody : salesTbody;
-            tbody.innerHTML = '';
+    function groupRows(rows, period) {
+        const grouped = {};
+        rows.forEach(row => {
+            const date = new Date(row.getAttribute('data-date'));
+            let key, label, startDate, endDate;
 
-            const groupKeys = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
-            const totalItems = filteredRows.length;
-            const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
-            if (currentPage > totalPages) currentPage = totalPages;
-            const start = (currentPage - 1) * itemsPerPage;
-            const end = start + itemsPerPage;
-            let renderedCount = 0;
+            if (period === 'day') {
+                key = date.toISOString().split('T')[0];
+                label = `${date.getDate()} ${date.toLocaleString('default', { month: 'long' })} ${date.getFullYear()}`;
+                startDate = new Date(date);
+                startDate.setHours(0, 0, 0, 0);
+                endDate = new Date(date);
+                endDate.setHours(23, 59, 59, 999);
+            } else if (period === 'week') {
+                const { start, end } = getWeekRange(date);
+                startDate = start;
+                endDate = end;
+                key = `${start.toISOString().split('T')[0]}-${end.toISOString().split('T')[0]}`;
+                label = `Week: ${formatDateRange(start, end)}`;
+            } else if (period === 'month') {
+                key = `${date.getFullYear()}-${date.getMonth()}`;
+                const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
+                const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+                startDate = monthStart;
+                endDate = monthEnd;
+                label = `${monthStart.toLocaleString('default', { month: 'long' })} ${date.getFullYear()}`;
+            } else if (period === 'year') {
+                key = `${date.getFullYear()}`;
+                const yearStart = new Date(date.getFullYear(), 0, 1);
+                const yearEnd = new Date(date.getFullYear(), 11, 31);
+                startDate = yearStart;
+                endDate = yearEnd;
+                label = `${date.getFullYear()}`;
+            } else { // 'all'
+                key = 'all';
+                label = 'All Orders';
+                startDate = new Date(0);
+                endDate = new Date(8640000000000000); // Max date
+            }
 
-            groupKeys.forEach((key, index) => {
-                const group = grouped[key];
+            if (!grouped[key]) {
+                grouped[key] = { rows: [], total: 0, debt: 0, label, startDate, endDate };
+            }
+            const totalAmount = parseFloat(row.getAttribute('data-initial-payment')) + parseFloat(row.getAttribute('data-balance'));
+            const debt = parseFloat(row.getAttribute('data-balance'));
+            grouped[key].rows.push(row);
+            grouped[key].total += totalAmount;
+            grouped[key].debt += debt;
+        });
+        return grouped;
+    }
+
+    function updateDisplay() {
+        const searchTerm = searchInput.value.toLowerCase();
+        emptyState.classList.add('hidden');
+        salesHistory.classList.toggle('hidden', currentStatusFilter === 'expenses');
+        expensesList.classList.toggle('hidden', currentStatusFilter !== 'expenses');
+
+        let filteredRows = currentStatusFilter === 'expenses' ? allExpensesRows : allSalesRows;
+        filteredRows = filteredRows.filter(row => {
+            const balance = parseFloat(row.getAttribute('data-balance')) || 0;
+            const searchText = row.getAttribute('data-search').toLowerCase();
+            const date = new Date(row.getAttribute('data-date'));
+            const matchesStatus = currentStatusFilter === 'all' ||
+                                 (currentStatusFilter === 'pending' && balance > 0) ||
+                                 (currentStatusFilter === 'completed' && balance === 0) ||
+                                 (currentStatusFilter === 'expenses');
+            const matchesSearch = searchTerm === '' || searchText.includes(searchTerm);
+            return matchesStatus && matchesSearch;
+        });
+
+        // Apply time filter
+        const grouped = groupRows(filteredRows, currentFilter);
+        const groupKeys = Object.keys(grouped).sort((a, b) => {
+            if (currentFilter === 'all') return 0;
+            const aStart = grouped[a].startDate;
+            const bStart = grouped[b].startDate;
+            return bStart - aStart; // Newest first
+        });
+
+        const tbody = currentStatusFilter === 'expenses' ? expensesTbody : salesTbody;
+        tbody.innerHTML = '';
+
+        let allRows = [];
+        groupKeys.forEach(key => {
+            const group = grouped[key];
+            if (currentFilter !== 'all') {
                 const headerRow = document.createElement('tr');
                 headerRow.className = 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white font-semibold';
                 headerRow.innerHTML = `
                     <td colspan="7" class="px-6 py-2">${group.label} (Total: KSh ${group.total.toFixed(2)}, Debt: KSh ${group.debt.toFixed(2)})</td>
                 `;
-                if (renderedCount >= start && renderedCount < end) {
-                    tbody.appendChild(headerRow);
-                }
-                renderedCount++;
-                group.rows.forEach(row => {
-                    if (renderedCount >= start && renderedCount < end) {
-                        tbody.appendChild(row.cloneNode(true));
-                    }
-                    renderedCount++;
-                });
-            });
-
-            pageEntries.textContent = `Showing ${start + 1} to ${Math.min(end, totalItems)} of ${totalItems} ${currentStatusFilter === 'expenses' ? 'expenses' : 'orders'}`;
-            pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
-            prevPageBtn.disabled = currentPage === 1;
-            nextPageBtn.disabled = currentPage === totalPages || totalItems === 0;
-
-            if (totalItems === 0) {
-                emptyState.classList.remove('hidden');
+                allRows.push(headerRow);
             }
+            group.rows.forEach(row => allRows.push(row));
+        });
+
+        // Pagination
+        const totalItems = allRows.length;
+        const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+        if (currentPage > totalPages) currentPage = totalPages;
+        const start = (currentPage - 1) * itemsPerPage;
+        const end = start + itemsPerPage;
+        const visibleRows = allRows.slice(start, end);
+
+        visibleRows.forEach(row => tbody.appendChild(row.cloneNode(true)));
+
+        pageEntries.textContent = `Showing ${start + 1} to ${Math.min(end, totalItems)} of ${totalItems} ${currentStatusFilter === 'expenses' ? 'expenses' : 'orders'}`;
+        pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+        prevPageBtn.disabled = currentPage === 1;
+        nextPageBtn.disabled = currentPage === totalPages || totalItems === 0;
+
+        if (totalItems === 0) {
+            emptyState.classList.remove('hidden');
         }
 
-        prevPageBtn.addEventListener('click', () => {
-            if (currentPage > 1) {
-                currentPage--;
-                updateDisplay();
-            }
+        // Reattach menu toggle listeners
+        tbody.querySelectorAll('button[onclick^="toggleMenu"]').forEach(btn => {
+            const menuId = btn.getAttribute('onclick').match(/'menu-[^']+'/)[0].replace(/'/g, '');
+            btn.onclick = () => toggleMenu(menuId);
         });
+    }
 
-        nextPageBtn.addEventListener('click', () => {
-            const filteredRows = (currentStatusFilter === 'expenses' ? allExpensesRows : allSalesRows).filter(row => {
-                const balance = parseFloat(row.getAttribute('data-balance')) || 0;
-                const searchText = row.getAttribute('data-search').toLowerCase();
-                const date = new Date(row.getAttribute('data-date'));
-                const matchesStatus = currentStatusFilter === 'all' ||
-                                     (currentStatusFilter === 'pending' && balance > 0) ||
-                                     (currentStatusFilter === 'completed' && balance === 0) ||
-                                     (currentStatusFilter === 'expenses');
-                const matchesSearch = searchInput.value.toLowerCase() === '' || searchText.includes(searchInput.value.toLowerCase());
-                const matchesTime = currentFilter === 'all' ||
-                                   (currentFilter === 'day' && date.toDateString() === today.toDateString()) ||
-                                   (currentFilter === 'week' && date >= getWeekRange(today).start && date <= getWeekRange(today).end) ||
-                                   (currentFilter === 'month' && date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear()) ||
-                                   (currentFilter === 'year' && date.getFullYear() === today.getFullYear());
-                return matchesStatus && matchesSearch && matchesTime;
-            });
-            const totalPages = Math.ceil(filteredRows.length / itemsPerPage);
-            if (currentPage < totalPages) {
-                currentPage++;
-                updateDisplay();
-            }
-        });
-
-        allBtn.addEventListener('click', () => {
-            currentStatusFilter = 'all';
-            currentPage = 1;
-            updateFilterButtonStyles();
+    prevPageBtn.addEventListener('click', () => {
+        if (currentPage > 1) {
+            currentPage--;
             updateDisplay();
-        });
-
-        pendingBtn.addEventListener('click', () => {
-            currentStatusFilter = 'pending';
-            currentPage = 1;
-            updateFilterButtonStyles();
-            updateDisplay();
-        });
-
-        completedBtn.addEventListener('click', () => {
-            currentStatusFilter = 'completed';
-            currentPage = 1;
-            updateFilterButtonStyles();
-            updateDisplay();
-        });
-
-        expensesBtn.addEventListener('click', () => {
-            currentStatusFilter = 'expenses';
-            currentPage = 1;
-            updateFilterButtonStyles();
-            updateDisplay();
-        });
-
-        timeFilter.addEventListener('change', () => {
-            currentFilter = timeFilter.value;
-            currentPage = 1;
-            updateDisplay();
-        });
-
-        searchInput.addEventListener('input', () => {
-            currentPage = 1;
-            updateDisplay();
-        });
-
-        function updateFilterButtonStyles() {
-            const buttons = { 'all': allBtn, 'pending': pendingBtn, 'completed': completedBtn, 'expenses': expensesBtn };
-            Object.keys(buttons).forEach(key => {
-                const btn = buttons[key];
-                if (key === currentStatusFilter) {
-                    btn.classList.remove('bg-blue-600', 'bg-red-600', 'bg-green-600', 'bg-purple-600');
-                    btn.classList.add(key === 'all' ? 'bg-blue-600' : key === 'pending' ? 'bg-red-600' : key === 'completed' ? 'bg-green-600' : 'bg-purple-600', 'text-white');
-                } else {
-                    btn.classList.remove('text-white');
-                    btn.classList.add(key === 'all' ? 'bg-blue-600' : key === 'pending' ? 'bg-red-600' : key === 'completed' ? 'bg-green-600' : 'bg-purple-600');
-                }
-            });
         }
+    });
 
-        function markNotificationRead(notificationId) {
-            fetch(`/mark_notification_read/${notificationId}`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'}
-            })
-            .then(response => {
-                if (response.ok) {
-                    loadNotifications(); // Refresh notifications
-                    updateDisplay(); // Refresh dashboard
-                } else {
-                    alert('Error marking notification as read');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Error marking notification as read');
-            });
-        }
-
-        function toggleMenu(menuId) {
-            const menu = document.getElementById(menuId);
-            const allMenus = document.querySelectorAll('[id^="menu-"]');
-            allMenus.forEach(m => {
-                if (m.id !== menuId) m.classList.add('hidden');
-            });
-            menu.classList.toggle('hidden');
-        }
-
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('button[onclick^="toggleMenu"]')) {
-                document.querySelectorAll('[id^="menu-"]').forEach(menu => menu.classList.add('hidden'));
-            }
+    nextPageBtn.addEventListener('click', () => {
+        const filteredRows = (currentStatusFilter === 'expenses' ? allExpensesRows : allSalesRows).filter(row => {
+            const balance = parseFloat(row.getAttribute('data-balance')) || 0;
+            const searchText = row.getAttribute('data-search').toLowerCase();
+            const matchesStatus = currentStatusFilter === 'all' ||
+                                 (currentStatusFilter === 'pending' && balance > 0) ||
+                                 (currentStatusFilter === 'completed' && balance === 0) ||
+                                 (currentStatusFilter === 'expenses');
+            return matchesStatus && (searchInput.value.toLowerCase() === '' || searchText.includes(searchInput.value.toLowerCase()));
         });
+        const grouped = groupRows(filteredRows, currentFilter);
+        let allRows = [];
+        Object.keys(grouped).forEach(key => {
+            const group = grouped[key];
+            if (currentFilter !== 'all') allRows.push({ isHeader: true });
+            allRows.push(...group.rows);
+        });
+        const totalPages = Math.ceil(allRows.length / itemsPerPage);
+        if (currentPage < totalPages) {
+            currentPage++;
+            updateDisplay();
+        }
+    });
 
+    allBtn.addEventListener('click', () => {
+        currentStatusFilter = 'all';
+        currentPage = 1;
         updateFilterButtonStyles();
         updateDisplay();
-    </script>
-{% endblock %}
+    });
+
+    pendingBtn.addEventListener('click', () => {
+        currentStatusFilter = 'pending';
+        currentPage = 1;
+        updateFilterButtonStyles();
+        updateDisplay();
+    });
+
+    completedBtn.addEventListener('click', () => {
+        currentStatusFilter = 'completed';
+        currentPage = 1;
+        updateFilterButtonStyles();
+        updateDisplay();
+    });
+
+    expensesBtn.addEventListener('click', () => {
+        currentStatusFilter = 'expenses';
+        currentPage = 1;
+        updateFilterButtonStyles();
+        updateDisplay();
+    });
+
+    timeFilter.addEventListener('change', () => {
+        currentFilter = timeFilter.value;
+        currentPage = 1;
+        updateDisplay();
+    });
+
+    searchInput.addEventListener('input', () => {
+        currentPage = 1;
+        updateDisplay();
+    });
+
+    function updateFilterButtonStyles() {
+        const buttons = { 'all': allBtn, 'pending': pendingBtn, 'completed': completedBtn, 'expenses': expensesBtn };
+        Object.keys(buttons).forEach(key => {
+            const btn = buttons[key];
+            if (key === currentStatusFilter) {
+                btn.classList.remove('bg-blue-600', 'bg-red-600', 'bg-green-600', 'bg-purple-600');
+                btn.classList.add(key === 'all' ? 'bg-blue-600' : key === 'pending' ? 'bg-red-600' : key === 'completed' ? 'bg-green-600' : 'bg-purple-600', 'text-white');
+            } else {
+                btn.classList.remove('text-white');
+                btn.classList.add(key === 'all' ? 'bg-blue-600' : key === 'pending' ? 'bg-red-600' : key === 'completed' ? 'bg-green-600' : 'bg-purple-600');
+            }
+        });
+    }
+
+    function markNotificationRead(notificationId) {
+        fetch(`/mark_notification_read/${notificationId}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        })
+        .then(response => {
+            if (response.ok) {
+                loadNotifications();
+                updateDisplay();
+            } else {
+                alert('Error marking notification as read');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error marking notification as read');
+        });
+    }
+
+    function toggleMenu(menuId) {
+        const menu = document.getElementById(menuId);
+        const allMenus = document.querySelectorAll('[id^="menu-"]');
+        allMenus.forEach(m => {
+            if (m.id !== menuId) m.classList.add('hidden');
+        });
+        menu.classList.toggle('hidden');
+    }
+
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('button[onclick^="toggleMenu"]')) {
+            document.querySelectorAll('[id^="menu-"]').forEach(menu => menu.classList.add('hidden'));
+        }
+    });
+
+    updateFilterButtonStyles();
+    updateDisplay();
+</script>
