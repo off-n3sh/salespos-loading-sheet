@@ -442,10 +442,10 @@ def login():
 @login_required
 def dashboard():
     """Render the dashboard with stats cards and sales history."""
-    # Pagination parameters
     page = int(request.args.get('page', 1))
-    per_page = 50  # Fixed at 50, like orders has 10
+    per_page = 50
     time_filter = request.args.get('time', 'all')
+    status_filter = request.args.get('status', 'all')  # New: 'all', 'pending', 'completed'
     search_query = request.args.get('search', '').strip()
 
     # Current time in Kenyan timezone
@@ -453,15 +453,39 @@ def dashboard():
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     today_end = today_start + timedelta(days=1)
 
-    # Base query for orders with descending date order
+    # Base query with descending date order
     orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING)
-    orders = []
 
-    # Total orders (for pagination and buttons)
+    # Apply time filter to query
+    if time_filter == 'day':
+        start = today_start
+        orders_ref = orders_ref.where('date', '>=', start).where('date', '<', today_end)
+    elif time_filter == 'week':
+        start = now - timedelta(days=now.weekday())
+        start = start.replace(hour=0, minute=0, second=0, microsecond=0)
+        end = start + timedelta(days=7)
+        orders_ref = orders_ref.where('date', '>=', start).where('date', '<', end)
+    elif time_filter == 'month':
+        start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        end = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0) + timedelta(days=31)
+        end = end.replace(day=1) - timedelta(microseconds=1)
+        orders_ref = orders_ref.where('date', '>=', start).where('date', '<', end)
+    elif time_filter == 'year':
+        start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        end = now.replace(month=12, day=31, hour=23, minute=59, second=59, microsecond=999999)
+        orders_ref = orders_ref.where('date', '>=', start).where('date', '<=', end)
+
+    # Apply status filter to query
+    if status_filter == 'pending':
+        orders_ref = orders_ref.where('balance', '>', 0)
+    elif status_filter == 'completed':
+        orders_ref = orders_ref.where('balance', '==', 0)
+
+    # Apply search filter and get total orders
     if search_query:
         search_lower = search_query.lower()
-        salesperson_orders = db.collection('orders').where('salesperson_name_lower', '>=', search_lower).where('salesperson_name_lower', '<=', search_lower + '\uf8ff').order_by('salesperson_name_lower').order_by('date', direction=firestore.Query.DESCENDING).stream()
-        shop_orders = db.collection('orders').where('shop_name_lower', '>=', search_lower).where('shop_name_lower', '<=', search_lower + '\uf8ff').order_by('shop_name_lower').order_by('date', direction=firestore.Query.DESCENDING).stream()
+        salesperson_orders = orders_ref.where('salesperson_name_lower', '>=', search_lower).where('salesperson_name_lower', '<=', search_lower + '\uf8ff').stream()
+        shop_orders = orders_ref.where('shop_name_lower', '>=', search_lower).where('shop_name_lower', '<=', search_lower + '\uf8ff').stream()
         matching_order_ids = set()
         for doc in salesperson_orders:
             matching_order_ids.add(doc.id)
@@ -469,9 +493,10 @@ def dashboard():
             matching_order_ids.add(doc.id)
         total_orders = len(matching_order_ids)
     else:
-        total_orders = sum(1 for _ in db.collection('orders').stream())
+        total_orders = sum(1 for _ in orders_ref.stream())
 
-    # Apply pagination with Firestore cursors
+    # Pagination
+    orders = []
     if search_query and matching_order_ids:
         matching_orders = []
         for doc_id in matching_order_ids:
@@ -503,9 +528,7 @@ def dashboard():
                 'last_payment_date': process_date(order_dict.get('last_payment_date', order_dict.get('date')))
             })
     else:
-        # Pagination for no-search case
         if page > 1:
-            # Get the last doc of the previous page to start after
             last_page_start = (page - 1) * per_page
             last_doc = None
             for i, doc in enumerate(orders_ref.stream()):
@@ -514,7 +537,6 @@ def dashboard():
                     break
             if last_doc:
                 orders_ref = orders_ref.start_after(last_doc)
-        # Fetch 50 orders for the current page
         orders_query = orders_ref.limit(per_page).stream()
         for doc in orders_query:
             order_dict = doc.to_dict()
@@ -537,23 +559,7 @@ def dashboard():
                 'last_payment_date': process_date(order_dict.get('last_payment_date', order_dict.get('date')))
             })
 
-    # Apply time filter to fetched orders
-    filtered_orders = orders.copy()
-    if time_filter == 'day':
-        start = today_start
-        filtered_orders = [o for o in orders if o['date'] >= start]
-    elif time_filter == 'week':
-        start = now - timedelta(days=now.weekday())
-        start = start.replace(hour=0, minute=0, second=0, microsecond=0)
-        filtered_orders = [o for o in orders if o['date'] >= start]
-    elif time_filter == 'month':
-        start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        filtered_orders = [o for o in orders if o['date'] >= start]
-    elif time_filter == 'year':
-        start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-        filtered_orders = [o for o in orders if o['date'] >= start]
-
-    # Calculate dashboard stats
+    # Calculate dashboard stats (unchanged)
     retail_sales_today = 0.0
     wholesale_sales_today = 0.0
     total_debts = 0.0
@@ -652,10 +658,11 @@ def dashboard():
         wholesale_sales_today=wholesale_sales_today,
         total_debts=total_debts,
         total_expenses=total_expenses,
-        sales_history=filtered_orders,
+        sales_history=orders,  # No need for filtered_orders, filtering is in query
         expenses=expenses,
         search=search_query,
         time_filter=time_filter,
+        status_filter=status_filter,  # Pass to template
         page=page,
         per_page=per_page,
         total_pages=total_pages,
@@ -669,6 +676,7 @@ def dashboard():
         wholesale_open_orders=wholesale_open_orders,
         wholesale_closed_orders=wholesale_closed_orders
     )
+    
 @app.route('/mark_notification_read/<notification_id>', methods=['POST'])
 @no_cache
 @login_required
