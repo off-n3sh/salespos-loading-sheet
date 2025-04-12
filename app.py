@@ -480,8 +480,7 @@ def dashboard():
         orders_ref = orders_ref.where('date', '>=', start).where('date', '<', end)
     elif time_filter == 'month':
         start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        end = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0) + timedelta(days=31)
-        end = end.replace(day=1) - timedelta(microseconds=1)
+        end = (start + timedelta(days=31)).replace(day=1, hour=0, minute=0, second=0, microsecond=0) - timedelta(microseconds=1)
         orders_ref = orders_ref.where('date', '>=', start).where('date', '<', end)
     elif time_filter == 'year':
         start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -553,9 +552,21 @@ def dashboard():
                 'last_payment_date': process_date(order_dict.get('last_payment_date', order_dict.get('date')))
             })
 
-    # Group orders by time period (e.g., weekly)
+    # Sort filtered orders by date (descending)
+    filtered_orders.sort(key=lambda x: x['date'], reverse=True)
+
+    # Group orders by time period
     grouped_orders = []
-    if time_filter == 'week':
+    if time_filter == 'day':
+        total = sum(order['payment'] + order['balance'] for order in filtered_orders)
+        debt = sum(order['balance'] for order in filtered_orders)
+        grouped_orders = [{
+            'label': f"Day: {today_start.strftime('%d %b %Y')}",
+            'rows': filtered_orders,
+            'total': total,
+            'debt': debt
+        }]
+    elif time_filter == 'week':
         weeks = {}
         for order in filtered_orders:
             sale_date = order['date']
@@ -574,7 +585,41 @@ def dashboard():
             weeks[week_key]['debt'] += order['balance']
         grouped_orders = list(weeks.values())
         grouped_orders.sort(key=lambda x: x['rows'][0]['date'], reverse=True)
-    else:
+    elif time_filter == 'month':
+        months = {}
+        for order in filtered_orders:
+            sale_date = order['date']
+            month_key = sale_date.strftime('%Y-%m')
+            if month_key not in months:
+                months[month_key] = {
+                    'label': f"Month: {sale_date.strftime('%B %Y')}",
+                    'rows': [],
+                    'total': 0,
+                    'debt': 0
+                }
+            months[month_key]['rows'].append(order)
+            months[month_key]['total'] += order['payment'] + order['balance']
+            months[month_key]['debt'] += order['balance']
+        grouped_orders = list(months.values())
+        grouped_orders.sort(key=lambda x: x['rows'][0]['date'], reverse=True)
+    elif time_filter == 'year':
+        years = {}
+        for order in filtered_orders:
+            sale_date = order['date']
+            year_key = sale_date.strftime('%Y')
+            if year_key not in years:
+                years[year_key] = {
+                    'label': f"Year: {year_key}",
+                    'rows': [],
+                    'total': 0,
+                    'debt': 0
+                }
+            years[year_key]['rows'].append(order)
+            years[year_key]['total'] += order['payment'] + order['balance']
+            years[year_key]['debt'] += order['balance']
+        grouped_orders = list(years.values())
+        grouped_orders.sort(key=lambda x: x['rows'][0]['date'], reverse=True)
+    else:  # time_filter == 'all'
         total = sum(order['payment'] + order['balance'] for order in filtered_orders)
         debt = sum(order['balance'] for order in filtered_orders)
         grouped_orders = [{'label': 'All Orders', 'rows': filtered_orders, 'total': total, 'debt': debt}]
@@ -730,7 +775,6 @@ def dashboard():
         wholesale_open_orders=wholesale_open_orders,
         wholesale_closed_orders=wholesale_closed_orders
     )
-    
 @app.route('/mark_notification_read/<notification_id>', methods=['POST'])
 @no_cache
 @login_required
