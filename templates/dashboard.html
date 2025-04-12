@@ -344,11 +344,13 @@
         const pageInfo = document.getElementById('page-info');
         const pageEntries = document.getElementById('page-entries');
         let currentStatusFilter = 'all';
-        let currentPage = {{ page }};
+        const totalOrders = {{ total_orders }};
+        const totalPages = {{ total_pages }};
+        const currentPage = {{ page }};
         const perPage = {{ per_page }};
         const allSalesRows = Array.from(document.querySelectorAll('#sales-history-body tr'));
         const allExpensesRows = Array.from(document.querySelectorAll('#expenses-body tr'));
-        const today = new Date('2025-04-12');
+        const today = new Date('2025-04-11');
 
         function updateTime() {
             const now = new Date();
@@ -484,10 +486,6 @@
             expensesList.classList.toggle('hidden', currentStatusFilter !== 'expenses');
 
             let filteredRows = currentStatusFilter === 'expenses' ? allExpensesRows : allSalesRows;
-            const searchTerm = searchInput.value.toLowerCase();
-            const timePeriod = timeFilter.value;
-
-            // Apply status and search filters
             filteredRows = filteredRows.filter(row => {
                 const balance = parseFloat(row.getAttribute('data-balance')) || 0;
                 const searchText = row.getAttribute('data-search').toLowerCase();
@@ -495,106 +493,48 @@
                                      (currentStatusFilter === 'pending' && balance > 0) ||
                                      (currentStatusFilter === 'completed' && balance === 0) ||
                                      (currentStatusFilter === 'expenses');
-                const matchesSearch = searchTerm === '' || searchText.includes(searchTerm);
+                const matchesSearch = searchInput.value.toLowerCase() === '' || searchText.includes(searchInput.value.toLowerCase());
                 return matchesStatus && matchesSearch;
-            });
-
-            // Apply time-based filters
-            filteredRows = filteredRows.filter(row => {
-                const rowDate = new Date(row.getAttribute('data-date'));
-                if (timePeriod === 'all') return true;
-                if (timePeriod === 'day') {
-                    const todayStart = new Date(today);
-                    todayStart.setHours(0, 0, 0, 0);
-                    const todayEnd = new Date(today);
-                    todayEnd.setHours(23, 59, 59, 999);
-                    return rowDate >= todayStart && rowDate <= todayEnd;
-                } else if (timePeriod === 'week') {
-                    const { start, end } = getWeekRange(today);
-                    return rowDate >= start && rowDate <= end;
-                } else if (timePeriod === 'month') {
-                    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-                    const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-                    return rowDate >= monthStart && rowDate <= monthEnd;
-                } else if (timePeriod === 'year') {
-                    const yearStart = new Date(today.getFullYear(), 0, 1);
-                    const yearEnd = new Date(today.getFullYear(), 11, 31);
-                    return rowDate >= yearStart && rowDate <= yearEnd;
-                }
-                return true;
-            });
-
-            // Sort rows by date descending
-            filteredRows.sort((a, b) => new Date(b.getAttribute('data-date')) - new Date(a.getAttribute('data-date')));
-
-            // Calculate pagination
-            const totalItems = filteredRows.length;
-            const totalPagesCalc = Math.ceil(totalItems / perPage) || 1;
-            if (currentPage > totalPagesCalc) currentPage = totalPagesCalc;
-            if (currentPage < 1) currentPage = 1;
-
-            const start = (currentPage - 1) * perPage;
-            const end = start + perPage;
-            let visibleRows = filteredRows.slice(start, end);
-
-            // Group rows if time filter is not 'all'
-            const grouped = groupRows(filteredRows, timePeriod);
-            const groupKeys = Object.keys(grouped).sort((a, b) => {
-                if (timePeriod === 'all') return 0;
-                const aStart = grouped[a].startDate;
-                const bStart = grouped[b].startDate;
-                return bStart - aStart;
             });
 
             const tbody = currentStatusFilter === 'expenses' ? expensesTbody : salesTbody;
             tbody.innerHTML = '';
 
+            const grouped = groupRows(filteredRows, timeFilter.value);
+            const groupKeys = Object.keys(grouped).sort((a, b) => {
+                if (timeFilter.value === 'all') return 0;
+                const aStart = grouped[a].startDate;
+                const bStart = grouped[b].startDate;
+                return bStart - aStart;
+            });
+
             let allRows = [];
-            if (timePeriod !== 'all' && totalItems > 0) {
-                groupKeys.forEach(key => {
-                    const group = grouped[key];
-                    const groupRows = group.rows.filter(row => filteredRows.includes(row));
-                    if (groupRows.length > 0) {
-                        const headerRow = document.createElement('tr');
-                        headerRow.className = 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white font-semibold';
-                        headerRow.innerHTML = `
-                            <td colspan="7" class="px-6 py-2">${group.label} (Total: KSh ${group.total.toFixed(2)}, Debt: KSh ${group.debt.toFixed(2)})</td>
-                        `;
-                        if (groupRows.some(row => visibleRows.includes(row))) {
-                            allRows.push(headerRow);
-                        }
-                        groupRows.forEach(row => {
-                            if (visibleRows.includes(row)) {
-                                allRows.push(row);
-                            }
-                        });
-                    }
-                });
-            } else {
-                allRows = visibleRows;
-            }
+            groupKeys.forEach(key => {
+                const group = grouped[key];
+                if (timeFilter.value !== 'all') {
+                    const headerRow = document.createElement('tr');
+                    headerRow.className = 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white font-semibold';
+                    headerRow.innerHTML = `
+                        <td colspan="7" class="px-6 py-2">${group.label} (Total: KSh ${group.total.toFixed(2)}, Debt: KSh ${group.debt.toFixed(2)})</td>
+                    `;
+                    allRows.push(headerRow);
+                }
+                group.rows.forEach(row => allRows.push(row));
+            });
 
-            // Render rows
             allRows.forEach(row => tbody.appendChild(row.cloneNode(true)));
-
-            // Update pagination controls
-            pageInfo.textContent = `Page ${currentPage} of ${totalPagesCalc}`;
-            pageEntries.textContent = `Showing ${start + 1} to ${Math.min(start + visibleRows.length, totalItems)} of ${totalItems} ${currentStatusFilter === 'expenses' ? 'expenses' : 'orders'}`;
+            const totalItems = allRows.length;
+            pageEntries.textContent = `Showing ${(currentPage - 1) * perPage + 1} to ${(currentPage - 1) * perPage + totalItems} of ${totalOrders} orders`;
+            pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
             prevPageBtn.classList.toggle('opacity-50', currentPage === 1);
             prevPageBtn.classList.toggle('pointer-events-none', currentPage === 1);
-            nextPageBtn.classList.toggle('opacity-50', currentPage >= totalPagesCalc);
-            nextPageBtn.classList.toggle('pointer-events-none', currentPage >= totalPagesCalc);
+            nextPageBtn.classList.toggle('opacity-50', currentPage === totalPages);
+            nextPageBtn.classList.toggle('pointer-events-none', currentPage === totalPages);
 
-            // Update pagination links to persist filters
-            prevPageBtn.href = currentPage > 1 ? `{{ url_for('dashboard') }}?page=${currentPage - 1}&per_page=${perPage}&time=${timePeriod}&search=${encodeURIComponent(searchTerm)}&filter=${currentStatusFilter}` : '#';
-            nextPageBtn.href = currentPage < totalPagesCalc ? `{{ url_for('dashboard') }}?page=${currentPage + 1}&per_page=${perPage}&time=${timePeriod}&search=${encodeURIComponent(searchTerm)}&filter=${currentStatusFilter}` : '#';
-
-            // Show empty state if no items
             if (totalItems === 0) {
                 emptyState.classList.remove('hidden');
             }
 
-            // Reattach menu toggle listeners
             tbody.querySelectorAll('button[onclick^="toggleMenu"]').forEach(btn => {
                 const menuId = btn.getAttribute('onclick').match(/'menu-[^']+'/)[0].replace(/'/g, '');
                 btn.onclick = () => toggleMenu(menuId);
@@ -603,88 +543,40 @@
 
         allBtn.addEventListener('click', () => {
             currentStatusFilter = 'all';
-            currentPage = 1;
             updateFilterButtonStyles();
             updateDisplay();
         });
 
         pendingBtn.addEventListener('click', () => {
             currentStatusFilter = 'pending';
-            currentPage = 1;
             updateFilterButtonStyles();
             updateDisplay();
         });
 
         completedBtn.addEventListener('click', () => {
             currentStatusFilter = 'completed';
-            currentPage = 1;
             updateFilterButtonStyles();
             updateDisplay();
         });
 
         expensesBtn.addEventListener('click', () => {
             currentStatusFilter = 'expenses';
-            currentPage = 1;
             updateFilterButtonStyles();
             updateDisplay();
         });
 
         timeFilter.addEventListener('change', () => {
             showLoading();
-            window.location.href = `{{ url_for('dashboard') }}?page=1&per_page=${perPage}&time=${timeFilter.value}&search=${encodeURIComponent(searchInput.value)}&filter=${currentStatusFilter}`;
+            window.location.href = `{{ url_for('dashboard') }}?page=1&per_page=${perPage}&time=${timeFilter.value}&search=${encodeURIComponent(searchInput.value)}`;
         });
 
         searchInput.addEventListener('input', () => {
+            // Debounce search to avoid too many updates
             clearTimeout(searchInput.debounce);
             searchInput.debounce = setTimeout(() => {
-                currentPage = 1;
-                updateDisplay();
+                showLoading();
+                window.location.href = `{{ url_for('dashboard') }}?page=1&per_page=${perPage}&time=${timeFilter.value}&search=${encodeURIComponent(searchInput.value)}`;
             }, 300);
-        });
-
-        prevPageBtn.addEventListener('click', (e) => {
-            if (currentPage > 1) {
-                currentPage--;
-                updateDisplay();
-            }
-        });
-
-        nextPageBtn.addEventListener('click', (e) => {
-            const totalItems = (currentStatusFilter === 'expenses' ? allExpensesRows : allSalesRows).filter(row => {
-                const balance = parseFloat(row.getAttribute('data-balance')) || 0;
-                const searchText = row.getAttribute('data-search').toLowerCase();
-                const rowDate = new Date(row.getAttribute('data-date'));
-                let matchesStatus = currentStatusFilter === 'all' ||
-                                   (currentStatusFilter === 'pending' && balance > 0) ||
-                                   (currentStatusFilter === 'completed' && balance === 0) ||
-                                   (currentStatusFilter === 'expenses');
-                let matchesSearch = searchInput.value.toLowerCase() === '' || searchText.includes(searchInput.value.toLowerCase());
-                let matchesTime = true;
-                if (timeFilter.value === 'day') {
-                    const todayStart = new Date(today);
-                    todayStart.setHours(0, 0, 0, 0);
-                    const todayEnd = new Date(today);
-                    todayEnd.setHours(23, 59, 59, 999);
-                    matchesTime = rowDate >= todayStart && rowDate <= todayEnd;
-                } else if (timeFilter.value === 'week') {
-                    const { start, end } = getWeekRange(today);
-                    matchesTime = rowDate >= start && rowDate <= end;
-                } else if (timeFilter.value === 'month') {
-                    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-                    const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-                    matchesTime = rowDate >= monthStart && rowDate <= monthEnd;
-                } else if (timeFilter.value === 'year') {
-                    const yearStart = new Date(today.getFullYear(), 0, 1);
-                    const yearEnd = new Date(today.getFullYear(), 11, 31);
-                    matchesTime = rowDate >= yearStart && rowDate <= yearEnd;
-                }
-                return matchesStatus && matchesSearch && matchesTime;
-            }).length;
-            const totalPagesCalc = Math.ceil(totalItems / perPage) || 1;
-            if (currentPage < totalPagesCalc) {
-                currentPage++;
-                updateDisplay();
-            }
         });
 
         function updateFilterButtonStyles() {
@@ -735,10 +627,6 @@
             }
         });
 
-        // Initialize filter based on URL parameter
-        const urlParams = new URLSearchParams(window.location.search);
-        const filterParam = urlParams.get('filter') || 'all';
-        currentStatusFilter = ['all', 'pending', 'completed', 'expenses'].includes(filterParam) ? filterParam : 'all';
         updateFilterButtonStyles();
         updateDisplay();
         hideLoading();
