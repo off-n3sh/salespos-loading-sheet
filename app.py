@@ -456,7 +456,7 @@ def dashboard():
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     today_end = today_start + timedelta(days=1)
 
-    # Fetch all orders to calculate counts and stats (we'll filter later for display)
+    # Fetch all orders to calculate counts and stats
     all_orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING)
     all_orders = list(all_orders_ref.stream())
 
@@ -471,7 +471,8 @@ def dashboard():
     # Apply time filter to query
     if time_filter == 'day':
         start = today_start
-        orders_ref = orders_ref.where('date', '>=', start).where('date', '<', today_end)
+        end = today_end
+        orders_ref = orders_ref.where('date', '>=', start).where('date', '<', end)
     elif time_filter == 'week':
         start = now - timedelta(days=now.weekday())
         start = start.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -487,19 +488,21 @@ def dashboard():
         end = now.replace(month=12, day=31, hour=23, minute=59, second=59, microsecond=999999)
         orders_ref = orders_ref.where('date', '>=', start).where('date', '<=', end)
 
-    # Apply status filter to query
+    # Apply status filter to query (only for sales history, not expenses)
     if status_filter == 'pending':
         orders_ref = orders_ref.where('balance', '>', 0)
     elif status_filter == 'completed':
         orders_ref = orders_ref.where('balance', '==', 0)
 
-    # Apply search filter and get filtered orders
+    # Fetch all matching orders (before pagination)
     filtered_orders = []
+    matching_order_ids = set()
+
+    # Apply search filter if provided
     if search_query:
         search_lower = search_query.lower()
         salesperson_orders = orders_ref.where('salesperson_name_lower', '>=', search_lower).where('salesperson_name_lower', '<=', search_lower + '\uf8ff').stream()
         shop_orders = orders_ref.where('shop_name_lower', '>=', search_lower).where('shop_name_lower', '<=', search_lower + '\uf8ff').stream()
-        matching_order_ids = set()
         for doc in salesperson_orders:
             matching_order_ids.add(doc.id)
         for doc in shop_orders:
@@ -580,8 +583,8 @@ def dashboard():
     flat_orders = []
     for group in grouped_orders:
         flat_orders.extend([(group['label'], order) for order in group['rows']])
-    total_items = len(flat_orders) if status_filter != 'expenses' else len(filtered_orders)
-    total_pages = (total_items + per_page - 1) // per_page
+    total_items = len(flat_orders) if status_filter != 'expenses' else 0  # Will update for expenses later
+    total_pages = (total_items + per_page - 1) // per_page if total_items > 0 else 1
     start_idx = (page - 1) * per_page
     end_idx = start_idx + per_page
     paginated_orders = flat_orders[start_idx:end_idx]
@@ -598,12 +601,11 @@ def dashboard():
                 'debt': next(group['debt'] for group in grouped_orders if group['label'] == label)
             }
             grouped_sales_history.append(current_group)
-        # Remove 'doc' from the order as it's not needed in the template
         order_copy = order.copy()
         order_copy.pop('doc', None)
         current_group['rows'].append(order_copy)
 
-    # Calculate dashboard stats (unchanged)
+    # Calculate dashboard stats
     retail_sales_today = 0.0
     wholesale_sales_today = 0.0
     total_debts = 0.0
@@ -662,6 +664,7 @@ def dashboard():
     total_sales_today = retail_sales_today + wholesale_sales_today
 
     # Fetch expenses
+    expenses_ref = db.collection('expenses').order_by('date', direction=firestore.Query.DESCENDING)
     expenses = [
         {
             'description': doc.to_dict().get('description', ''),
@@ -669,14 +672,15 @@ def dashboard():
             'category': doc.to_dict().get('category', ''),
             'date': process_date(doc.to_dict().get('date'))
         }
-        for doc in db.collection('expenses').order_by('date', direction=firestore.Query.DESCENDING).stream()
+        for doc in expenses_ref.stream()
     ]
     total_expenses = sum(e['amount'] for e in expenses)
+    expenses_count = len(expenses)
 
-    # Adjust total_items for expenses
+    # Adjust total_items and total_pages for expenses
     if status_filter == 'expenses':
-        total_items = len(expenses)
-        total_pages = (total_items + per_page - 1) // per_page
+        total_items = expenses_count
+        total_pages = (total_items + per_page - 1) // per_page if total_items > 0 else 1
 
     # Fetch notifications
     user_id = session['user'].get('uid', '')
@@ -706,6 +710,7 @@ def dashboard():
         sales_history=[order for _, order in paginated_orders] if status_filter != 'expenses' else [],
         grouped_sales_history=grouped_sales_history if status_filter != 'expenses' else [],
         expenses=expenses,
+        expenses_count=expenses_count,
         search=search_query,
         time_filter=time_filter,
         status_filter=status_filter,
