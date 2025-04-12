@@ -304,16 +304,15 @@
 
         <!-- Pagination Controls -->
         <div class="p-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center">
-            <span id="page-entries" class="text-sm text-gray-600 dark:text-gray-400">
-                Showing {{ (page - 1) * per_page + 1 }} to {{ (page - 1) * per_page + (status_filter == 'expenses' ? expenses | length : sales_history | length) }} of {{ total_items }} {% if status_filter == 'expenses' %}expenses{% else %}orders{% endif %}
-            </span>
-            <div class="flex items-center space-x-2">
-                <a id="prev-page" href="{{ url_for('dashboard', page=page-1, per_page=per_page, time=time_filter, search=search, status=status_filter) if page > 1 else '#' }}" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 {% if page <= 1 %}opacity-50 pointer-events-none{% endif %}">Previous</a>
-                <span id="page-info" class="text-sm text-gray-600 dark:text-gray-300">Page {{ page }} of {{ total_pages }}</span>
-                <a id="next-page" href="{{ url_for('dashboard', page=page+1, per_page=per_page, time=time_filter, search=search, status=status_filter) if page < total_pages else '#' }}" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 {% if page >= total_pages %}opacity-50 pointer-events-none{% endif %}">Next</a>
-            </div>
+        	<span id="page-entries" class="text-sm text-gray-600 dark:text-gray-400">
+        		Showing {{ (page - 1) * per_page + 1 }} to {{ (page - 1) * per_page + (expenses | length if status_filter == 'expenses' else sales_history | length) }} of {{ total_items }} {% if status_filter == 'expenses' %}expenses{% else %}orders{% endif %}
+        	</span>
+        	<div class="flex items-center space-x-2">
+        		<a id="prev-page" href="{{ url_for('dashboard', page=page-1, per_page=per_page, time=time_filter, search=search, status=status_filter) if page > 1 else '#' }}" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 {% if page <= 1 %}opacity-50 pointer-events-none{% endif %}">Previous</a>
+        		<span id="page-info" class="text-sm text-gray-600 dark:text-gray-300">Page {{ page }} of {{ total_pages }}</span>
+        		<a id="next-page" href="{{ url_for('dashboard', page=page+1, per_page=per_page, time=time_filter, search=search, status=status_filter) if page < total_pages else '#' }}" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 {% if page >= total_pages %}opacity-50 pointer-events-none{% endif %}">Next</a>
+        	</div>
         </div>
-
         <!-- Empty State for Filtered Data -->
         <div id="empty-state" class="hidden p-8 text-center">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
