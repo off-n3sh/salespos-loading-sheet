@@ -465,27 +465,8 @@ def dashboard():
     pending_count = sum(1 for doc in all_orders if float(doc.to_dict().get('balance', 0)) > 0)
     completed_count = sum(1 for doc in all_orders if float(doc.to_dict().get('balance', 0)) == 0)
 
-    # Base query for filtered orders
+    # Base query for filtered orders (no time filter applied here)
     orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING)
-
-    # Apply time filter to query
-    if time_filter == 'day':
-        start = today_start
-        end = today_end
-        orders_ref = orders_ref.where('date', '>=', start).where('date', '<', end)
-    elif time_filter == 'week':
-        start = now - timedelta(days=now.weekday())
-        start = start.replace(hour=0, minute=0, second=0, microsecond=0)
-        end = start + timedelta(days=7)
-        orders_ref = orders_ref.where('date', '>=', start).where('date', '<', end)
-    elif time_filter == 'month':
-        start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        end = (start + timedelta(days=31)).replace(day=1, hour=0, minute=0, second=0, microsecond=0) - timedelta(microseconds=1)
-        orders_ref = orders_ref.where('date', '>=', start).where('date', '<', end)
-    elif time_filter == 'year':
-        start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-        end = now.replace(month=12, day=31, hour=23, minute=59, second=59, microsecond=999999)
-        orders_ref = orders_ref.where('date', '>=', start).where('date', '<=', end)
 
     # Apply status filter to query (only for sales history, not expenses)
     if status_filter == 'pending':
@@ -558,14 +539,22 @@ def dashboard():
     # Group orders by time period
     grouped_orders = []
     if time_filter == 'day':
-        total = sum(order['payment'] + order['balance'] for order in filtered_orders)
-        debt = sum(order['balance'] for order in filtered_orders)
-        grouped_orders = [{
-            'label': f"Day: {today_start.strftime('%d %b %Y')}",
-            'rows': filtered_orders,
-            'total': total,
-            'debt': debt
-        }]
+        days = {}
+        for order in filtered_orders:
+            sale_date = order['date']
+            day_key = sale_date.strftime('%Y-%m-%d')
+            if day_key not in days:
+                days[day_key] = {
+                    'label': f"Day: {sale_date.strftime('%d %b %Y')}",
+                    'rows': [],
+                    'total': 0,
+                    'debt': 0
+                }
+            days[day_key]['rows'].append(order)
+            days[day_key]['total'] += order['payment'] + order['balance']
+            days[day_key]['debt'] += order['balance']
+        grouped_orders = list(days.values())
+        grouped_orders.sort(key=lambda x: x['rows'][0]['date'], reverse=True)
     elif time_filter == 'week':
         weeks = {}
         for order in filtered_orders:
