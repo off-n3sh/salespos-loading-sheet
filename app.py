@@ -445,15 +445,27 @@ def dashboard():
     page = int(request.args.get('page', 1))
     per_page = 50
     time_filter = request.args.get('time', 'all')
-    status_filter = request.args.get('status', 'all')  # New: 'all', 'pending', 'completed'
+    status_filter = request.args.get('status', 'all')  # 'all', 'pending', 'completed', 'expenses'
     search_query = request.args.get('search', '').strip()
+
+    # Initialize Firestore client
+    db = firestore.Client()
 
     # Current time in Kenyan timezone
     now = datetime.now(KENYA_TZ)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     today_end = today_start + timedelta(days=1)
 
-    # Base query with descending date order
+    # Fetch all orders to calculate counts and stats (we'll filter later for display)
+    all_orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING)
+    all_orders = list(all_orders_ref.stream())
+
+    # Calculate total counts for filters (across all orders)
+    total_orders = len(all_orders)
+    pending_count = sum(1 for doc in all_orders if float(doc.to_dict().get('balance', 0)) > 0)
+    completed_count = sum(1 for doc in all_orders if float(doc.to_dict().get('balance', 0)) == 0)
+
+    # Base query for filtered orders
     orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING)
 
     # Apply time filter to query
@@ -481,7 +493,8 @@ def dashboard():
     elif status_filter == 'completed':
         orders_ref = orders_ref.where('balance', '==', 0)
 
-    # Apply search filter and get total orders
+    # Apply search filter and get filtered orders
+    filtered_orders = []
     if search_query:
         search_lower = search_query.lower()
         salesperson_orders = orders_ref.where('salesperson_name_lower', '>=', search_lower).where('salesperson_name_lower', '<=', search_lower + '\uf8ff').stream()
@@ -491,60 +504,38 @@ def dashboard():
             matching_order_ids.add(doc.id)
         for doc in shop_orders:
             matching_order_ids.add(doc.id)
-        total_orders = len(matching_order_ids)
-    else:
-        total_orders = sum(1 for _ in orders_ref.stream())
-
-    # Pagination
-    orders = []
-    if search_query and matching_order_ids:
-        matching_orders = []
         for doc_id in matching_order_ids:
             doc = db.collection('orders').document(doc_id).get()
             if doc.exists:
-                matching_orders.append((doc, process_date(doc.to_dict().get('date'))))
-        matching_orders.sort(key=lambda x: x[1], reverse=True)
-        start_idx = (page - 1) * per_page
-        end_idx = start_idx + per_page
-        paginated_orders = matching_orders[start_idx:end_idx]
-        for doc, _ in paginated_orders:
-            order_dict = doc.to_dict()
-            balance = float(order_dict.get('balance', 0))
-            closed_date = process_date(order_dict.get('closed_date'))
-            if balance > 0 and closed_date:
-                closed_date = None
-            orders.append({
-                'receipt_id': order_dict.get('receipt_id', doc.id),
-                'salesperson_name': order_dict.get('salesperson_name', 'N/A'),
-                'shop_name': order_dict.get('shop_name', 'Unknown Shop'),
-                'items': json.dumps(order_dict.get('items', [])),
-                'photoUrl': order_dict.get('photoUrl', ''),
-                'payment': float(order_dict.get('payment', 0)),
-                'balance': balance,
-                'date': process_date(order_dict.get('date')),
-                'closed_date': closed_date,
-                'order_type': order_dict.get('order_type', 'wholesale'),
-                'final_payment': float(order_dict.get('final_payment', 0)),
-                'last_payment_date': process_date(order_dict.get('last_payment_date', order_dict.get('date')))
-            })
+                order_dict = doc.to_dict()
+                balance = float(order_dict.get('balance', 0))
+                closed_date = process_date(order_dict.get('closed_date'))
+                if balance > 0 and closed_date:
+                    closed_date = None
+                filtered_orders.append({
+                    'doc': doc,
+                    'receipt_id': order_dict.get('receipt_id', doc.id),
+                    'salesperson_name': order_dict.get('salesperson_name', 'N/A'),
+                    'shop_name': order_dict.get('shop_name', 'Unknown Shop'),
+                    'items': json.dumps(order_dict.get('items', [])),
+                    'photoUrl': order_dict.get('photoUrl', ''),
+                    'payment': float(order_dict.get('payment', 0)),
+                    'balance': balance,
+                    'date': process_date(order_dict.get('date')),
+                    'closed_date': closed_date,
+                    'order_type': order_dict.get('order_type', 'wholesale'),
+                    'final_payment': float(order_dict.get('final_payment', 0)),
+                    'last_payment_date': process_date(order_dict.get('last_payment_date', order_dict.get('date')))
+                })
     else:
-        if page > 1:
-            last_page_start = (page - 1) * per_page
-            last_doc = None
-            for i, doc in enumerate(orders_ref.stream()):
-                if i == last_page_start - 1:
-                    last_doc = doc
-                    break
-            if last_doc:
-                orders_ref = orders_ref.start_after(last_doc)
-        orders_query = orders_ref.limit(per_page).stream()
-        for doc in orders_query:
+        for doc in orders_ref.stream():
             order_dict = doc.to_dict()
             balance = float(order_dict.get('balance', 0))
             closed_date = process_date(order_dict.get('closed_date'))
             if balance > 0 and closed_date:
                 closed_date = None
-            orders.append({
+            filtered_orders.append({
+                'doc': doc,
                 'receipt_id': order_dict.get('receipt_id', doc.id),
                 'salesperson_name': order_dict.get('salesperson_name', 'N/A'),
                 'shop_name': order_dict.get('shop_name', 'Unknown Shop'),
@@ -558,6 +549,59 @@ def dashboard():
                 'final_payment': float(order_dict.get('final_payment', 0)),
                 'last_payment_date': process_date(order_dict.get('last_payment_date', order_dict.get('date')))
             })
+
+    # Group orders by time period (e.g., weekly)
+    grouped_orders = []
+    if time_filter == 'week':
+        weeks = {}
+        for order in filtered_orders:
+            sale_date = order['date']
+            start_of_week = sale_date - timedelta(days=sale_date.weekday())
+            week_key = start_of_week.strftime('%Y-%m-%d')
+            if week_key not in weeks:
+                end_of_week = start_of_week + timedelta(days=6)
+                weeks[week_key] = {
+                    'label': f"Week: {start_of_week.strftime('%d %b')} – {end_of_week.strftime('%d %b %Y')}",
+                    'rows': [],
+                    'total': 0,
+                    'debt': 0
+                }
+            weeks[week_key]['rows'].append(order)
+            weeks[week_key]['total'] += order['payment'] + order['balance']
+            weeks[week_key]['debt'] += order['balance']
+        grouped_orders = list(weeks.values())
+        grouped_orders.sort(key=lambda x: x['rows'][0]['date'], reverse=True)
+    else:
+        total = sum(order['payment'] + order['balance'] for order in filtered_orders)
+        debt = sum(order['balance'] for order in filtered_orders)
+        grouped_orders = [{'label': 'All Orders', 'rows': filtered_orders, 'total': total, 'debt': debt}]
+
+    # Paginate the grouped orders
+    flat_orders = []
+    for group in grouped_orders:
+        flat_orders.extend([(group['label'], order) for order in group['rows']])
+    total_items = len(flat_orders) if status_filter != 'expenses' else len(filtered_orders)
+    total_pages = (total_items + per_page - 1) // per_page
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+    paginated_orders = flat_orders[start_idx:end_idx]
+
+    # Reconstruct grouped orders for the current page
+    grouped_sales_history = []
+    current_group = None
+    for label, order in paginated_orders:
+        if not current_group or current_group['label'] != label:
+            current_group = {
+                'label': label,
+                'rows': [],
+                'total': next(group['total'] for group in grouped_orders if group['label'] == label),
+                'debt': next(group['debt'] for group in grouped_orders if group['label'] == label)
+            }
+            grouped_sales_history.append(current_group)
+        # Remove 'doc' from the order as it's not needed in the template
+        order_copy = order.copy()
+        order_copy.pop('doc', None)
+        current_group['rows'].append(order_copy)
 
     # Calculate dashboard stats (unchanged)
     retail_sales_today = 0.0
@@ -570,7 +614,6 @@ def dashboard():
     wholesale_open_orders = 0
     wholesale_closed_orders = 0
 
-    all_orders = db.collection('orders').stream()
     for order in all_orders:
         order_dict = order.to_dict()
         order_date = process_date(order_dict.get('date'))
@@ -630,6 +673,11 @@ def dashboard():
     ]
     total_expenses = sum(e['amount'] for e in expenses)
 
+    # Adjust total_items for expenses
+    if status_filter == 'expenses':
+        total_items = len(expenses)
+        total_pages = (total_items + per_page - 1) // per_page
+
     # Fetch notifications
     user_id = session['user'].get('uid', '')
     notifications_ref = db.collection('notifications').where('recipient', '==', user_id).order_by('timestamp', direction=firestore.Query.DESCENDING).limit(10).stream()
@@ -647,9 +695,6 @@ def dashboard():
             'read': notif_dict.get('read', False)
         })
 
-    # Pagination totals
-    total_pages = (total_orders + per_page - 1) // per_page
-
     return render_template(
         'dashboard.html',
         user=session['user'],
@@ -658,15 +703,19 @@ def dashboard():
         wholesale_sales_today=wholesale_sales_today,
         total_debts=total_debts,
         total_expenses=total_expenses,
-        sales_history=orders,  # No need for filtered_orders, filtering is in query
+        sales_history=[order for _, order in paginated_orders] if status_filter != 'expenses' else [],
+        grouped_sales_history=grouped_sales_history if status_filter != 'expenses' else [],
         expenses=expenses,
         search=search_query,
         time_filter=time_filter,
-        status_filter=status_filter,  # Pass to template
+        status_filter=status_filter,
         page=page,
         per_page=per_page,
         total_pages=total_pages,
         total_orders=total_orders,
+        pending_count=pending_count,
+        completed_count=completed_count,
+        total_items=total_items,
         notifications=notifications,
         unread_count=unread_count,
         open_orders_count=open_orders_count,
