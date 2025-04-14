@@ -4,6 +4,16 @@
 <div class="container mx-auto px-4 py-6">
     <h2 class="text-3xl font-bold mb-6 text-gray-900 dark:text-white">Stock Overview</h2>
 
+    <!-- Debug: Check if filter is available -->
+    <p class="text-gray-700 dark:text-gray-300">
+        Debug: expire_date_days_left defined? 
+        {% if 'expire_date_days_left' in app.jinja_env.filters %}
+            Yes
+        {% else %}
+            No
+        {% endif %}
+    </p>
+
     <!-- Add New Stock Button and Form (Manager Only) -->
     {% if session['user']['role'] == 'manager' %}
     <div class="mb-6">
@@ -78,12 +88,15 @@
     <!-- Stock Grid -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" id="stock-grid">
         {% for item in stock_items %}
-        <div class="stock-card bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md {% if item.expire_date and expire_date_days_left(item.expire_date) <= 7 %}bg-red-100 dark:bg-red-900{% elif item.expire_date and expire_date_days_left(item.expire_date) <= 30 %}bg-yellow-100 dark:bg-yellow-900{% elif item.stock_quantity <= item.reorder_quantity %}bg-orange-100 dark:bg-orange-900{% elif item.stock_quantity <= item.reorder_quantity * 2 %}bg-yellow-100 dark:bg-yellow-900{% else %}bg-green-100 dark:bg-green-900{% endif %}">
+        <div class="stock-card bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md 
+            {% if item.stock_quantity <= item.reorder_quantity %}bg-orange-100 dark:bg-orange-900
+            {% elif item.stock_quantity <= item.reorder_quantity * 2 %}bg-yellow-100 dark:bg-yellow-900
+            {% else %}bg-green-100 dark:bg-green-900{% endif %}">
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ item.stock_name }}</h3>
             <p class="text-gray-700 dark:text-gray-300">Qty: <span class="font-bold">{{ item.stock_quantity }}</span> (Reorder at {{ item.reorder_quantity }})</p>
             <p class="text-gray-700 dark:text-gray-300">Retail: <span class="font-bold">{{ item.selling_price | format_currency }}</span> | Wholesale: <span class="font-bold">{{ item.wholesale | format_currency }}</span> | Cost: {{ item.company_price | format_currency }}</p>
             <p class="text-gray-700 dark:text-gray-300">Category: {{ item.category }}</p>
-            <p class="text-gray-700 dark:text-gray-300">Expires: <span class="font-bold">{{ item.expire_date or 'N/A' }}</span>{% if item.expire_date and expire_date_days_left(item.expire_date) <= 30 %} ({{ expire_date_days_left(item.expire_date) }} days left){% endif %}</p>
+            <p class="text-gray-700 dark:text-gray-300">Expires: <span class="font-bold">{{ item.expire_date or 'N/A' }}</span></p>
             {% if session['user']['role'] == 'manager' %}
             <form method="POST" class="mt-4 flex flex-col gap-2">
                 <input type="hidden" name="stock_id" value="{{ item.id }}">

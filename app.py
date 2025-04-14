@@ -131,6 +131,13 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def format_currency(value):
+    """Format a number as currency (KES)."""
+    try:
+        return f"KES {float(value):.2f}"
+    except (TypeError, ValueError):
+        return "KES 0.00"
+
 def expire_date_days_left(date_str):
     """Calculate days until expiry date."""
     try:
@@ -142,12 +149,6 @@ def expire_date_days_left(date_str):
         return days_left if days_left >= 0 else 0
     except (ValueError, TypeError):
         return None
-def format_currency(value):
-    """Format a number as currency (KES)."""
-    try:
-        return f"KES {float(value):.2f}"
-    except (TypeError, ValueError):
-        return "KES 0.00"
 
 app.jinja_env.filters['format_currency'] = format_currency
 app.jinja_env.filters['expire_date_days_left'] = expire_date_days_left
