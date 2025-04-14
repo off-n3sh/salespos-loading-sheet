@@ -9,6 +9,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from io import BytesIO
 import os
+import re
 from functools import wraps
 from firebase_admin.auth import UserNotFoundError
 
@@ -130,6 +131,27 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def expire_date_days_left(date_str):
+    """Calculate days until expiry date."""
+    try:
+        if not date_str or date_str == "0000-00-00 00:00:00":
+            return None
+        expiry_date = datetime.strptime(date_str, "%Y-%m-%d")
+        today = datetime.now(KENYA_TZ).replace(hour=0, minute=0, second=0, microsecond=0)
+        days_left = (expiry_date - today).days
+        return days_left if days_left >= 0 else 0
+    except (ValueError, TypeError):
+        return None
+def format_currency(value):
+    """Format a number as currency (KES)."""
+    try:
+        return f"KES {float(value):.2f}"
+    except (TypeError, ValueError):
+        return "KES 0.00"
+
+app.jinja_env.filters['format_currency'] = format_currency
+app.jinja_env.filters['expire_date_days_left'] = expire_date_days_left
+        
 @app.route('/logout')
 def logout():
     session.pop('user', None)
@@ -899,6 +921,7 @@ def orders():
     stock_items = [doc.to_dict() for doc in db.collection('stock').order_by('stock_name').get()]
     return render_template('orders.html', orders=orders, recent_activity=recent_activity, stock_items=stock_items)
         
+# Updated /stock route
 @app.route('/stock', methods=['GET', 'POST'])
 @no_cache
 @login_required
@@ -911,30 +934,60 @@ def stock():
 
         action = request.form.get('action')
         if action == 'add_stock':
-            stock_id = request.form.get('stock_id')
             stock_name = request.form.get('stock_name')
             category = request.form.get('category')
-            initial_quantity = int(request.form.get('initial_quantity', 0))
-            reorder_quantity = int(request.form.get('reorder_quantity', 0))
-            selling_price = float(request.form.get('selling_price', 0.0))
-            company_price = float(request.form.get('company_price', 0.0))
-            expire_date = request.form.get('expire_date', '')
+            new_category = request.form.get('new_category')
+            initial_quantity = request.form.get('initial_quantity')
+            reorder_quantity = request.form.get('reorder_quantity')
+            selling_price = request.form.get('selling_price')
+            wholesale_price = request.form.get('wholesale_price')
+            company_price = request.form.get('company_price')
+            expire_date = request.form.get('expire_date')
 
-            if not stock_id or not stock_name or not category or initial_quantity < 0 or reorder_quantity < 0 or selling_price < 0 or company_price < 0:
-                return "Invalid input data for required fields", 400
+            # Validation
+            if not all([stock_name, category or new_category, initial_quantity, reorder_quantity, selling_price, wholesale_price, company_price, expire_date]):
+                return "All fields are required", 400
 
+            try:
+                initial_quantity = int(initial_quantity)
+                reorder_quantity = int(reorder_quantity)
+                selling_price = float(selling_price)
+                wholesale_price = float(wholesale_price)
+                company_price = float(company_price)
+                if any(x < 0 for x in [initial_quantity, reorder_quantity, selling_price, wholesale_price, company_price]):
+                    return "Numeric fields cannot be negative", 400
+                # Validate expire_date format (YYYY-MM-DD)
+                datetime.strptime(expire_date, '%Y-%m-%d')
+            except ValueError:
+                return "Invalid numeric or date format", 400
+
+            # Use new_category if provided, else use selected category
+            final_category = new_category.strip() if new_category else category
+
+            # Auto-generate stock_id
+            # Use category initials (first 3 letters, uppercase) + counter
+            category_prefix = ''.join(c for c in final_category[:3] if c.isalnum()).upper()
             counter_ref = db.collection('metadata').document('stock_counter')
             counter = counter_ref.get()
             if not counter.exists:
                 counter_ref.set({'last_id': 0})
-                new_id = 1
+                new_counter = 1
             else:
                 last_id = counter.to_dict().get('last_id', 0)
-                new_id = last_id + 1
-            counter_ref.update({'last_id': new_id})
+                new_counter = last_id + 1
+            counter_ref.update({'last_id': new_counter})
+            stock_id = f"{category_prefix}{new_counter:03d}"
+
+            # Check for duplicate stock_name or stock_id
+            existing_stock = db.collection('stock').where('stock_name', '==', stock_name).get()
+            if existing_stock:
+                return f"Stock item '{stock_name}' already exists", 400
+            existing_id = db.collection('stock').where('stock_id', '==', stock_id).get()
+            if existing_id:
+                return f"Stock ID '{stock_id}' already exists", 400
 
             stock_data = {
-                'id': new_id,
+                'id': new_counter,
                 'stock_id': stock_id,
                 'stock_name': stock_name,
                 'stock_quantity': initial_quantity,
@@ -942,22 +995,21 @@ def stock():
                 'supplier_id': None,
                 'company_price': company_price,
                 'selling_price': selling_price,
-                'wholesale': 0.0,
+                'wholesale': wholesale_price,
                 'barprice': 0.0,
-                'category': category,
+                'category': final_category,
                 'date': datetime.now(KENYA_TZ).strftime('%Y-%m-%d %H:%M:%S'),
-                'expire_date': expire_date if expire_date else None,
+                'expire_date': expire_date,
                 'uom': None,
-                'code': None,
+                'code': stock_id,  # Align code with stock_id for consistency
                 'date2': None
             }
 
             doc_id = stock_id.replace('/', '-')
-            if not doc_id:
-                return "Invalid stock_id", 400
-
             db.collection('stock').document(doc_id).set(stock_data)
-            log_stock_change(category, stock_name, 'add_stock', initial_quantity, selling_price)
+            log_stock_change(final_category, stock_name, 'add_stock', initial_quantity, selling_price)
+            # Log wholesale price change for auditing
+            log_stock_change(final_category, stock_name, 'wholesale_price_set', 0, wholesale_price)
 
         elif action == 'restock':
             stock_id = request.form.get('stock_id')
@@ -965,11 +1017,15 @@ def stock():
                 stock_ref = db.collection('stock').document(stock_id)
                 stock = stock_ref.get()
                 if stock.exists:
-                    restock_qty = int(request.form.get('restock_quantity', 0))
-                    if restock_qty > 0:
+                    try:
+                        restock_qty = int(request.form.get('restock_quantity', 0))
+                        if restock_qty <= 0:
+                            return "Restock quantity must be positive", 400
                         current_qty = stock.to_dict().get('stock_quantity', 0)
                         stock_ref.update({'stock_quantity': current_qty + restock_qty})
                         log_stock_change(stock.to_dict().get('category'), stock.to_dict().get('stock_name'), 'restock', restock_qty, stock.to_dict().get('selling_price'))
+                    except ValueError:
+                        return "Invalid restock quantity", 400
 
         elif action == 'update_price':
             stock_id = request.form.get('stock_id')
@@ -977,12 +1033,48 @@ def stock():
                 stock_ref = db.collection('stock').document(stock_id)
                 stock = stock_ref.get()
                 if stock.exists:
-                    new_price = float(request.form.get('new_selling_price', 0))
-                    if new_price > 0:
-                        stock_ref.update({'selling_price': new_price})
-                        log_stock_change(stock.to_dict().get('category'), stock.to_dict().get('stock_name'), 'price_update', 0, new_price)
+                    try:
+                        new_selling_price = float(request.form.get('new_selling_price', 0))
+                        new_wholesale_price = float(request.form.get('new_wholesale_price', 0))
+                        if new_selling_price < 0 or new_wholesale_price < 0:
+                            return "Prices cannot be negative", 400
+                        updates = {}
+                        if new_selling_price > 0:
+                            updates['selling_price'] = new_selling_price
+                        if new_wholesale_price > 0:
+                            updates['wholesale'] = new_wholesale_price
+                        if updates:
+                            stock_ref.update(updates)
+                            stock_data = stock.to_dict()
+                            if new_selling_price > 0:
+                                log_stock_change(stock_data.get('category'), stock_data.get('stock_name'), 'price_update', 0, new_selling_price)
+                            if new_wholesale_price > 0:
+                                log_stock_change(stock_data.get('category'), stock_data.get('stock_name'), 'wholesale_price_update', 0, new_wholesale_price)
+                    except ValueError:
+                        return "Invalid price format", 400
 
+    # Check for near-expiry items and generate notifications
     stock_items = [doc.to_dict() | {'id': doc.id} for doc in db.collection('stock').order_by('stock_name').get()]
+    for item in stock_items:
+        expire_date = item.get('expire_date')
+        if expire_date and expire_date != "0000-00-00 00:00:00":
+            try:
+                days_left = expire_date_days_left(expire_date)
+                if days_left is not None and days_left <= 30:
+                    notification_message = f"Stock '{item['stock_name']}' is nearing expiry ({days_left} days left) on {expire_date}"
+                    # Check if notification already exists to avoid duplicates
+                    existing_notif = db.collection('notifications').where('message', '==', notification_message).get()
+                    if not existing_notif:
+                        db.collection('notifications').add({
+                            'recipient': session['user']['uid'],
+                            'message': notification_message,
+                            'timestamp': datetime.now(KENYA_TZ),
+                            'order_id': None,
+                            'read': False
+                        })
+            except ValueError:
+                continue
+
     recent_activity = [
         {
             'receipt_id': doc.to_dict().get('receipt_id', doc.id),
@@ -994,7 +1086,7 @@ def stock():
     ]
 
     return render_template('stock.html', stock_items=stock_items, recent_activity=recent_activity)
-
+    
 @app.route('/receipts')
 @no_cache
 @login_required

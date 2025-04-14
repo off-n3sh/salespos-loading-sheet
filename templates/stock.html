@@ -1,32 +1,35 @@
 {% extends "base.html" %}
 {% block title %}Stock{% endblock %}
 {% block content %}
-<div class="container mx-auto">
+<div class="container mx-auto px-4 py-6">
     <h2 class="text-3xl font-bold mb-6 text-gray-900 dark:text-white">Stock Overview</h2>
-    
+
     <!-- Add New Stock Button and Form (Manager Only) -->
     {% if session['user']['role'] == 'manager' %}
     <div class="mb-6">
         <button id="toggle-add-stock-form" class="bg-green-500 text-white font-semibold px-4 py-2 rounded border border-green-600 shadow-md hover:bg-green-600 focus:outline-none dark:bg-green-500 dark:hover:bg-green-600 dark:border-green-600">
             Add New Stock
         </button>
-        <div id="add-stock-form" class="hidden mt-4 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg shadow-md">
+        <div id="add-stock-form" class="hidden mt-4 p-6 bg-gray-100 dark:bg-gray-800 rounded-lg shadow-md">
             <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Add New Stock Item</h3>
             <form method="POST">
                 <input type="hidden" name="action" value="add_stock">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                        <label for="stock_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Stock ID</label>
-                        <input type="text" name="stock_id" id="stock_id" required placeholder="e.g., ACT01" class="w-full p-2 border rounded dark:bg-gray-700 dark:text-white">
-                    </div>
-                    <div>
                         <label for="stock_name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Stock Name</label>
                         <input type="text" name="stock_name" id="stock_name" required placeholder="e.g., Action Tembe" class="w-full p-2 border rounded dark:bg-gray-700 dark:text-white">
                     </div>
                     <div>
                         <label for="category" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Category</label>
-                        <input type="text" name="category" id="category" required placeholder="e.g., Medication" class="w-full p-2 border rounded dark:bg-gray-700 dark:text-white">
+                        <select name="category" id="category" required class="w-full p-2 border rounded dark:bg-gray-700 dark:text-white">
+                            <option value="" disabled selected>Select a category</option>
+                            {% for item in stock_items | unique(attribute='category') %}
+                                <option value="{{ item.category }}">{{ item.category }}</option>
+                            {% endfor %}
+                            <option value="new">Add new category...</option>
+                        </select>
+                        <input type="text" name="new_category" id="new_category" placeholder="Enter new category" class="w-full p-2 border rounded dark:bg-gray-700 dark:text-white mt-2 hidden">
                     </div>
                     <div>
                         <label for="initial_quantity" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Initial Quantity</label>
@@ -37,16 +40,20 @@
                         <input type="number" name="reorder_quantity" id="reorder_quantity" required min="0" placeholder="e.g., 5" class="w-full p-2 border rounded dark:bg-gray-700 dark:text-white">
                     </div>
                     <div>
-                        <label for="selling_price" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Selling Price</label>
+                        <label for="selling_price" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Retail Price</label>
                         <input type="number" name="selling_price" id="selling_price" required min="0" step="0.01" placeholder="e.g., 20.00" class="w-full p-2 border rounded dark:bg-gray-700 dark:text-white">
+                    </div>
+                    <div>
+                        <label for="wholesale_price" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Wholesale Price</label>
+                        <input type="number" name="wholesale_price" id="wholesale_price" required min="0" step="0.01" placeholder="e.g., 18.00" class="w-full p-2 border rounded dark:bg-gray-700 dark:text-white">
                     </div>
                     <div>
                         <label for="company_price" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Company Price</label>
                         <input type="number" name="company_price" id="company_price" required min="0" step="0.01" placeholder="e.g., 340.00" class="w-full p-2 border rounded dark:bg-gray-700 dark:text-white">
                     </div>
                     <div>
-                        <label for="expire_date" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Expiry Date (Optional)</label>
-                        <input type="date" name="expire_date" id="expire_date" class="w-full p-2 border rounded dark:bg-gray-700 dark:text-white">
+                        <label for="expire_date" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Expiry Date</label>
+                        <input type="date" name="expire_date" id="expire_date" required class="w-full p-2 border rounded dark:bg-gray-700 dark:text-white">
                     </div>
                 </div>
                 <button type="submit" class="mt-4 bg-green-500 text-white font-semibold px-4 py-2 rounded border border-green-600 shadow-md hover:bg-green-600 focus:outline-none dark:bg-green-500 dark:hover:bg-green-600 dark:border-green-600">
@@ -58,9 +65,9 @@
     {% endif %}
 
     <!-- Search and Filter -->
-    <div class="mb-4 flex justify-between items-center">
-        <input type="text" id="search" placeholder="Search stock..." class="w-1/3 p-2 border rounded dark:bg-gray-800 dark:text-white">
-        <select id="category-filter" class="p-2 border rounded dark:bg-gray-800 dark:text-white">
+    <div class="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <input type="text" id="search" placeholder="Search stock..." class="w-full sm:w-1/3 p-2 border rounded dark:bg-gray-800 dark:text-white">
+        <select id="category-filter" class="w-full sm:w-1/4 p-2 border rounded dark:bg-gray-800 dark:text-white">
             <option value="">All Categories</option>
             {% for item in stock_items | unique(attribute='category') %}
                 <option value="{{ item.category }}">{{ item.category }}</option>
@@ -71,22 +78,24 @@
     <!-- Stock Grid -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" id="stock-grid">
         {% for item in stock_items %}
-        <div class="stock-card bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md {% if item.stock_quantity <= item.reorder_quantity %}bg-red-100 dark:bg-red-900{% elif item.stock_quantity <= item.reorder_quantity * 2 %}bg-yellow-100 dark:bg-yellow-900{% else %}bg-green-100 dark:bg-green-900{% endif %}">
+        <div class="stock-card bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md {% if item.expire_date and expire_date_days_left(item.expire_date) <= 7 %}bg-red-100 dark:bg-red-900{% elif item.expire_date and expire_date_days_left(item.expire_date) <= 30 %}bg-yellow-100 dark:bg-yellow-900{% elif item.stock_quantity <= item.reorder_quantity %}bg-orange-100 dark:bg-orange-900{% elif item.stock_quantity <= item.reorder_quantity * 2 %}bg-yellow-100 dark:bg-yellow-900{% else %}bg-green-100 dark:bg-green-900{% endif %}">
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ item.stock_name }}</h3>
             <p class="text-gray-700 dark:text-gray-300">Qty: <span class="font-bold">{{ item.stock_quantity }}</span> (Reorder at {{ item.reorder_quantity }})</p>
-            <p class="text-gray-700 dark:text-gray-300">Sell: <span class="font-bold">{{ item.selling_price }}</span> | Cost: {{ item.company_price }}</p>
+            <p class="text-gray-700 dark:text-gray-300">Retail: <span class="font-bold">{{ item.selling_price | format_currency }}</span> | Wholesale: <span class="font-bold">{{ item.wholesale | format_currency }}</span> | Cost: {{ item.company_price | format_currency }}</p>
             <p class="text-gray-700 dark:text-gray-300">Category: {{ item.category }}</p>
+            <p class="text-gray-700 dark:text-gray-300">Expires: <span class="font-bold">{{ item.expire_date or 'N/A' }}</span>{% if item.expire_date and expire_date_days_left(item.expire_date) <= 30 %} ({{ expire_date_days_left(item.expire_date) }} days left){% endif %}</p>
             {% if session['user']['role'] == 'manager' %}
-            <form method="POST" class="mt-2 flex flex-col items-start">
+            <form method="POST" class="mt-4 flex flex-col gap-2">
                 <input type="hidden" name="stock_id" value="{{ item.id }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <div class="flex items-center mb-2">
-                    <input type="number" name="restock_quantity" min="1" placeholder="Restock qty" class="w-24 p-1 border rounded mr-2 dark:bg-gray-700 dark:text-white">
+                <div class="flex items-center gap-2">
+                    <input type="number" name="restock_quantity" min="1" placeholder="Restock qty" class="w-24 p-1 border rounded dark:bg-gray-700 dark:text-white">
                     <button type="submit" name="action" value="restock" class="bg-orange-700 text-white font-semibold px-4 py-2 rounded border border-orange-800 shadow-md hover:bg-orange-800 focus:outline-none dark:bg-orange-600 dark:hover:bg-orange-700 dark:border-orange-700">Restock</button>
                 </div>
-                <div class="flex items-center">
-                    <input type="number" name="new_selling_price" min="0" step="0.01" placeholder="New sell price" class="w-24 p-1 border rounded mr-2 dark:bg-gray-700 dark:text-white" value="{{ item.selling_price }}">
-                    <button type="submit" name="action" value="update_price" class="bg-blue-500 text-white font-semibold px-4 py-2 rounded border border-blue-600 shadow-md hover:bg-blue-600 focus:outline-none dark:bg-blue-500 dark:hover:bg-blue-600 dark:border-blue-600">Update Price</button>
+                <div class="flex items-center gap-2">
+                    <input type="number" name="new_selling_price" min="0" step="0.01" placeholder="New retail price" class="w-24 p-1 border rounded dark:bg-gray-700 dark:text-white" value="{{ item.selling_price }}">
+                    <input type="number" name="new_wholesale_price" min="0" step="0.01" placeholder="New wholesale price" class="w-24 p-1 border rounded dark:bg-gray-700 dark:text-white" value="{{ item.wholesale }}">
+                    <button type="submit" name="action" value="update_price" class="bg-blue-500 text-white font-semibold px-4 py-2 rounded border border-blue-600 shadow-md hover:bg-blue-600 focus:outline-none dark:bg-blue-500 dark:hover:bg-blue-600 dark:border-blue-600">Update Prices</button>
                 </div>
             </form>
             {% endif %}
@@ -96,6 +105,32 @@
 </div>
 
 <script>
+    // Toggle Add Stock Form
+    const toggleButton = document.getElementById('toggle-add-stock-form');
+    const addStockForm = document.getElementById('add-stock-form');
+    if (toggleButton && addStockForm) {
+        toggleButton.addEventListener('click', () => {
+            addStockForm.classList.toggle('hidden');
+        });
+    }
+
+    // Category Selection Logic
+    const categorySelect = document.getElementById('category');
+    const newCategoryInput = document.getElementById('new_category');
+    if (categorySelect && newCategoryInput) {
+        categorySelect.addEventListener('change', () => {
+            if (categorySelect.value === 'new') {
+                newCategoryInput.classList.remove('hidden');
+                newCategoryInput.required = true;
+            } else {
+                newCategoryInput.classList.add('hidden');
+                newCategoryInput.required = false;
+                newCategoryInput.value = '';
+            }
+        });
+    }
+
+    // Search and Filter Logic
     const searchInput = document.getElementById('search');
     const categoryFilter = document.getElementById('category-filter');
     const stockGrid = document.getElementById('stock-grid');
@@ -116,14 +151,5 @@
 
     searchInput.addEventListener('input', filterStock);
     categoryFilter.addEventListener('change', filterStock);
-
-    // Toggle Add Stock Form (only if the form exists, i.e., for managers)
-    const toggleButton = document.getElementById('toggle-add-stock-form');
-    const addStockForm = document.getElementById('add-stock-form');
-    if (toggleButton && addStockForm) {
-        toggleButton.addEventListener('click', () => {
-            addStockForm.classList.toggle('hidden');
-        });
-    }
 </script>
 {% endblock %}
