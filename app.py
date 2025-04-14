@@ -45,6 +45,10 @@ def pluralize_filter(value, singular='', plural='s'):
 
 app.jinja_env.filters['pluralize'] = pluralize_filter
 
+# Set up logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
 # Helper Functions
 # Decorator to prevent caching of protected pages
 def no_cache(f):
@@ -149,6 +153,16 @@ def expire_date_days_left(date_str):
         return days_left if days_left >= 0 else 0
     except (ValueError, TypeError):
         return None
+
+# Register filters with logging
+try:
+    logger.debug("Registering format_currency filter")
+    app.jinja_env.filters['format_currency'] = format_currency
+    logger.debug("Registering expire_date_days_left filter")
+    app.jinja_env.filters['expire_date_days_left'] = expire_date_days_left
+    logger.debug("Filters registered: %s", list(app.jinja_env.filters.keys()))
+except Exception as e:
+    logger.error("Filter registration failed: %s", e)
 
 app.jinja_env.filters['format_currency'] = format_currency
 app.jinja_env.filters['expire_date_days_left'] = expire_date_days_left
