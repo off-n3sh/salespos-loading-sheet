@@ -79,20 +79,14 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" id="stock-grid">
         {% for item in stock_items %}
         <div class="stock-card bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md 
-            {% if item.expire_date and item.expire_date != '0000-00-00 00:00:00' and expire_date_days_left(item.expire_date) is not none and expire_date_days_left(item.expire_date) <= 7 %}bg-red-100 dark:bg-red-900
-            {% elif item.expire_date and item.expire_date != '0000-00-00 00:00:00' and expire_date_days_left(item.expire_date) is not none and expire_date_days_left(item.expire_date) <= 30 %}bg-yellow-100 dark:bg-yellow-900
-            {% elif item.stock_quantity <= item.reorder_quantity %}bg-orange-100 dark:bg-orange-900
+            {% if item.stock_quantity <= item.reorder_quantity %}bg-orange-100 dark:bg-orange-900
             {% elif item.stock_quantity <= item.reorder_quantity * 2 %}bg-yellow-100 dark:bg-yellow-900
             {% else %}bg-green-100 dark:bg-green-900{% endif %}">
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ item.stock_name }}</h3>
             <p class="text-gray-700 dark:text-gray-300">Qty: <span class="font-bold">{{ item.stock_quantity }}</span> (Reorder at {{ item.reorder_quantity }})</p>
             <p class="text-gray-700 dark:text-gray-300">Retail: <span class="font-bold">{{ item.selling_price | format_currency }}</span> | Wholesale: <span class="font-bold">{{ item.wholesale | format_currency }}</span> | Cost: {{ item.company_price | format_currency }}</p>
             <p class="text-gray-700 dark:text-gray-300">Category: {{ item.category }}</p>
-            <p class="text-gray-700 dark:text-gray-300">Expires: <span class="font-bold {{ 'text-red-600 dark:text-red-400' if item.expire_date and item.expire_date != '0000-00-00 00:00:00' and expire_date_days_left(item.expire_date) is not none and expire_date_days_left(item.expire_date) <= 7 else 'text-yellow-600 dark:text-yellow-400' if item.expire_date and item.expire_date != '0000-00-00 00:00:00' and expire_date_days_left(item.expire_date) is not none and expire_date_days_left(item.expire_date) <= 30 else '' }}">{{ item.expire_date or 'N/A' }}</span>
-                {% if item.expire_date and item.expire_date != '0000-00-00 00:00:00' and expire_date_days_left(item.expire_date) is not none and expire_date_days_left(item.expire_date) <= 30 %}
-                    (<span class="font-bold {{ 'text-red-600 dark:text-red-400' if expire_date_days_left(item.expire_date) <= 7 else 'text-yellow-600 dark:text-yellow-400' }}">{{ expire_date_days_left(item.expire_date) }} days left</span>)
-                {% endif %}
-            </p>
+            <p class="text-gray-700 dark:text-gray-300">Expires: <span class="font-bold">{{ item.expire_date or 'N/A' }}</span></p>
             {% if session['user']['role'] == 'manager' %}
             <form method="POST" class="mt-4 flex flex-col gap-2">
                 <input type="hidden" name="stock_id" value="{{ item.id }}">
