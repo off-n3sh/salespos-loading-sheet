@@ -1,63 +1,73 @@
 {% extends "base.html" %}
 {% block title %}Stock{% endblock %}
 {% block content %}
-<div class="container mx-auto px-4 py-6">
-    <h2 class="text-3xl font-bold mb-6 text-gray-900 dark:text-white">Stock Overview</h2>
+<div class="container mx-auto px-6 py-8">
+    <h2 class="text-3xl font-bold mb-8 text-gray-900 dark:text-white">Stock Overview</h2>
 
     <!-- Add New Stock Button and Form (Manager Only) -->
     {% if session['user']['role'] == 'manager' %}
-    <div class="mb-6">
-        <button id="toggle-add-stock-form" class="bg-green-500 text-white font-semibold px-4 py-2 rounded border border-green-600 shadow-md hover:bg-green-600 focus:outline-none dark:bg-green-500 dark:hover:bg-green-600 dark:border-green-600">
-            Add New Stock
+    <div class="mb-8">
+        <button id="toggle-add-stock-form" class="bg-green-500 text-white font-semibold px-5 py-2.5 rounded-md border border-green-600 shadow-md hover:bg-green-600 focus:outline-none transition-colors duration-200 dark:bg-green-600 dark:hover:bg-green-700 dark:border-green-700">
+            <span class="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 3a1 1 0 00-1 1v5H4a1 1 0 100 2h5v5a1 1 0 102 0v-5h5a1 1 0 100-2h-5V4a1 1 0 00-1-1z" clip-rule="evenodd" />
+                </svg>
+                Add New Stock
+            </span>
         </button>
-        <div id="add-stock-form" class="hidden mt-4 p-6 bg-gray-100 dark:bg-gray-800 rounded-lg shadow-md">
-            <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Add New Stock Item</h3>
+        <div id="add-stock-form" class="hidden mt-6 p-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
+            <h3 class="text-xl font-semibold mb-6 text-gray-900 dark:text-white border-b pb-3 dark:border-gray-700">Add New Stock Item</h3>
             <form method="POST">
                 <input type="hidden" name="action" value="add_stock">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     <div>
-                        <label for="stock_name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Stock Name</label>
-                        <input type="text" name="stock_name" id="stock_name" required placeholder="e.g., Action Tembe" class="w-full p-2 border rounded dark:bg-gray-700 dark:text-white">
+                        <label for="stock_name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Stock Name</label>
+                        <input type="text" name="stock_name" id="stock_name" required placeholder="e.g., Action Tembe" class="w-full p-3 border rounded-md shadow-sm focus:ring focus:ring-green-200 dark:focus:ring-green-800 dark:bg-gray-700 dark:text-white">
                     </div>
                     <div>
-                        <label for="category" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Category</label>
-                        <select name="category" id="category" required class="w-full p-2 border rounded dark:bg-gray-700 dark:text-white">
+                        <label for="category" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
+                        <select name="category" id="category" required class="w-full p-3 border rounded-md shadow-sm focus:ring focus:ring-green-200 dark:focus:ring-green-800 dark:bg-gray-700 dark:text-white">
                             <option value="" disabled selected>Select a category</option>
                             {% for item in stock_items | unique(attribute='category') %}
                                 <option value="{{ item.category }}">{{ item.category }}</option>
                             {% endfor %}
                             <option value="new">Add new category...</option>
                         </select>
-                        <input type="text" name="new_category" id="new_category" placeholder="Enter new category" class="w-full p-2 border rounded dark:bg-gray-700 dark:text-white mt-2 hidden">
+                        <input type="text" name="new_category" id="new_category" placeholder="Enter new category" class="w-full p-3 border rounded-md shadow-sm dark:bg-gray-700 dark:text-white mt-2 hidden focus:ring focus:ring-green-200 dark:focus:ring-green-800">
                     </div>
                     <div>
-                        <label for="initial_quantity" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Initial Quantity</label>
-                        <input type="number" name="initial_quantity" id="initial_quantity" required min="0" placeholder="e.g., 36" class="w-full p-2 border rounded dark:bg-gray-700 dark:text-white">
+                        <label for="initial_quantity" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Initial Quantity</label>
+                        <input type="number" name="initial_quantity" id="initial_quantity" required min="0" placeholder="e.g., 36" class="w-full p-3 border rounded-md shadow-sm focus:ring focus:ring-green-200 dark:focus:ring-green-800 dark:bg-gray-700 dark:text-white">
                     </div>
                     <div>
-                        <label for="reorder_quantity" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Reorder Quantity</label>
-                        <input type="number" name="reorder_quantity" id="reorder_quantity" required min="0" placeholder="e.g., 5" class="w-full p-2 border rounded dark:bg-gray-700 dark:text-white">
+                        <label for="reorder_quantity" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Reorder Quantity</label>
+                        <input type="number" name="reorder_quantity" id="reorder_quantity" required min="0" placeholder="e.g., 5" class="w-full p-3 border rounded-md shadow-sm focus:ring focus:ring-green-200 dark:focus:ring-green-800 dark:bg-gray-700 dark:text-white">
                     </div>
                     <div>
-                        <label for="selling_price" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Retail Price</label>
-                        <input type="number" name="selling_price" id="selling_price" required min="0" step="0.01" placeholder="e.g., 20.00" class="w-full p-2 border rounded dark:bg-gray-700 dark:text-white">
+                        <label for="selling_price" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Retail Price</label>
+                        <input type="number" name="selling_price" id="selling_price" required min="0" step="0.01" placeholder="e.g., 20.00" class="w-full p-3 border rounded-md shadow-sm focus:ring focus:ring-green-200 dark:focus:ring-green-800 dark:bg-gray-700 dark:text-white">
                     </div>
                     <div>
-                        <label for="wholesale_price" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Wholesale Price</label>
-                        <input type="number" name="wholesale_price" id="wholesale_price" required min="0" step="0.01" placeholder="e.g., 18.00" class="w-full p-2 border rounded dark:bg-gray-700 dark:text-white">
+                        <label for="wholesale_price" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Wholesale Price</label>
+                        <input type="number" name="wholesale_price" id="wholesale_price" required min="0" step="0.01" placeholder="e.g., 18.00" class="w-full p-3 border rounded-md shadow-sm focus:ring focus:ring-green-200 dark:focus:ring-green-800 dark:bg-gray-700 dark:text-white">
                     </div>
                     <div>
-                        <label for="company_price" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Company Price</label>
-                        <input type="number" name="company_price" id="company_price" required min="0" step="0.01" placeholder="e.g., 340.00" class="w-full p-2 border rounded dark:bg-gray-700 dark:text-white">
+                        <label for="company_price" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Company Price</label>
+                        <input type="number" name="company_price" id="company_price" required min="0" step="0.01" placeholder="e.g., 340.00" class="w-full p-3 border rounded-md shadow-sm focus:ring focus:ring-green-200 dark:focus:ring-green-800 dark:bg-gray-700 dark:text-white">
                     </div>
                     <div>
-                        <label for="expire_date" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Expiry Date</label>
-                        <input type="date" name="expire_date" id="expire_date" required class="w-full p-2 border rounded dark:bg-gray-700 dark:text-white">
+                        <label for="expire_date" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Expiry Date</label>
+                        <input type="date" name="expire_date" id="expire_date" required class="w-full p-3 border rounded-md shadow-sm focus:ring focus:ring-green-200 dark:focus:ring-green-800 dark:bg-gray-700 dark:text-white">
                     </div>
                 </div>
-                <button type="submit" class="mt-4 bg-green-500 text-white font-semibold px-4 py-2 rounded border border-green-600 shadow-md hover:bg-green-600 focus:outline-none dark:bg-green-500 dark:hover:bg-green-600 dark:border-green-600">
-                    Add Stock
+                <button type="submit" class="mt-6 bg-green-500 text-white font-medium px-6 py-3 rounded-md border border-green-600 shadow-md hover:bg-green-600 focus:outline-none transition-colors duration-200 dark:bg-green-600 dark:hover:bg-green-700 dark:border-green-700">
+                    <span class="flex items-center justify-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 3a1 1 0 00-1 1v5H4a1 1 0 100 2h5v5a1 1 0 102 0v-5h5a1 1 0 100-2h-5V4a1 1 0 00-1-1z" clip-rule="evenodd" />
+                        </svg>
+                        Add Stock
+                    </span>
                 </button>
             </form>
         </div>
@@ -65,9 +75,16 @@
     {% endif %}
 
     <!-- Search and Filter -->
-    <div class="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <input type="text" id="search" placeholder="Search stock..." class="w-full sm:w-1/3 p-2 border rounded dark:bg-gray-800 dark:text-white">
-        <select id="category-filter" class="w-full sm:w-1/4 p-2 border rounded dark:bg-gray-800 dark:text-white">
+    <div class="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gray-50 dark:bg-gray-900 p-4 rounded-lg shadow-sm">
+        <div class="relative w-full sm:w-1/2">
+            <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                <svg class="w-4 h-4 text-gray-500 dark:text-gray-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
+                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m19 19-4-4m0-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0Z"/>
+                </svg>
+            </div>
+            <input type="text" id="search" placeholder="Search stock..." class="w-full p-3 pl-10 border rounded-md shadow-sm focus:ring focus:ring-blue-200 dark:focus:ring-blue-800 dark:bg-gray-800 dark:text-white">
+        </div>
+        <select id="category-filter" class="w-full sm:w-1/3 p-3 border rounded-md shadow-sm focus:ring focus:ring-blue-200 dark:focus:ring-blue-800 dark:bg-gray-800 dark:text-white">
             <option value="">All Categories</option>
             {% for item in stock_items | unique(attribute='category') %}
                 <option value="{{ item.category }}">{{ item.category }}</option>
@@ -78,27 +95,81 @@
     <!-- Stock Grid -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" id="stock-grid">
         {% for item in stock_items %}
-        <div class="stock-card bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md 
-            {% if item.stock_quantity <= item.reorder_quantity %}bg-orange-100 dark:bg-orange-900
-            {% elif item.stock_quantity <= item.reorder_quantity * 2 %}bg-yellow-100 dark:bg-yellow-900
-            {% else %}bg-green-100 dark:bg-green-900{% endif %}">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ item.stock_name }}</h3>
-            <p class="text-gray-700 dark:text-gray-300">Qty: <span class="font-bold">{{ item.stock_quantity }}</span> (Reorder at {{ item.reorder_quantity }})</p>
-            <p class="text-gray-700 dark:text-gray-300">Retail: <span class="font-bold">{{ item.selling_price | format_currency }}</span> | Wholesale: <span class="font-bold">{{ item.wholesale | format_currency }}</span> | Cost: {{ item.company_price | format_currency }}</p>
-            <p class="text-gray-700 dark:text-gray-300">Category: {{ item.category }}</p>
-            <p class="text-gray-700 dark:text-gray-300">Expires: <span class="font-bold">{{ item.expire_date or 'N/A' }}</span></p>
+        <div class="stock-card p-5 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 
+            {% if item.stock_quantity <= item.reorder_quantity %}bg-orange-50 border-l-4 border-orange-500 dark:bg-gray-800 dark:border-orange-500
+            {% elif item.stock_quantity <= item.reorder_quantity * 2 %}bg-yellow-50 border-l-4 border-yellow-500 dark:bg-gray-800 dark:border-yellow-500
+            {% else %}bg-green-50 border-l-4 border-green-500 dark:bg-gray-800 dark:border-green-500{% endif %}">
+            <div class="flex justify-between items-start mb-3">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ item.stock_name }}</h3>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
+                    {% if item.stock_quantity <= item.reorder_quantity %}bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200
+                    {% elif item.stock_quantity <= item.reorder_quantity * 2 %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200
+                    {% else %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% endif %}">
+                    {{ item.category }}
+                </span>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-2 mb-4">
+                <div class="text-gray-700 dark:text-gray-300">
+                    <span class="text-sm font-medium">Quantity:</span>
+                    <span class="block text-lg font-bold 
+                        {% if item.stock_quantity <= item.reorder_quantity %}text-red-600 dark:text-red-400
+                        {% elif item.stock_quantity <= item.reorder_quantity * 2 %}text-yellow-600 dark:text-yellow-400
+                        {% else %}text-green-600 dark:text-green-400{% endif %}">
+                        {{ item.stock_quantity }}
+                    </span>
+                    <span class="text-xs text-gray-500 dark:text-gray-400">(Reorder at {{ item.reorder_quantity }})</span>
+                </div>
+                <div class="text-gray-700 dark:text-gray-300">
+                    <span class="text-sm font-medium">Expires:</span>
+                    <span class="block text-lg font-medium">{{ item.expire_date or 'N/A' }}</span>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-3 gap-2 text-center mb-4 bg-white dark:bg-gray-700 rounded-md p-2">
+                <div class="text-sm">
+                    <div class="text-gray-500 dark:text-gray-400">Retail</div>
+                    <div class="font-bold text-gray-800 dark:text-white">{{ item.selling_price | format_currency }}</div>
+                </div>
+                <div class="text-sm border-l border-r border-gray-200 dark:border-gray-600">
+                    <div class="text-gray-500 dark:text-gray-400">Wholesale</div>
+                    <div class="font-bold text-gray-800 dark:text-white">{{ item.wholesale | format_currency }}</div>
+                </div>
+                <div class="text-sm">
+                    <div class="text-gray-500 dark:text-gray-400">Cost</div>
+                    <div class="font-bold text-gray-800 dark:text-white">{{ item.company_price | format_currency }}</div>
+                </div>
+            </div>
+            
             {% if session['user']['role'] == 'manager' %}
-            <form method="POST" class="mt-4 flex flex-col gap-2">
+            <form method="POST" class="mt-4 space-y-3">
                 <input type="hidden" name="stock_id" value="{{ item.id }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                
                 <div class="flex items-center gap-2">
-                    <input type="number" name="restock_quantity" min="1" placeholder="Restock qty" class="w-24 p-1 border rounded dark:bg-gray-700 dark:text-white">
-                    <button type="submit" name="action" value="restock" class="bg-orange-700 text-white font-semibold px-4 py-2 rounded border border-orange-800 shadow-md hover:bg-orange-800 focus:outline-none dark:bg-orange-600 dark:hover:bg-orange-700 dark:border-orange-700">Restock</button>
+                    <div class="relative flex-grow">
+                        <input type="number" name="restock_quantity" min="1" placeholder="Qty" class="w-full p-2 pl-3 border rounded-md text-sm shadow-sm focus:ring focus:ring-orange-200 dark:focus:ring-orange-800 dark:bg-gray-700 dark:text-white">
+                    </div>
+                    <button type="submit" name="action" value="restock" class="bg-orange-500 text-white font-medium px-4 py-2 rounded-md border border-orange-600 shadow-sm hover:bg-orange-600 focus:outline-none transition-colors duration-200 text-sm dark:bg-orange-600 dark:hover:bg-orange-700 dark:border-orange-700">
+                        Restock
+                    </button>
                 </div>
-                <div class="flex items-center gap-2">
-                    <input type="number" name="new_selling_price" min="0" step="0.01" placeholder="New retail price" class="w-24 p-1 border rounded dark:bg-gray-700 dark:text-white" value="{{ item.selling_price }}">
-                    <input type="number" name="new_wholesale_price" min="0" step="0.01" placeholder="New wholesale price" class="w-24 p-1 border rounded dark:bg-gray-700 dark:text-white" value="{{ item.wholesale }}">
-                    <button type="submit" name="action" value="update_price" class="bg-blue-500 text-white font-semibold px-4 py-2 rounded border border-blue-600 shadow-md hover:bg-blue-600 focus:outline-none dark:bg-blue-500 dark:hover:bg-blue-600 dark:border-blue-600">Update Prices</button>
+                
+                <div class="p-3 bg-white dark:bg-gray-700 rounded-md shadow-sm">
+                    <div class="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Update Prices</div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Retail</label>
+                            <input type="number" name="new_selling_price" min="0" step="0.01" class="w-full p-2 border rounded-md text-sm shadow-sm focus:ring focus:ring-blue-200 dark:focus:ring-blue-800 dark:bg-gray-600 dark:text-white" value="{{ item.selling_price }}">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Wholesale</label>
+                            <input type="number" name="new_wholesale_price" min="0" step="0.01" class="w-full p-2 border rounded-md text-sm shadow-sm focus:ring focus:ring-blue-200 dark:focus:ring-blue-800 dark:bg-gray-600 dark:text-white" value="{{ item.wholesale }}">
+                        </div>
+                    </div>
+                    <button type="submit" name="action" value="update_price" class="mt-3 w-full bg-blue-500 text-white font-medium px-4 py-2 rounded-md border border-blue-600 shadow-sm hover:bg-blue-600 focus:outline-none transition-colors duration-200 text-sm dark:bg-blue-600 dark:hover:bg-blue-700 dark:border-blue-700">
+                        Update Prices
+                    </button>
                 </div>
             </form>
             {% endif %}
@@ -145,9 +216,9 @@
 
         cards.forEach(card => {
             const name = card.querySelector('h3').textContent.toLowerCase();
-            const cat = card.querySelector('p:nth-child(4)').textContent.replace('Category: ', '');
+            const categorySpan = card.querySelector('span.inline-flex').textContent.trim();
             const matchesSearch = name.includes(searchText);
-            const matchesCategory = !category || cat === category;
+            const matchesCategory = !category || categorySpan === category;
             card.style.display = (matchesSearch && matchesCategory) ? 'block' : 'none';
         });
     }
