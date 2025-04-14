@@ -4,16 +4,6 @@
 <div class="container mx-auto px-4 py-6">
     <h2 class="text-3xl font-bold mb-6 text-gray-900 dark:text-white">Stock Overview</h2>
 
-    <!-- Debug: Check if filter is available -->
-    <p class="text-gray-700 dark:text-gray-300">
-        Debug: expire_date_days_left defined? 
-        {% if 'expire_date_days_left' in app.jinja_env.filters %}
-            Yes
-        {% else %}
-            No
-        {% endif %}
-    </p>
-
     <!-- Add New Stock Button and Form (Manager Only) -->
     {% if session['user']['role'] == 'manager' %}
     <div class="mb-6">

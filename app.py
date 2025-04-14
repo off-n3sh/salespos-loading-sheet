@@ -928,6 +928,8 @@ def orders():
 @login_required
 def stock():
     """Handle stock management (add, restock, update price) and display stock page."""
+    logger.debug("Entering stock route")
+    logger.debug("Available Jinja filters: %s", list(app.jinja_env.filters.keys()))
     if request.method == 'POST':
         # Restrict POST actions to managers only
         if session['user']['role'] != 'manager':
