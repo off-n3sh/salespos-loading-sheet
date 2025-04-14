@@ -15,6 +15,7 @@ from firebase_admin.auth import UserNotFoundError
 import logging
 
 app = Flask(__name__)
+logger = logging.getLogger(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY')
 if not app.secret_key:
     raise ValueError("FLASK_SECRET_KEY environment variable must be set")
@@ -133,27 +134,31 @@ def login_required(f):
 
 # Filter definitions
 def format_currency(value):
-    """Format a number as currency (KES)."""
     try:
         return f"KES {float(value):.2f}"
     except (TypeError, ValueError):
         return "KES 0.00"
 
 def expire_date_days_left(date_str):
-    """Calculate days until expiry date."""
+    """Calculate days until expiry date, handling all edge cases."""
+    if not date_str or date_str in [None, "", "0000-00-00 00:00:00"]:
+        return None
     try:
-        if not date_str or date_str == "0000-00-00 00:00:00":
-            return None
         expiry_date = datetime.strptime(date_str, "%Y-%m-%d")
         today = datetime.now(KENYA_TZ).replace(hour=0, minute=0, second=0, microsecond=0)
         days_left = (expiry_date - today).days
-        return days_left if days_left >= 0 else 0
+        return max(days_left, 0)  # Ensure no negative days
     except (ValueError, TypeError):
         return None
-        
+
 app.jinja_env.filters['format_currency'] = format_currency
 app.jinja_env.filters['expire_date_days_left'] = expire_date_days_left
-        
+
+# Verify registration
+logger.info("Filters registered at startup: %s", list(app.jinja_env.filters.keys()))
+if 'expire_date_days_left' not in app.jinja_env.filters:
+    raise RuntimeError("Failed to register 'expire_date_days_left' filter")
+      
 @app.route('/logout')
 def logout():
     session.pop('user', None)
