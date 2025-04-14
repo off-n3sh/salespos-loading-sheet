@@ -98,7 +98,11 @@
         <div class="stock-card p-5 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 
             {% if item.stock_quantity <= item.reorder_quantity %}bg-orange-50 border-l-4 border-orange-500 dark:bg-gray-800 dark:border-orange-500
             {% elif item.stock_quantity <= item.reorder_quantity * 2 %}bg-yellow-50 border-l-4 border-yellow-500 dark:bg-gray-800 dark:border-yellow-500
-            {% else %}bg-green-50 border-l-4 border-green-500 dark:bg-gray-800 dark:border-green-500{% endif %}">
+            {% else %}bg-green-50 border-l-4 border-green-500 dark:bg-gray-800 dark:border-green-500{% endif %}"
+            data-id="{{ item.id }}" 
+            data-name="{{ item.stock_name }}" 
+            data-expiry="{{ item.expire_date or '' }}" 
+            data-days-left="{{ item.expire_date|expire_date_days_left or '' }}">
             <div class="flex justify-between items-start mb-3">
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ item.stock_name }}</h3>
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
@@ -122,7 +126,32 @@
                 </div>
                 <div class="text-gray-700 dark:text-gray-300">
                     <span class="text-sm font-medium">Expires:</span>
-                    <span class="block text-lg font-medium">{{ item.expire_date or 'N/A' }}</span>
+                    {% if item.expire_date %}
+                        {% set days_left = item.expire_date|expire_date_days_left %}
+                        <span class="block text-lg font-medium
+                            {% if days_left is not none %}
+                                {% if days_left <= 7 %}text-red-600 dark:text-red-400
+                                {% elif days_left <= 30 %}text-yellow-600 dark:text-yellow-400
+                                {% else %}text-green-600 dark:text-green-400{% endif %}
+                            {% endif %}">
+                            {{ item.expire_date }}
+                            {% if days_left is not none %}
+                                <span class="expiry-countdown text-sm font-normal block">
+                                    {% if days_left == 0 %}
+                                        <span class="bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100 px-2 py-0.5 rounded-full">Expired today</span>
+                                    {% else %}
+                                        <span class="{% if days_left <= 7 %}bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100
+                                            {% elif days_left <= 30 %}bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100
+                                            {% else %}bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100{% endif %} px-2 py-0.5 rounded-full">
+                                            {{ days_left }} day{% if days_left != 1 %}s{% endif %} left
+                                        </span>
+                                    {% endif %}
+                                </span>
+                            {% endif %}
+                        </span>
+                    {% else %}
+                        <span class="block text-lg font-medium">N/A</span>
+                    {% endif %}
                 </div>
             </div>
             
@@ -178,6 +207,29 @@
     </div>
 </div>
 
+<!-- Notification Toast -->
+<div id="notification-toast" class="fixed bottom-4 right-4 z-50 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 max-w-md transform translate-y-10 opacity-0 transition-all duration-300 hidden">
+    <div class="flex items-start">
+        <div class="flex-shrink-0">
+            <svg class="h-6 w-6 text-red-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        </div>
+        <div class="ml-3 w-0 flex-1">
+            <p class="text-sm font-medium text-gray-900 dark:text-white" id="notification-title">Expiry Alert</p>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400" id="notification-message"></p>
+        </div>
+        <div class="ml-4 flex-shrink-0 flex">
+            <button class="bg-white dark:bg-gray-800 rounded-md inline-flex text-gray-400 hover:text-gray-500 focus:outline-none" id="close-notification">
+                <span class="sr-only">Close</span>
+                <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                </svg>
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
     // Toggle Add Stock Form
     const toggleButton = document.getElementById('toggle-add-stock-form');
@@ -225,5 +277,108 @@
 
     searchInput.addEventListener('input', filterStock);
     categoryFilter.addEventListener('change', filterStock);
+
+    // Expiry Notification System
+    function showNotification(title, message) {
+        const toast = document.getElementById('notification-toast');
+        const titleElement = document.getElementById('notification-title');
+        const messageElement = document.getElementById('notification-message');
+        
+        titleElement.textContent = title;
+        messageElement.textContent = message;
+        
+        toast.classList.remove('hidden', 'translate-y-10', 'opacity-0');
+        toast.classList.add('translate-y-0', 'opacity-100');
+        
+        setTimeout(() => {
+            toast.classList.add('translate-y-10', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 300);
+        }, 5000);
+    }
+    
+    document.getElementById('close-notification').addEventListener('click', () => {
+        const toast = document.getElementById('notification-toast');
+        toast.classList.add('translate-y-10', 'opacity-0');
+        setTimeout(() => {
+            toast.classList.add('hidden');
+        }, 300);
+    });
+
+    // Check expiry dates and send notifications
+    function checkExpiryDates() {
+        const stockItems = Array.from(document.querySelectorAll('.stock-card'));
+        const expiringItems = [];
+        const expiredItems = [];
+        
+        stockItems.forEach(item => {
+            const daysLeft = parseInt(item.dataset.daysLeft);
+            const name = item.dataset.name;
+            const expiry = item.dataset.expiry;
+            
+            if (daysLeft !== undefined && !isNaN(daysLeft)) {
+                if (daysLeft === 0) {
+                    expiredItems.push({name, expiry});
+                } else if (daysLeft <= 7) {
+                    expiringItems.push({name, expiry, daysLeft});
+                }
+            }
+        });
+        
+        // Send notifications for expired items
+        if (expiredItems.length > 0) {
+            const message = expiredItems.length === 1 
+                ? `${expiredItems[0].name} has expired!` 
+                : `${expiredItems.length} items have expired!`;
+            
+            showNotification('Expired Items Alert', message);
+            sendNotificationToServer('expired', expiredItems);
+        }
+        
+        // Send notifications for soon-to-expire items
+        if (expiringItems.length > 0) {
+            const message = expiringItems.length === 1 
+                ? `${expiringItems[0].name} will expire in ${expiringItems[0].daysLeft} day(s)!` 
+                : `${expiringItems.length} items will expire soon!`;
+            
+            showNotification('Expiry Warning', message);
+            sendNotificationToServer('expiring', expiringItems);
+        }
+    }
+    
+    function sendNotificationToServer(type, items) {
+        // Placeholder for your notification endpoint
+        const notificationEndpoint = '/api/notifications';
+        
+        fetch(notificationEndpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('input[name="csrf_token"]').value
+            },
+            body: JSON.stringify({
+                type: type,
+                items: items
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                console.error('Failed to send notification to server');
+            }
+        })
+        .catch(error => {
+            console.error('Error sending notification:', error);
+        });
+    }
+
+    // Check for expiring items when page loads
+    document.addEventListener('DOMContentLoaded', () => {
+        checkExpiryDates();
+    });
+    
+    // For demo purposes, check periodically (in a real app, this might be handled by server-side scheduler)
+    // This check is every 30 minutes (1800000 ms)
+    setInterval(checkExpiryDates, 1800000);
 </script>
 {% endblock %}
