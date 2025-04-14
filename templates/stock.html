@@ -78,27 +78,83 @@
     <!-- Stock Grid -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" id="stock-grid">
         {% for item in stock_items %}
-        <div class="stock-card bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md 
-            {% if item.stock_quantity <= item.reorder_quantity %}bg-orange-100 dark:bg-orange-900
-            {% elif item.stock_quantity <= item.reorder_quantity * 2 %}bg-yellow-100 dark:bg-yellow-900
-            {% else %}bg-green-100 dark:bg-green-900{% endif %}">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ item.stock_name }}</h3>
-            <p class="text-gray-700 dark:text-gray-300">Qty: <span class="font-bold">{{ item.stock_quantity }}</span> (Reorder at {{ item.reorder_quantity }})</p>
-            <p class="text-gray-700 dark:text-gray-300">Retail: <span class="font-bold">{{ item.selling_price | format_currency }}</span> | Wholesale: <span class="font-bold">{{ item.wholesale | format_currency }}</span> | Cost: {{ item.company_price | format_currency }}</p>
-            <p class="text-gray-700 dark:text-gray-300">Category: {{ item.category }}</p>
-            <p class="text-gray-700 dark:text-gray-300">Expires: <span class="font-bold">{{ item.expire_date or 'N/A' }}</span></p>
+        <div class="stock-card relative bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 transition-all duration-300 hover:shadow-lg 
+            {% if item.expire_date and expire_date_days_left(item.expire_date) is not none and expire_date_days_left(item.expire_date) <= 7 %}bg-red-50 dark:bg-red-900
+            {% elif item.expire_date and expire_date_days_left(item.expire_date) is not none and expire_date_days_left(item.expire_date) <= 30 %}bg-yellow-50 dark:bg-yellow-900
+            {% elif item.stock_quantity <= item.reorder_quantity %}bg-orange-50 dark:bg-orange-900
+            {% elif item.stock_quantity <= item.reorder_quantity * 2 %}bg-yellow-50 dark:bg-yellow-900
+            {% else %}bg-green-50 dark:bg-green-900{% endif %}">
+            <!-- Stock Name -->
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-3 flex items-center">
+                <svg class="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h18M3 3v18M3 3h18M21 3v18M3 21h18M9 3v18M15 3v18M3 9h18M3 15h18"></path>
+                </svg>
+                {{ item.stock_name }}
+            </h3>
+
+            <!-- Stock Details Grid -->
+            <div class="grid grid-cols-2 gap-3 text-sm">
+                <!-- Quantity -->
+                <div class="flex items-center">
+                    <svg class="w-4 h-4 mr-2 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path>
+                    </svg>
+                    <p class="text-gray-700 dark:text-gray-300">
+                        Qty: <span class="font-bold">{{ item.stock_quantity }}</span> (Reorder at {{ item.reorder_quantity }})
+                    </p>
+                </div>
+
+                <!-- Category -->
+                <div class="flex items-center">
+                    <svg class="w-4 h-4 mr-2 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    <p class="text-gray-700 dark:text-gray-300">Category: {{ item.category }}</p>
+                </div>
+
+                <!-- Prices -->
+                <div class="flex items-center col-span-2">
+                    <svg class="w-4 h-4 mr-2 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0-4c-2.2 0-4 1.8-4 4s1.8 4 4 4 4-1.8 4-4-1.8-4-4-4zm0 12c-3.3 0-6 2.7-6 6h12c0-3.3-2.7-6-6-6z"></path>
+                    </svg>
+                    <p class="text-gray-700 dark:text-gray-300">
+                        Retail: <span class="font-bold text-green-600 dark:text-green-400">{{ item.selling_price | format_currency }}</span> | 
+                        Wholesale: <span class="font-bold text-blue-600 dark:text-blue-400">{{ item.wholesale | format_currency }}</span> | 
+                        Cost: <span class="font-bold text-gray-600 dark:text-gray-400">{{ item.company_price | format_currency }}</span>
+                    </p>
+                </div>
+
+                <!-- Expiry -->
+                <div class="flex items-center col-span-2">
+                    <svg class="w-4 h-4 mr-2 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                    <p class="text-gray-700 dark:text-gray-300">
+                        Expires: <span class="font-bold {% if item.expire_date and expire_date_days_left(item.expire_date) is not none and expire_date_days_left(item.expire_date) <= 7 %}text-red-600 dark:text-red-400{% elif item.expire_date and expire_date_days_left(item.expire_date) is not none and expire_date_days_left(item.expire_date) <= 30 %}text-yellow-600 dark:text-yellow-400{% endif %}">{{ item.expire_date or 'N/A' }}</span>
+                        {% if item.expire_date and expire_date_days_left(item.expire_date) is not none and expire_date_days_left(item.expire_date) <= 30 %}
+                            (<span class="font-bold {% if expire_date_days_left(item.expire_date) <= 7 %}text-red-600 dark:text-red-400{% else %}text-yellow-600 dark:text-yellow-400{% endif %}">{{ expire_date_days_left(item.expire_date) | default('N/A') }} days left</span>)
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+
+            <!-- Manager Actions -->
             {% if session['user']['role'] == 'manager' %}
-            <form method="POST" class="mt-4 flex flex-col gap-2">
+            <form method="POST" class="mt-4 flex flex-col gap-3">
                 <input type="hidden" name="stock_id" value="{{ item.id }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="flex items-center gap-2">
                     <input type="number" name="restock_quantity" min="1" placeholder="Restock qty" class="w-24 p-1 border rounded dark:bg-gray-700 dark:text-white">
-                    <button type="submit" name="action" value="restock" class="bg-orange-700 text-white font-semibold px-4 py-2 rounded border border-orange-800 shadow-md hover:bg-orange-800 focus:outline-none dark:bg-orange-600 dark:hover:bg-orange-700 dark:border-orange-700">Restock</button>
+                    <button type="submit" name="action" value="restock" class="bg-orange-500 text-white font-semibold px-4 py-2 rounded border border-orange-600 shadow-md hover:bg-orange-600 focus:outline-none dark:bg-orange-500 dark:hover:bg-orange-600 dark:border-orange-600">
+                        Restock
+                    </button>
                 </div>
                 <div class="flex items-center gap-2">
                     <input type="number" name="new_selling_price" min="0" step="0.01" placeholder="New retail price" class="w-24 p-1 border rounded dark:bg-gray-700 dark:text-white" value="{{ item.selling_price }}">
                     <input type="number" name="new_wholesale_price" min="0" step="0.01" placeholder="New wholesale price" class="w-24 p-1 border rounded dark:bg-gray-700 dark:text-white" value="{{ item.wholesale }}">
-                    <button type="submit" name="action" value="update_price" class="bg-blue-500 text-white font-semibold px-4 py-2 rounded border border-blue-600 shadow-md hover:bg-blue-600 focus:outline-none dark:bg-blue-500 dark:hover:bg-blue-600 dark:border-blue-600">Update Prices</button>
+                    <button type="submit" name="action" value="update_price" class="bg-blue-500 text-white font-semibold px-4 py-2 rounded border border-blue-600 shadow-md hover:bg-blue-600 focus:outline-none dark:bg-blue-500 dark:hover:bg-blue-600 dark:border-blue-600">
+                        Update Prices
+                    </button>
                 </div>
             </form>
             {% endif %}

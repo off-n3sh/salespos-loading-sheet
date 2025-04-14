@@ -45,10 +45,6 @@ def pluralize_filter(value, singular='', plural='s'):
 
 app.jinja_env.filters['pluralize'] = pluralize_filter
 
-# Set up logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
-
 # Helper Functions
 # Decorator to prevent caching of protected pages
 def no_cache(f):
@@ -135,6 +131,7 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+# Filter definitions
 def format_currency(value):
     """Format a number as currency (KES)."""
     try:
@@ -153,17 +150,7 @@ def expire_date_days_left(date_str):
         return days_left if days_left >= 0 else 0
     except (ValueError, TypeError):
         return None
-
-# Register filters with logging
-try:
-    logger.debug("Registering format_currency filter")
-    app.jinja_env.filters['format_currency'] = format_currency
-    logger.debug("Registering expire_date_days_left filter")
-    app.jinja_env.filters['expire_date_days_left'] = expire_date_days_left
-    logger.debug("Filters registered: %s", list(app.jinja_env.filters.keys()))
-except Exception as e:
-    logger.error("Filter registration failed: %s", e)
-
+        
 app.jinja_env.filters['format_currency'] = format_currency
 app.jinja_env.filters['expire_date_days_left'] = expire_date_days_left
         
@@ -941,11 +928,8 @@ def orders():
 @no_cache
 @login_required
 def stock():
-    """Handle stock management (add, restock, update price) and display stock page."""
-    logger.debug("Entering stock route")
-    logger.debug("Available Jinja filters: %s", list(app.jinja_env.filters.keys()))
+    """Handle stock management."""
     if request.method == 'POST':
-        # Restrict POST actions to managers only
         if session['user']['role'] != 'manager':
             return "Unauthorized: Only managers can modify stock", 403
 
@@ -961,7 +945,6 @@ def stock():
             company_price = request.form.get('company_price')
             expire_date = request.form.get('expire_date')
 
-            # Validation
             if not all([stock_name, category or new_category, initial_quantity, reorder_quantity, selling_price, wholesale_price, company_price, expire_date]):
                 return "All fields are required", 400
 
@@ -973,16 +956,11 @@ def stock():
                 company_price = float(company_price)
                 if any(x < 0 for x in [initial_quantity, reorder_quantity, selling_price, wholesale_price, company_price]):
                     return "Numeric fields cannot be negative", 400
-                # Validate expire_date format (YYYY-MM-DD)
                 datetime.strptime(expire_date, '%Y-%m-%d')
             except ValueError:
                 return "Invalid numeric or date format", 400
 
-            # Use new_category if provided, else use selected category
             final_category = new_category.strip() if new_category else category
-
-            # Auto-generate stock_id
-            # Use category initials (first 3 letters, uppercase) + counter
             category_prefix = ''.join(c for c in final_category[:3] if c.isalnum()).upper()
             counter_ref = db.collection('metadata').document('stock_counter')
             counter = counter_ref.get()
@@ -995,7 +973,6 @@ def stock():
             counter_ref.update({'last_id': new_counter})
             stock_id = f"{category_prefix}{new_counter:03d}"
 
-            # Check for duplicate stock_name or stock_id
             existing_stock = db.collection('stock').where('stock_name', '==', stock_name).get()
             if existing_stock:
                 return f"Stock item '{stock_name}' already exists", 400
@@ -1018,14 +995,13 @@ def stock():
                 'date': datetime.now(KENYA_TZ).strftime('%Y-%m-%d %H:%M:%S'),
                 'expire_date': expire_date,
                 'uom': None,
-                'code': stock_id,  # Align code with stock_id for consistency
+                'code': stock_id,
                 'date2': None
             }
 
             doc_id = stock_id.replace('/', '-')
             db.collection('stock').document(doc_id).set(stock_data)
             log_stock_change(final_category, stock_name, 'add_stock', initial_quantity, selling_price)
-            # Log wholesale price change for auditing
             log_stock_change(final_category, stock_name, 'wholesale_price_set', 0, wholesale_price)
 
         elif action == 'restock':
@@ -1070,8 +1046,20 @@ def stock():
                     except ValueError:
                         return "Invalid price format", 400
 
-    # Check for near-expiry items and generate notifications
+    # GET: Render stock page
     stock_items = [doc.to_dict() | {'id': doc.id} for doc in db.collection('stock').order_by('stock_name').get()]
+    
+    # Remove duplicates by stock_name (based on screenshot observation)
+    seen = set()
+    unique_stock_items = []
+    for item in stock_items:
+        stock_name = item['stock_name']
+        if stock_name not in seen:
+            seen.add(stock_name)
+            unique_stock_items.append(item)
+    stock_items = unique_stock_items
+
+    # Expiry notifications
     for item in stock_items:
         expire_date = item.get('expire_date')
         if expire_date and expire_date != "0000-00-00 00:00:00":
@@ -1079,7 +1067,6 @@ def stock():
                 days_left = expire_date_days_left(expire_date)
                 if days_left is not None and days_left <= 30:
                     notification_message = f"Stock '{item['stock_name']}' is nearing expiry ({days_left} days left) on {expire_date}"
-                    # Check if notification already exists to avoid duplicates
                     existing_notif = db.collection('notifications').where('message', '==', notification_message).get()
                     if not existing_notif:
                         db.collection('notifications').add({
@@ -1101,7 +1088,7 @@ def stock():
         }
         for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).limit(3).get()
     ]
-    logger.debug("Rendering stock.html with %d stock items", len(stock_items))	
+
     return render_template('stock.html', stock_items=stock_items, recent_activity=recent_activity)
     
 @app.route('/receipts')
