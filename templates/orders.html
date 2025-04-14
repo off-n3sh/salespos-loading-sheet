@@ -122,7 +122,10 @@
                 <button type="button" id="add-retail-manual" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">Add Manual Item</button>
                 <div class="text-right"><span class="font-semibold">Subtotal:</span> <span id="retail-order-total" class="ml-2">0.00</span></div>
             </div>
-            <input type="number" name="amount_paid" placeholder="Amount Paid (optional)" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" min="0" step="0.01">
+            <div>
+                <input type="number" name="amount_paid" id="retail-amount-paid" placeholder="Amount Paid (optional)" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" min="0" step="0.01">
+                <div class="text-right mt-2"><span class="font-semibold">Change:</span> <span id="retail-order-change" class="ml-2">0.00</span></div>
+            </div>
             <div class="flex space-x-2 mt-4">
                 <button type="submit" class="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600 submit-btn">Submit Order</button>
                 <button type="button" id="close-retail-modal" class="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600">Cancel</button>
@@ -160,7 +163,10 @@
                 <button type="button" id="add-wholesale-manual" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">Add Manual Item</button>
                 <div class="text-right"><span class="font-semibold">Subtotal:</span> <span id="wholesale-order-total" class="ml-2">0.00</span></div>
             </div>
-            <input type="number" name="amount_paid" placeholder="Amount Paid (optional)" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" min="0" step="0.01">
+            <div>
+                <input type="number" name="amount_paid" id="wholesale-amount-paid" placeholder="Amount Paid (optional)" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" min="0" step="0.01">
+                <div class="text-right mt-2"><span class="font-semibold">Change:</span> <span id="wholesale-order-change" class="ml-2">0.00</span></div>
+            </div>
             <div class="flex space-x-2 mt-4">
                 <button type="submit" class="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600 submit-btn">Submit Order</button>
                 <button type="button" id="close-wholesale-modal" class="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600">Cancel</button>
@@ -176,7 +182,7 @@
         <div id="manual-error" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded mb-4"></div>
         <form id="manual-item-form" class="space-y-4">
             <input id="manual-item-name" placeholder="Item Name" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" required>
-            <input id="manual-item-qty" type="number" placeholder="Quantity" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" min="1" required>
+            <input id="manual-item-qty" type="number" placeholder="Quantity" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" min="0" step="0.01" required>
             <input id="manual-item-price" type="number" placeholder="Price per Unit" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" min="0" step="0.01" required>
             <p id="manual-total" class="text-sm text-gray-600 dark:text-gray-300">Total: 0.00</p>
             <div class="flex space-x-2">
@@ -292,6 +298,10 @@ const editContainer = document.getElementById('edit-items-container');
 const manualQty = document.getElementById('manual-item-qty');
 const manualPrice = document.getElementById('manual-item-price');
 const manualTotal = document.getElementById('manual-total');
+const retailAmountPaid = document.getElementById('retail-amount-paid');
+const wholesaleAmountPaid = document.getElementById('wholesale-amount-paid');
+const retailOrderChange = document.getElementById('retail-order-change');
+const wholesaleOrderChange = document.getElementById('wholesale-order-change');
 
 let currentContainer;
 
@@ -318,6 +328,10 @@ function resetModal(container) {
     container.appendChild(header);
     container.appendChild(initialAddBtn);
     updateSubtotal(container);
+    // Reset change display
+    const modalId = container.id.split('-')[0];
+    const changeSpan = document.getElementById(`${modalId}-order-change`);
+    if (changeSpan) changeSpan.textContent = '0.00';
 }
 
 openRetail.addEventListener('click', () => {
@@ -328,7 +342,7 @@ openRetail.addEventListener('click', () => {
     attachAddItemListeners(retailContainer);
 });
 
-openWholesale.addEventListener('click', () => {
+openWholesale.addEventListener('click', () =>	{
     closeAllModals();
     resetModal(wholesaleContainer);
     wholesaleModal.classList.remove('hidden');
@@ -443,7 +457,6 @@ populateClients(document.getElementById('edit-client-input'), document.getElemen
 // Function to attach action button listeners
 function attachActionButtonListeners() {
     document.querySelectorAll('.order-actions-btn').forEach(btn => {
-        // Remove existing listeners to prevent duplicates
         const newBtn = btn.cloneNode(true);
         btn.parentNode.replaceChild(newBtn, btn);
         
@@ -452,15 +465,12 @@ function attachActionButtonListeners() {
             const menu = newBtn.nextElementSibling;
             const isOpen = !menu.classList.contains('hidden');
             
-            // Close all other menus
             document.querySelectorAll('.order-actions-menu').forEach(m => {
                 if (m !== menu) m.classList.add('hidden');
             });
             
-            // Toggle the current menu
             menu.classList.toggle('hidden');
 
-            // Adjust menu position to prevent cut-off
             const menuRect = menu.getBoundingClientRect();
             const tableRect = document.getElementById('orders-table').getBoundingClientRect();
             if (menuRect.bottom > tableRect.bottom) {
@@ -480,7 +490,6 @@ function attachActionButtonListeners() {
         });
     });
 
-    // Reattach other button listeners
     document.querySelectorAll('.mark-paid-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const receiptId = btn.getAttribute('data-receipt-id');
@@ -555,7 +564,6 @@ function updateOrdersDisplay() {
     prevPageBtn.disabled = currentPage === 1;
     nextPageBtn.disabled = currentPage === totalPages || filteredRows.length === 0;
 
-    // Reattach listeners after updating the table
     attachActionButtonListeners();
 }
 
@@ -601,7 +609,6 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
     });
 });
 
-// Initial display
 document.querySelector('[data-filter="all"]').click();
 
 // Remaining Functions
@@ -612,17 +619,19 @@ function attachAddItemListeners(container) {
 }
 
 function addItem(container) {
+    const isRetail = container.id === 'retail-items-container';
+    const isWholesale = container.id === 'wholesale-items-container';
     const div = document.createElement('div');
     div.className = 'grid grid-cols-6 gap-2 item-row';
     div.innerHTML = `
         <select name="items[]" class="col-span-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-select w-full">
             <option value="">Search or select a product</option>
             {% for item in stock_items %}
-            <option value="product|{{ item.stock_name }}|quantity|0|price|{{ item.selling_price }}|stock|{{ item.stock_quantity }}">{{ item.stock_name }}</option>
+            <option value="product|{{ item.stock_name }}|quantity|0|price|${isRetail ? '{{ item.selling_price }}' : isWholesale ? '{{ item.wholesale }}' : '{{ item.selling_price }}'}|stock|{{ item.stock_quantity }}|uom|${item.uom || 'Unit'}">{{ item.stock_name }} (${item.uom || 'Unit'})</option>
             {% endfor %}
         </select>
-        <input name="items[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="1">
-        <input type="number" class="price-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+        <input name="items[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="0.01">
+        <input type="number" class="price-display p-2 border rounded-lg text-center w-full" readonly>
         <input type="number" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
         <input type="number" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
         <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
@@ -645,7 +654,7 @@ function addItem(container) {
 
 addManualToOrder.addEventListener('click', () => {
     const name = document.getElementById('manual-item-name').value.trim();
-    const qty = parseInt(manualQty.value) || 0;
+    const qty = parseFloat(manualQty.value) || 0;
     const price = parseFloat(manualPrice.value) || 0;
     if (!name) {
         showModalError('manual-item', 'Item name is required.');
@@ -662,10 +671,10 @@ addManualToOrder.addEventListener('click', () => {
     const div = document.createElement('div');
     div.className = 'grid grid-cols-6 gap-2 item-row';
     div.innerHTML = `
-        <input name="items[]" type="hidden" value="product|${name}|quantity|0|price|${price}|stock|0">
+        <input name="items[]" type="hidden" value="product|${name}|quantity|0|price|${price}|stock|0|uom|Unit">
         <span class="col-span-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center">${name}</span>
-        <input name="items[]" type="number" value="${qty}" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="1">
-        <input type="number" value="${price}" class="price-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+        <input name="items[]" type="number" value="${qty}" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="0.01">
+        <input type="number" value="${price}" class="price-display p-2 border rounded-lg text-center w-full" readonly>
         <input type="number" value="0" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
         <input type="number" value="${price * qty}" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
         <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
@@ -843,10 +852,10 @@ function editOrder(receiptId, orderType, shopName, itemsJson) {
             const div = document.createElement('div');
             div.className = 'grid grid-cols-6 gap-2 item-row';
             div.innerHTML = `
-                <input name="items[]" type="hidden" value="product|${item.name}|quantity|0|price|${item.price || 0}|stock|0">
+                <input name="items[]" type="hidden" value="product|${item.name}|quantity|0|price|${item.price || 0}|stock|0|uom|Unit">
                 <span class="col-span-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center">${item.name}</span>
-                <input name="items[]" type="number" value="${item.quantity}" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="1">
-                <input type="number" value="${item.price || 0}" class="price-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+                <input name="items[]" type="number" value="${item.quantity}" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="0.01">
+                <input type="number" value="${item.price || 0}" class="price-display p-2 border rounded-lg text-center w-full" readonly>
                 <input type="number" value="0" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
                 <input type="number" value="${(item.price || 0) * item.quantity}" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
                 <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
@@ -916,7 +925,7 @@ function deleteOrder(receiptId) {
 manualQty.addEventListener('input', updateManualTotal);
 manualPrice.addEventListener('input', updateManualTotal);
 function updateManualTotal() {
-    const qty = parseInt(manualQty.value) || 0;
+    const qty = parseFloat(manualQty.value) || 0;
     const price = parseFloat(manualPrice.value) || 0;
     manualTotal.textContent = `Total: ${(qty * price).toFixed(2)}`;
 }
@@ -935,15 +944,15 @@ function attachPriceListener(row) {
         if (selectedOption.value) {
             const values = selectedOption.value.split('|');
             basePrice = parseFloat(values[5]) || 0;
-            maxStock = parseInt(values[7]) || 0;
-            priceDisplay.value = basePrice;
-            stockDisplay.value = maxStock;
-            const qty = parseInt(qtyInput.value) || 0;
+            maxStock = parseFloat(values[7]) || 0;
+            priceDisplay.value = basePrice.toFixed(2);
+            stockDisplay.value = maxStock.toFixed(2);
+            const qty = parseFloat(qtyInput.value) || 0;
             if (qty > maxStock) {
                 qtyInput.value = maxStock;
                 alert(`Cannot order more than ${maxStock} units of ${values[1]}.`);
             }
-            totalDisplay.value = (basePrice * (parseInt(qtyInput.value) || 0)).toFixed(2);
+            totalDisplay.value = (basePrice * (parseFloat(qtyInput.value) || 0)).toFixed(2);
             updateSubtotal(row.closest('.space-y-4'));
         } else {
             basePrice = 0;
@@ -956,12 +965,12 @@ function attachPriceListener(row) {
     });
 
     qtyInput.addEventListener('input', () => {
-        const qty = parseInt(qtyInput.value) || 0;
+        const qty = parseFloat(qtyInput.value) || 0;
         if (qty > maxStock) {
             qtyInput.value = maxStock;
             alert(`Cannot order more than ${maxStock} units.`);
         }
-        totalDisplay.value = (basePrice * (parseInt(qtyInput.value) || 0)).toFixed(2);
+        totalDisplay.value = (basePrice * (parseFloat(qtyInput.value) || 0)).toFixed(2);
         updateSubtotal(row.closest('.space-y-4'));
     });
 }
@@ -971,7 +980,7 @@ function updatePriceAndTotal(row) {
     const priceDisplay = row.querySelector('.price-display');
     const totalDisplay = row.querySelector('.total-display');
     const basePrice = parseFloat(row.querySelector('input[type="hidden"]')?.value.split('|')[5]) || parseFloat(priceDisplay.value) || 0;
-    const qty = parseInt(qtyInput.value) || 0;
+    const qty = parseFloat(qtyInput.value) || 0;
     totalDisplay.value = (basePrice * qty).toFixed(2);
     updateSubtotal(row.closest('.space-y-4'));
 }
@@ -986,7 +995,24 @@ function updateSubtotal(container) {
     });
     const totalSpan = activeContainer.parentElement.querySelector('[id$="-order-total"]');
     if (totalSpan) totalSpan.textContent = subtotal.toFixed(2);
+    updateChange(activeContainer);
 }
+
+function updateChange(container) {
+    const modalId = container.id.split('-')[0];
+    const amountPaidInput = document.getElementById(`${modalId}-amount-paid`);
+    const changeSpan = document.getElementById(`${modalId}-order-change`);
+    const totalSpan = container.parentElement.querySelector('[id$="-order-total"]');
+    const subtotal = parseFloat(totalSpan.textContent) || 0;
+    const amountPaid = parseFloat(amountPaidInput.value) || 0;
+    const change = amountPaid - subtotal;
+    changeSpan.textContent = change >= 0 ? change.toFixed(2) : '0.00';
+    changeSpan.parentElement.classList.toggle('text-green-600', change >= 0);
+    changeSpan.parentElement.classList.toggle('text-red-600', change < 0);
+}
+
+retailAmountPaid.addEventListener('input', () => updateChange(retailContainer));
+wholesaleAmountPaid.addEventListener('input', () => updateChange(wholesaleContainer));
 
 document.querySelectorAll('.product-select').forEach(select => {
     const choices = new Choices(select, {
@@ -1171,11 +1197,19 @@ input[type="number"][readonly]::-webkit-outer-spin-button {
     width: 100%;
 }
 .item-row .qty-input,
-.item-row .price-display,
 .item-row .stock-display,
 .item-row .total-display,
 .item-row .remove-item {
     text-align: center;
+}
+.item-row .price-display {
+    text-align: center;
+    background-color: #f0f9ff; /* Light blue background for price box */
+    border: 1px solid #38bdf8; /* Sky blue border */
+}
+.dark .item-row .price-display {
+    background-color: #1e3a8a; /* Darker blue for dark mode */
+    border: 1px solid #60a5fa;
 }
 .return-item-checkbox:checked {
     background-color: #f59e0b;
