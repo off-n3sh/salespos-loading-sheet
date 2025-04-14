@@ -12,7 +12,7 @@ import os
 import re
 from functools import wraps
 from firebase_admin.auth import UserNotFoundError
-
+import logging
 
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY')
@@ -1101,7 +1101,7 @@ def stock():
         }
         for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).limit(3).get()
     ]
-
+    logger.debug("Rendering stock.html with %d stock items", len(stock_items))	
     return render_template('stock.html', stock_items=stock_items, recent_activity=recent_activity)
     
 @app.route('/receipts')
