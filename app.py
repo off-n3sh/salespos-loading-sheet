@@ -2001,42 +2001,32 @@ def edit_order(order_id):
         i = 0
         while i < len(old_items):
             if old_items[i] == 'product' and i + 5 < len(old_items):
-                try:
-                    qty = int(old_items[i + 3]) if old_items[i + 2] == 'quantity' else 0
-                    price = float(old_items[i + 5]) if old_items[i + 4] == 'price' else 0.0
-                    old_items_list.append({
-                        'name': old_items[i + 1],
-                        'quantity': qty,
-                        'price': price
-                    })
-                except (ValueError, TypeError):
-                    pass  # Skip malformed items
+                old_items_list.append({
+                    'name': old_items[i + 1],
+                    'quantity': int(old_items[i + 3]) if old_items[i + 2] == 'quantity' else 0,
+                    'price': float(old_items[i + 5]) if old_items[i + 4] == 'price' else 0.0
+                })
                 i += 6
             else:
                 i += 1
 
-        # Get new items from the form
+        # Get new items from the form (manual inputs)
         new_items = request.form.getlist('items[]')
-        amount_paid_str = request.form.get('amount_paid', str(order_data.get('payment', 0.0)))
-        amount_paid = float(amount_paid_str.strip() or '0')  # Default to 0 if empty
+        amount_paid = float(request.form.get('amount_paid', order_data.get('payment', 0.0)))
 
         # Parse new items (name, qty, price)
         new_items_list = []
         i = 0
         while i < len(new_items):
             if i + 2 < len(new_items):
-                name = new_items[i].strip()
-                try:
-                    quantity = int(new_items[i + 1]) if new_items[i + 1].strip() else 0
-                    price = float(new_items[i + 2]) if new_items[i + 2].strip() else 0.0
-                    if name and quantity > 0:
-                        new_items_list.append({
-                            'name': name,
-                            'quantity': quantity,
-                            'price': price
-                        })
-                except (ValueError, TypeError):
-                    pass  # Skip invalid inputs
+                name = new_items[i]
+                quantity = int(new_items[i + 1]) if new_items[i + 1] else 0
+                price = float(new_items[i + 2]) if new_items[i + 2] else 0.0
+                new_items_list.append({
+                    'name': name,
+                    'quantity': quantity,
+                    'price': price
+                })
                 i += 3
             else:
                 i += 1
@@ -2044,12 +2034,13 @@ def edit_order(order_id):
         # Combine items
         combined_items_list = old_items_list[:]
         for new_item in new_items_list:
-            existing_item = next((item for item in combined_items_list if item['name'] == new_item['name']), None)
-            if existing_item:
-                existing_item['quantity'] = new_item['quantity']
-                existing_item['price'] = new_item['price']
-            else:
-                combined_items_list.append(new_item)
+            if new_item['quantity'] > 0:
+                existing_item = next((item for item in combined_items_list if item['name'] == new_item['name']), None)
+                if existing_item:
+                    existing_item['quantity'] = new_item['quantity']
+                    existing_item['price'] = new_item['price']
+                else:
+                    combined_items_list.append(new_item)
 
         # Convert to flat list
         combined_items = []
@@ -2112,14 +2103,6 @@ def edit_order(order_id):
             "subtotal": subtotal,
             "balance": balance
         }), 200
-    except ValueError as ve:
-        error_msg = f"Invalid input: {str(ve)}"
-        print(error_msg)
-        return jsonify({
-            "error": error_msg,
-            "user_id": session.get('user', {}).get('id', 'unknown'),
-            "status": "error"
-        }), 400
     except Exception as e:
         error_msg = f"Failed to update order {order_id}: {str(e)}"
         print(error_msg)
