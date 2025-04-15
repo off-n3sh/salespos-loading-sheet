@@ -1969,6 +1969,9 @@ def get_loading_sheet(sheet_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+from flask import jsonify, request, session
+from datetime import datetime
+
 @app.route('/edit_order/<order_id>', methods=['POST'])
 @login_required
 def edit_order(order_id):
@@ -1981,7 +1984,17 @@ def edit_order(order_id):
 
         order_data = order.to_dict()
         order_type = order_data.get('order_type', 'wholesale')
+        salesperson_name = order_data.get('salesperson_name', '')
+
+        # Restrict editing to order creator or manager
+        current_user_name = f"{session.get('user', {}).get('firstName', '')} {session.get('user', {}).get('lastName', '')}"
+        current_user_role = session.get('user', {}).get('role', '')
+        if current_user_role != 'manager' and current_user_name != salesperson_name:
+            return jsonify({"error": "Unauthorized: Only the order creator or a manager can edit this order"}), 403
+
         old_items = order_data.get('items', [])
+        
+        # Parse existing items
         old_items_list = []
         i = 0
         while i < len(old_items):
@@ -1995,48 +2008,52 @@ def edit_order(order_id):
                 i += 1
 
         # Get new items from the form
-        items = request.form.getlist('items[]')
-        shop_name = request.form.get('shop_name', order_data.get('shop_name', ''))
-        salesperson_name = request.form.get('salesperson_name', order_data.get('salesperson_name', ''))
+        new_items = request.form.getlist('items[]')
         amount_paid = float(request.form.get('amount_paid', order_data.get('payment', 0.0)))
 
         # Parse new items
         new_items_list = []
-        total_items = 0
-        subtotal = 0.0
         i = 0
-        while i < len(items):
-            if items[i] == 'product':
-                product_name = items[i + 1]
-                quantity = int(items[i + 3]) if i + 3 < len(items) and items[i + 2] == 'quantity' else 0
-                price = float(items[i + 5]) if i + 5 < len(items) and items[i + 4] == 'price' else 0.0
+        while i < len(new_items):
+            if new_items[i] == 'product':
+                product_name = new_items[i + 1]
+                quantity = int(new_items[i + 3]) if i + 3 < len(new_items) and new_items[i + 2] == 'quantity' else 0
+                price = float(new_items[i + 5]) if i + 5 < len(new_items) and new_items[i + 4] == 'price' else 0.0
                 new_items_list.append({'name': product_name, 'quantity': quantity, 'price': price})
-                total_items += quantity
-                subtotal += quantity * price
                 i += 6
             else:
                 i += 1
 
+        # Append new items to existing items
+        combined_items_list = old_items_list[:]
+        for new_item in new_items_list:
+            existing_item = next((item for item in combined_items_list if item['name'] == new_item['name']), None)
+            if existing_item:
+                existing_item['quantity'] += new_item['quantity']
+                existing_item['price'] = new_item['price']
+            else:
+                combined_items_list.append(new_item)
+
+        # Convert combined items back to flat list
+        combined_items = []
+        total_items = 0
+        subtotal = 0.0
+        for item in combined_items_list:
+            if item['quantity'] > 0:
+                combined_items.extend([
+                    'product', item['name'],
+                    'quantity', str(item['quantity']),
+                    'price', str(item['price'])
+                ])
+                total_items += item['quantity']
+                subtotal += item['quantity'] * item['price']
+
         # Adjust stock for wholesale orders
         if order_type == 'wholesale':
-            # Restock items that were removed or reduced
-            for old_item in old_items_list:
-                old_qty = old_item['quantity']
-                new_item = next((item for item in new_items_list if item['name'] == old_item['name']), None)
-                new_qty = new_item['quantity'] if new_item else 0
-                qty_to_restock = old_qty - new_qty
-                if qty_to_restock > 0:
-                    stock_ref = db.collection('stock').where('stock_name', '==', old_item['name']).limit(1).stream()
-                    stock_doc = next(stock_ref, None)
-                    if stock_doc:
-                        current_qty = stock_doc.to_dict().get('stock_quantity', 0)
-                        stock_doc.reference.update({'stock_quantity': current_qty + qty_to_restock})
-
-            # Deduct stock for new or increased items
             for new_item in new_items_list:
                 old_item = next((item for item in old_items_list if item['name'] == new_item['name']), None)
                 old_qty = old_item['quantity'] if old_item else 0
-                qty_to_deduct = new_item['quantity'] - old_qty
+                qty_to_deduct = new_item['quantity']
                 if qty_to_deduct > 0:
                     stock_ref = db.collection('stock').where('stock_name', '==', new_item['name']).limit(1).stream()
                     stock_doc = next(stock_ref, None)
@@ -2050,17 +2067,27 @@ def edit_order(order_id):
         # Update the order
         balance = subtotal - amount_paid
         updated_order = {
-            'items': items,
+            'items': combined_items,
             'total_items': total_items,
             'subtotal': subtotal,
             'payment': amount_paid,
             'balance': balance if balance > 0 else 0,
-            'shop_name': shop_name,
+            'shop_name': order_data.get('shop_name', ''),
             'salesperson_name': salesperson_name,
             'order_type': order_type,
             'date': order_data.get('date', datetime.now(KENYA_TZ).isoformat())
         }
         order_ref.set(updated_order)
+
+        # Update receipt balance
+        receipt_ref = db.collection('receipts').where('order_id', '==', order_id).limit(1).stream()
+        receipt_doc = next(receipt_ref, None)
+        if receipt_doc:
+            receipt_doc.reference.update({
+                'balance': balance if balance > 0 else 0,
+                'subtotal': subtotal,
+                'payment': amount_paid
+            })
 
         log_user_action('Updated Order', f'Updated order {order_id} with {total_items} items')
         return jsonify({"status": "success"}), 200
