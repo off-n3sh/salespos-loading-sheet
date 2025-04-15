@@ -1572,15 +1572,25 @@ def return_stock(order_id):
     except Exception as e:
         return f"Error processing stock returns: {str(e)}", 500
     
+
 @app.route('/expenses', methods=['GET', 'POST'])
 @no_cache
 @login_required
 def expenses():
     """Add a new expense and redirect to the dashboard."""
+    if session['user']['role'] != 'manager':
+        return jsonify({'error': 'Unauthorized: Only managers can add expenses'}), 403
+
     if request.method == 'POST':
         description = request.form['description']
         amount = float(request.form['amount'])
         category = request.form['category']
+        reason = request.form.get('reason', '')  # Optional reason for "Other"
+
+        # Append reason to description for "Other" category
+        if category == 'Other' and reason:
+            description = f"Other: {reason} - {description}"
+
         db.collection('expenses').add({
             'description': description,
             'amount': amount,
@@ -1588,7 +1598,9 @@ def expenses():
             'date': datetime.now(KENYA_TZ)
         })
         log_stock_change(category, description, 'expense', -amount, 1)
-    return redirect(url_for('dashboard'))
+        return redirect(url_for('dashboard'))
+    
+    return jsonify({'error': 'Method not allowed'}), 405
 
 @app.route('/load_to_loading_sheet/<receipt_id>/<action>')
 @login_required
