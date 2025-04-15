@@ -221,10 +221,9 @@
         </form>
     </div>
 </div>
-
 <!-- Edit Order Modal -->
 <div id="edit-order-modal" class="modal fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="edit-order-modal-title">
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[insulinvh] overflow-y-auto p-6">
         <h2 id="edit-order-modal-title" class="text-xl font-bold mb-4 text-gray-900 dark:text-white">Edit Order #<span id="edit-order-id"></span></h2>
         <div id="edit-error" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded mb-4"></div>
         <form id="edit-order-form" method="POST" action="" class="space-y-4">
@@ -247,7 +246,7 @@
                 <div class="text-right"><span class="font-semibold">Subtotal:</span> <span id="edit-order-total" class="ml-2">0.00</span></div>
             </div>
             <div>
-                <input type="number" name="amount_paid" id="edit-amount-paid" placeholder="Amount Paid (optional)" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" min="0" step="0.01">
+                <input type="number" name="amount_paid" id="edit-amount-paid" placeholder="Amount Paid (optional)" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" min="0" step="0.01" value="0">
                 <div class="text-right mt-2"><span class="font-semibold">Change:</span> <span id="edit-order-change" class="ml-2">0.00</span></div>
             </div>
             <div class="flex space-x-2 mt-4">
@@ -1013,9 +1012,9 @@ function editOrder(orderId, orderType, itemsJson, subtotal, amountPaid) {
             div.innerHTML = `
                 <input name="items[]" type="text" value="${item.name}" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-input w-full">
                 <input name="items[]" type="number" value="${quantity}" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="1">
-                <input name="items[]" type="number" value="${price}" class="price-display p-2 border rounded-lg text-center w-full">
+                <input name="items[]" type="number" value="${price.toFixed(2)}" class="price-display p-2 border rounded-lg text-center w-full" step="0.01">
                 <input type="number" value="0" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-                <input type="number" value="${price * quantity}" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+                <input type="number" value="${(price * quantity).toFixed(2)}" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
                 <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
             `;
             const addBtn = editContainer.querySelector('.add-item-btn');
@@ -1031,10 +1030,10 @@ function editOrder(orderId, orderType, itemsJson, subtotal, amountPaid) {
     // Set initial subtotal and amount paid
     const initialSubtotal = parseFloat(subtotal) || 0;
     document.getElementById('edit-order-total').textContent = initialSubtotal.toFixed(2);
-    document.getElementById('edit-amount-paid').value = parseFloat(amountPaid || 0).toFixed(2);
+    document.getElementById('edit-amount-paid').value = parseFloat(amountPaid || 0).toFixed(2) || '0';
     updateSubtotal(editContainer);
 
-    // Add item button (mimics manual item)
+    // Add item button
     const addItemBtn = editContainer.querySelector('.add-item-btn');
     addItemBtn.addEventListener('click', () => {
         const div = document.createElement('div');
@@ -1042,7 +1041,29 @@ function editOrder(orderId, orderType, itemsJson, subtotal, amountPaid) {
         div.innerHTML = `
             <input name="items[]" type="text" placeholder="Item name" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-input w-full">
             <input name="items[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="1">
-            <input name="items[]" type="number" placeholder="Price" class="price-display p-2 border rounded-lg text-center w-full">
+            <input name="items[]" type="number" placeholder="Price" class="price-display p-2 border rounded-lg text-center w-full" step="0.01">
+            <input type="number" value="0" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+            <input type="number" value="0" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+            <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
+        `;
+        const addBtn = editContainer.querySelector('.add-item-btn');
+        editContainer.insertBefore(div, addBtn);
+        attachPriceListener(div);
+        div.querySelector('.remove-item').addEventListener('click', () => {
+            div.remove();
+            updateSubtotal(editContainer);
+        });
+        updateSubtotal(editContainer);
+    });
+
+    // Manual item button
+    document.getElementById('add-edit-manual').addEventListener('click', () => {
+        const div = document.createElement('div');
+        div.className = 'grid grid-cols-6 gap-2 item-row';
+        div.innerHTML = `
+            <input name="items[]" type="text" placeholder="Item name" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-input w-full">
+            <input name="items[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="1">
+            <input name="items[]" type="number" placeholder="Price" class="price-display p-2 border rounded-lg text-center w-full" step="0.01">
             <input type="number" value="0" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
             <input type="number" value="0" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
             <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
@@ -1087,7 +1108,6 @@ function editOrder(orderId, orderType, itemsJson, subtotal, amountPaid) {
     };
 }
 
-// Success message
 function showSuccessMessage(message) {
     const div = document.createElement('div');
     div.className = 'fixed top-4 right-4 bg-green-500 text-white p-4 rounded-lg shadow-lg z-50';
@@ -1096,7 +1116,6 @@ function showSuccessMessage(message) {
     setTimeout(() => div.remove(), 3000);
 }
 
-// Update subtotal (aligned with add-edit-manual)
 function updateSubtotal(container) {
     let subtotal = 0;
     container.querySelectorAll('.item-row').forEach(row => {
@@ -1112,10 +1131,9 @@ function updateSubtotal(container) {
     const amountPaidInput = container.parentElement.querySelector('#edit-amount-paid');
     const changeSpan = container.parentElement.querySelector('#edit-order-change');
     const amountPaid = parseFloat(amountPaidInput.value) || 0;
-    changeSpan.textContent = (amountPaid - subtotal).toFixed(2);
+    change facilitatorspan.textContent = (amountPaid - subtotal).toFixed(2);
 }
 
-// Price listener for manual items
 function attachPriceListener(row) {
     const qtyInput = row.querySelector('.qty-input');
     const priceInput = row.querySelector('.price-display');
@@ -1130,20 +1148,18 @@ function attachPriceListener(row) {
     priceInput.addEventListener('input', updateTotal);
 }
 
-// Reset modal
 function resetModal(container) {
     container.querySelectorAll('.item-row').forEach(row => row.remove());
 }
 
-// Update edit button listeners
 document.querySelectorAll('.edit-order-btn').forEach(btn => {
     btn.addEventListener('click', () => {
         const orderRow = btn.closest('.order-row');
-        const orderId = btn.getAttribute('data-order-id') || orderRow.getAttribute('data-receipt-id'); // Fallback to receipt_id
+        const orderId = orderRow.getAttribute('data-receipt-id');
         const orderType = orderRow.getAttribute('data-order-type');
         const itemsJson = btn.getAttribute('data-items');
-        const subtotal = orderRow.getAttribute('data-subtotal') || orderRow.querySelector('td:nth-child(6)').textContent.trim(); // Balance column
-        const amountPaid = orderRow.getAttribute('data-payment') || orderRow.querySelector('td:nth-child(5)').textContent.trim(); // Payment column
+        const subtotal = orderRow.getAttribute('data-subtotal') || orderRow.querySelector('td:nth-child(6)').textContent.trim();
+        const amountPaid = orderRow.getAttribute('data-payment') || orderRow.querySelector('td:nth-child(5)').textContent.trim();
         editOrder(orderId, orderType, itemsJson, subtotal, amountPaid);
     });
 });
