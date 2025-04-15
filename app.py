@@ -34,6 +34,12 @@ else:
 db = firestore.client()
 # Set Kenyan timezone
 KENYA_TZ = pytz.timezone('Africa/Nairobi')
+# In-memory cache
+stock_cache = {
+    'data': None,
+    'timestamp': None,
+    'timeout': timedelta(hours=1)  # 1 hour cache duration
+}
 
 with open('firebase_config.json', 'r') as f:
     firebase_config = json.load(f)
@@ -158,7 +164,58 @@ app.jinja_env.filters['expire_date_days_left'] = expire_date_days_left
 logger.info("Filters registered at startup: %s", list(app.jinja_env.filters.keys()))
 if 'expire_date_days_left' not in app.jinja_env.filters:
     raise RuntimeError("Failed to register 'expire_date_days_left' filter")
-      
+
+@app.route('/stock_data', methods=['GET'])
+@no_cache
+@login_required
+def stock_data():
+    """Fetch stock data from Firestore for retail/wholesale modals."""
+    try:
+        # Check cache
+        if (stock_cache['data'] is not None and
+                stock_cache['timestamp'] is not None and
+                datetime.now() < stock_cache['timestamp'] + stock_cache['timeout']):
+            print("Serving stock data from cache")  # Debug log
+            return jsonify(stock_cache['data']), 200
+
+        # Fetch stock items from Firestore
+        stock_items = [
+            {
+                'stock_name': doc.to_dict()['stock_name'],
+                'selling_price': float(doc.to_dict()['selling_price'] or 0),
+                'wholesale': float(doc.to_dict()['wholesale'] or 0),
+                'stock_quantity': float(doc.to_dict()['stock_quantity'] or 0),
+                'uom': doc.to_dict().get('uom', 'Unit')  # Default to 'Unit' if null
+            }
+            for doc in db.collection('stock').order_by('stock_name').get()
+        ]
+
+        # Remove duplicates by stock_name
+        seen = set()
+        unique_stock_items = []
+        for item in stock_items:
+            stock_name = item['stock_name']
+            if stock_name not in seen and all(
+                item[key] is not None for key in ['selling_price', 'wholesale', 'stock_quantity']
+            ):
+                seen.add(stock_name)
+                unique_stock_items.append(item)
+        
+        if not unique_stock_items:
+            print("No stock items found in Firestore")  # Debug log
+            return jsonify([]), 200
+
+        # Update cache
+        stock_cache['data'] = unique_stock_items
+        stock_cache['timestamp'] = datetime.now()
+        
+        print(f"Returning {len(unique_stock_items)} stock items")  # Debug log
+        return jsonify(unique_stock_items), 200
+
+    except Exception as e:
+        print(f"Error fetching stock data: {str(e)}")  # Debug log
+        return jsonify({'error': 'Failed to fetch stock data'}), 500
+              
 @app.route('/logout')
 def logout():
     session.pop('user', None)

@@ -474,21 +474,29 @@ populateClients(document.getElementById('edit-client-input'), document.getElemen
 async function fetchStockData() {
     if (stockDataCache) return stockDataCache;
     try {
-        const stockRef = db.collection('stock');
-        const snapshot = await stockRef.get();
-        stockDataCache = snapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-                stock_name: data.stock_name,
-                selling_price: parseFloat(data.selling_price) || 0,
-                wholesale: parseFloat(data.wholesale) || 0,
-                stock_quantity: parseFloat(data.stock_quantity) || 0,
-                uom: data.uom || 'Unit'
-            };
+        const response = await fetch('/stock_data', {
+            credentials: 'include' // Ensure session cookies are sent for @login_required
         });
+        if (!response.ok) {
+            throw new Error(`HTTP error: ${response.status}`);
+        }
+        const data = await response.json();
+        if (!Array.isArray(data)) {
+            throw new Error('Invalid response format: Expected an array');
+        }
+        stockDataCache = data.map(item => ({
+            stock_name: item.stock_name,
+            selling_price: parseFloat(item.selling_price) || 0,
+            wholesale: parseFloat(item.wholesale) || 0,
+            stock_quantity: parseFloat(item.stock_quantity) || 0,
+            uom: item.uom || 'Unit'
+        }));
+        if (!stockDataCache.length) {
+            console.warn('No stock items returned from /stock_data');
+        }
         return stockDataCache;
     } catch (error) {
-        console.error('Error fetching stock data from Firestore:', error);
+        console.error('Error fetching stock data from /stock_data:', error);
         return [];
     }
 }
