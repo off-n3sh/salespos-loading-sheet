@@ -1969,9 +1969,6 @@ def get_loading_sheet(sheet_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-from flask import jsonify, request, session
-from datetime import datetime
-
 @app.route('/edit_order/<order_id>', methods=['POST'])
 @login_required
 def edit_order(order_id):
@@ -1988,8 +1985,7 @@ def edit_order(order_id):
 
         # Restrict editing to order creator or manager
         current_user_name = f"{session.get('user', {}).get('firstName', '')} {session.get('user', {}).get('lastName', '')}"
-        current_user_role = session.get('user', {}).get('role', '')
-        if current_user_role != 'manager' and current_user_name != salesperson_name:
+        if session.get('user', {}).get('role') != 'manager' and current_user_name != salesperson_name:
             return jsonify({"error": "Unauthorized: Only the order creator or a manager can edit this order"}), 403
 
         old_items = order_data.get('items', [])
@@ -1999,10 +1995,11 @@ def edit_order(order_id):
         i = 0
         while i < len(old_items):
             if old_items[i] == 'product':
-                product_name = old_items[i + 1]
-                quantity = int(old_items[i + 3]) if i + 3 < len(old_items) and old_items[i + 2] == 'quantity' else 0
-                price = float(old_items[i + 5]) if i + 5 < len(old_items) and old_items[i + 4] == 'price' else 0.0
-                old_items_list.append({'name': product_name, 'quantity': quantity, 'price': price})
+                old_items_list.append({
+                    'name': old_items[i + 1],
+                    'quantity': int(old_items[i + 3]) if i + 3 < len(old_items) and old_items[i + 2] == 'quantity' else 0,
+                    'price': float(old_items[i + 5]) if i + 5 < len(old_items) and old_items[i + 4] == 'price' else 0.0
+                })
                 i += 6
             else:
                 i += 1
@@ -2015,11 +2012,12 @@ def edit_order(order_id):
         new_items_list = []
         i = 0
         while i < len(new_items):
-            if new_items[i] == 'product':
-                product_name = new_items[i + 1]
-                quantity = int(new_items[i + 3]) if i + 3 < len(new_items) and new_items[i + 2] == 'quantity' else 0
-                price = float(new_items[i + 5]) if i + 5 < len(new_items) and new_items[i + 4] == 'price' else 0.0
-                new_items_list.append({'name': product_name, 'quantity': quantity, 'price': price})
+            if i + 5 < len(new_items) and new_items[i] == 'product':
+                new_items_list.append({
+                    'name': new_items[i + 1],
+                    'quantity': int(new_items[i + 3]) if new_items[i + 2] == 'quantity' else 0,
+                    'price': float(new_items[i + 5]) if new_items[i + 4] == 'price' else 0.0
+                })
                 i += 6
             else:
                 i += 1
@@ -2029,7 +2027,7 @@ def edit_order(order_id):
         for new_item in new_items_list:
             existing_item = next((item for item in combined_items_list if item['name'] == new_item['name']), None)
             if existing_item:
-                existing_item['quantity'] += new_item['quantity']
+                existing_item['quantity'] = new_item['quantity']  # Update to new quantity
                 existing_item['price'] = new_item['price']
             else:
                 combined_items_list.append(new_item)
@@ -2040,11 +2038,7 @@ def edit_order(order_id):
         subtotal = 0.0
         for item in combined_items_list:
             if item['quantity'] > 0:
-                combined_items.extend([
-                    'product', item['name'],
-                    'quantity', str(item['quantity']),
-                    'price', str(item['price'])
-                ])
+                combined_items.extend(['product', item['name'], 'quantity', str(item['quantity']), 'price', str(item['price'])])
                 total_items += item['quantity']
                 subtotal += item['quantity'] * item['price']
 
@@ -2053,7 +2047,7 @@ def edit_order(order_id):
             for new_item in new_items_list:
                 old_item = next((item for item in old_items_list if item['name'] == new_item['name']), None)
                 old_qty = old_item['quantity'] if old_item else 0
-                qty_to_deduct = new_item['quantity']
+                qty_to_deduct = new_item['quantity'] - old_qty
                 if qty_to_deduct > 0:
                     stock_ref = db.collection('stock').where('stock_name', '==', new_item['name']).limit(1).stream()
                     stock_doc = next(stock_ref, None)
@@ -2072,14 +2066,14 @@ def edit_order(order_id):
             'subtotal': subtotal,
             'payment': amount_paid,
             'balance': balance if balance > 0 else 0,
-            'shop_name': order_data.get('shop_name', ''),
+            'shop_name': order_data.get('shop_name', '') or 'Retail Direct',  # Fallback, but should use existing
             'salesperson_name': salesperson_name,
             'order_type': order_type,
             'date': order_data.get('date', datetime.now(KENYA_TZ).isoformat())
         }
         order_ref.set(updated_order)
 
-        # Update receipt balance
+        # Update receipt
         receipt_ref = db.collection('receipts').where('order_id', '==', order_id).limit(1).stream()
         receipt_doc = next(receipt_ref, None)
         if receipt_doc:
@@ -2090,7 +2084,12 @@ def edit_order(order_id):
             })
 
         log_user_action('Updated Order', f'Updated order {order_id} with {total_items} items')
-        return jsonify({"status": "success"}), 200
+        return jsonify({
+            "status": "success",
+            "message": f"Order #{order_id} edited successfully on {datetime.now(KENYA_TZ).strftime('%d/%m/%Y')}",
+            "subtotal": subtotal,
+            "balance": balance
+        }), 200
     except Exception as e:
         error_msg = f"Failed to update order {order_id}: {str(e)}"
         print(error_msg)
@@ -2098,8 +2097,7 @@ def edit_order(order_id):
             "error": error_msg,
             "user_id": session.get('user', {}).get('id', 'unknown'),
             "status": "error"
-        }), 500
-        
+        }), 500        
 @app.route('/delete_order/<receipt_id>', methods=['POST'])
 @login_required
 def delete_order(receipt_id):
