@@ -13,6 +13,7 @@ import re
 from functools import wraps
 from firebase_admin.auth import UserNotFoundError
 import logging
+from google.cloud.firestore_v1 import FieldFilter
 
 app = Flask(__name__)
 logger = logging.getLogger(__name__)
@@ -556,9 +557,9 @@ def dashboard():
 
     # Apply status filter to query (only for sales history, not expenses)
     if status_filter == 'pending':
-        orders_ref = orders_ref.where('balance', '>', 0)
+        orders_ref = orders_ref.where(filter=FieldFilter('balance', '>', 0))
     elif status_filter == 'completed':
-        orders_ref = orders_ref.where('balance', '==', 0)
+        orders_ref = orders_ref.where(filter=FieldFilter('balance', '>=', -0.001)).where(filter=FieldFilter('balance', '<=', 0.001))
 
     # Fetch all matching orders (before pagination)
     filtered_orders = []
@@ -850,6 +851,7 @@ def dashboard():
         wholesale_open_orders=wholesale_open_orders,
         wholesale_closed_orders=wholesale_closed_orders
     )
+
 @app.route('/mark_notification_read/<notification_id>', methods=['POST'])
 @no_cache
 @login_required
