@@ -1977,7 +1977,13 @@ def edit_order(order_id):
         order_ref = db.collection('orders').document(order_id)
         order = order_ref.get()
         if not order.exists:
-            return jsonify({"error": "Order not found"}), 404
+            # Try finding by receipt_id
+            order_query = db.collection('orders').where('receipt_id', '==', order_id).limit(1).stream()
+            order_doc = next(order_query, None)
+            if not order_doc:
+                return jsonify({"error": "Order not found"}), 404
+            order_ref = order_doc.reference
+            order = order_doc
 
         order_data = order.to_dict()
         order_type = order_data.get('order_type', 'wholesale')
@@ -1994,45 +2000,49 @@ def edit_order(order_id):
         old_items_list = []
         i = 0
         while i < len(old_items):
-            if old_items[i] == 'product':
+            if old_items[i] == 'product' and i + 5 < len(old_items):
                 old_items_list.append({
                     'name': old_items[i + 1],
-                    'quantity': int(old_items[i + 3]) if i + 3 < len(old_items) and old_items[i + 2] == 'quantity' else 0,
-                    'price': float(old_items[i + 5]) if i + 5 < len(old_items) and old_items[i + 4] == 'price' else 0.0
+                    'quantity': int(old_items[i + 3]) if old_items[i + 2] == 'quantity' else 0,
+                    'price': float(old_items[i + 5]) if old_items[i + 4] == 'price' else 0.0
                 })
                 i += 6
             else:
                 i += 1
 
-        # Get new items from the form
+        # Get new items from the form (manual inputs)
         new_items = request.form.getlist('items[]')
         amount_paid = float(request.form.get('amount_paid', order_data.get('payment', 0.0)))
 
-        # Parse new items
+        # Parse new items (name, qty, price)
         new_items_list = []
         i = 0
         while i < len(new_items):
-            if i + 5 < len(new_items) and new_items[i] == 'product':
+            if i + 2 < len(new_items):
+                name = new_items[i]
+                quantity = int(new_items[i + 1]) if new_items[i + 1] else 0
+                price = float(new_items[i + 2]) if new_items[i + 2] else 0.0
                 new_items_list.append({
-                    'name': new_items[i + 1],
-                    'quantity': int(new_items[i + 3]) if new_items[i + 2] == 'quantity' else 0,
-                    'price': float(new_items[i + 5]) if new_items[i + 4] == 'price' else 0.0
+                    'name': name,
+                    'quantity': quantity,
+                    'price': price
                 })
-                i += 6
+                i += 3
             else:
                 i += 1
 
-        # Append new items to existing items
+        # Combine items
         combined_items_list = old_items_list[:]
         for new_item in new_items_list:
-            existing_item = next((item for item in combined_items_list if item['name'] == new_item['name']), None)
-            if existing_item:
-                existing_item['quantity'] = new_item['quantity']  # Update to new quantity
-                existing_item['price'] = new_item['price']
-            else:
-                combined_items_list.append(new_item)
+            if new_item['quantity'] > 0:
+                existing_item = next((item for item in combined_items_list if item['name'] == new_item['name']), None)
+                if existing_item:
+                    existing_item['quantity'] = new_item['quantity']
+                    existing_item['price'] = new_item['price']
+                else:
+                    combined_items_list.append(new_item)
 
-        # Convert combined items back to flat list
+        # Convert to flat list
         combined_items = []
         total_items = 0
         subtotal = 0.0
@@ -2045,18 +2055,19 @@ def edit_order(order_id):
         # Adjust stock for wholesale orders
         if order_type == 'wholesale':
             for new_item in new_items_list:
-                old_item = next((item for item in old_items_list if item['name'] == new_item['name']), None)
-                old_qty = old_item['quantity'] if old_item else 0
-                qty_to_deduct = new_item['quantity'] - old_qty
-                if qty_to_deduct > 0:
-                    stock_ref = db.collection('stock').where('stock_name', '==', new_item['name']).limit(1).stream()
-                    stock_doc = next(stock_ref, None)
-                    if stock_doc:
-                        current_qty = stock_doc.to_dict().get('stock_quantity', 0)
-                        if current_qty >= qty_to_deduct:
-                            stock_doc.reference.update({'stock_quantity': current_qty - qty_to_deduct})
-                        else:
-                            return jsonify({"error": f"Insufficient stock for {new_item['name']}. Available: {current_qty}, Requested: {qty_to_deduct}"}), 400
+                if new_item['quantity'] > 0:
+                    old_item = next((item for item in old_items_list if item['name'] == new_item['name']), None)
+                    old_qty = old_item['quantity'] if old_item else 0
+                    qty_to_deduct = new_item['quantity'] - old_qty
+                    if qty_to_deduct > 0:
+                        stock_ref = db.collection('stock').where('stock_name', '==', new_item['name']).limit(1).stream()
+                        stock_doc = next(stock_ref, None)
+                        if stock_doc:
+                            current_qty = stock_doc.to_dict().get('stock_quantity', 0)
+                            if current_qty >= qty_to_deduct:
+                                stock_doc.reference.update({'stock_quantity': current_qty - qty_to_deduct})
+                            else:
+                                return jsonify({"error": f"Insufficient stock for {new_item['name']}. Available: {current_qty}, Requested: {qty_to_deduct}"}), 400
 
         # Update the order
         balance = subtotal - amount_paid
@@ -2066,21 +2077,23 @@ def edit_order(order_id):
             'subtotal': subtotal,
             'payment': amount_paid,
             'balance': balance if balance > 0 else 0,
-            'shop_name': order_data.get('shop_name', '') or 'Retail Direct',  # Fallback, but should use existing
+            'shop_name': order_data.get('shop_name', ''),
             'salesperson_name': salesperson_name,
             'order_type': order_type,
+            'receipt_id': order_data.get('receipt_id', order_id),
             'date': order_data.get('date', datetime.now(KENYA_TZ).isoformat())
         }
         order_ref.set(updated_order)
 
         # Update receipt
-        receipt_ref = db.collection('receipts').where('order_id', '==', order_id).limit(1).stream()
+        receipt_ref = db.collection('receipts').where('order_id', '==', order_ref.id).limit(1).stream()
         receipt_doc = next(receipt_ref, None)
         if receipt_doc:
             receipt_doc.reference.update({
                 'balance': balance if balance > 0 else 0,
                 'subtotal': subtotal,
-                'payment': amount_paid
+                'payment': amount_paid,
+                'order_id': order_ref.id
             })
 
         log_user_action('Updated Order', f'Updated order {order_id} with {total_items} items')
@@ -2097,7 +2110,7 @@ def edit_order(order_id):
             "error": error_msg,
             "user_id": session.get('user', {}).get('id', 'unknown'),
             "status": "error"
-        }), 500        
+        }), 500
 @app.route('/delete_order/<receipt_id>', methods=['POST'])
 @login_required
 def delete_order(receipt_id):
