@@ -851,28 +851,6 @@ def dashboard():
         wholesale_open_orders=wholesale_open_orders,
         wholesale_closed_orders=wholesale_closed_orders
     )
-
-@app.route('/mark_notification_read/<notification_id>', methods=['POST'])
-@no_cache
-@login_required
-def mark_notification_read(notification_id):
-    try:
-        notification_ref = db.collection('notifications').document(notification_id)
-        notification_doc = notification_ref.get()
-        if not notification_doc.exists:
-            return "Notification not found", 404
-
-        # Verify the user has permission to update this notification
-        user_id = session['user'].get('id', '')
-        notification_dict = notification_doc.to_dict()
-        if notification_dict.get('recipient') != user_id:
-            return "Unauthorized: You can only mark your own notifications as read", 403
-
-        notification_ref.update({'read': True})
-        return '', 200
-    except Exception as e:
-        print(f"Error marking notification as read: {str(e)}")  # Log the error for debugging
-        return f"Error marking notification as read: {str(e)}", 500
                
 @app.route('/orders', methods=['GET', 'POST'])
 @no_cache
@@ -1221,30 +1199,6 @@ def receipt(order_id):
         print(f"Error in receipt route for {order_id}: {str(e)}")
         return f"Internal Server Error: {str(e)}", 500
 
-@app.route('/retail', methods=['GET', 'POST'])
-@no_cache
-@login_required
-def retail():
-    """Handle retail sales and display the retail page."""
-    if request.method == 'POST':
-        item = request.form['item']
-        price = float(request.form['price'])
-        amount = float(request.form['amount'])
-        operator = request.form['operator']
-        db.collection('retail').add({
-            'item': item,
-            'price': price,
-            'amount': amount,
-            'operator': operator,
-            'date': datetime.now(KENYA_TZ).strftime('%Y-%m-%d')
-        })
-        db.collection('products').document(item.lower().replace(' ', '')).update({'quantity': firestore.Increment(-1)})
-    retail_sales = [doc.to_dict() for doc in db.collection('retail').order_by('date', direction=firestore.Query.DESCENDING).get()]
-    recent_activity = [{'receipt_id': doc.to_dict().get('receipt_id', doc.id), 'salesperson_name': doc.to_dict().get('salesperson_name', 'N/A'), 
-                        'shop_name': doc.to_dict().get('shop_name', 'Unknown Shop'), 'date': process_date(doc.to_dict().get('date'))} 
-                       for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).limit(3).get()]
-    return render_template('retail.html', retail_sales=retail_sales, recent_activity=recent_activity)
-
 @app.route('/reports')
 @no_cache
 @login_required
@@ -1378,52 +1332,6 @@ def mark_paid(order_id):
         return redirect(url_for('dashboard', time='day'))
     except Exception as e:
         return f"Error updating order: {str(e)}", 500@app.route('/mark_paid/<order_id>', methods=['POST'])
-@no_cache
-@login_required
-def mark_paid(order_id):
-    orders_ref = db.collection('orders').where('receipt_id', '==', order_id).limit(1).stream()
-    order_doc = next(orders_ref, None)
-    if not order_doc:
-        return "Order not found", 404
-
-    try:
-        order_ref = db.collection('orders').document(order_doc.id)
-        order_dict = order_doc.to_dict()
-        current_payment = float(order_dict.get('payment', 0))
-        current_balance = float(order_dict.get('balance', 0))
-        amount_paid = float(request.form.get('amount_paid', 0))
-        now = datetime.now(KENYA_TZ)
-
-        new_payment = current_payment + amount_paid
-        new_balance = max(current_balance - amount_paid, 0)
-        final_payment = amount_paid  # Only the new payment amount
-
-        update_data = {
-            'payment': new_payment,
-            'balance': new_balance,
-            'final_payment': final_payment,  # Overwrite with latest payment
-            'last_payment_date': now
-        }
-        if new_balance == 0 and current_balance > 0:
-            update_data['closed_date'] = now
-            notification_message = f"Order #{order_id} fully paid and closed on {now.strftime('%d/%m/%Y %H:%M')}"
-            log_user_action('Closed Order', f"Order #{order_id} marked fully paid")
-        else:
-            notification_message = f"Order #{order_id} partially paid. New balance: KSh {new_balance} on {now.strftime('%d/%m/%Y %H:%M')}"
-            log_user_action('Marked Paid', f"Order #{order_id} - Paid {amount_paid} KES, New Balance {new_balance} KES")
-
-        order_ref.update(update_data)
-
-        db.collection('notifications').add({
-            'recipient': order_dict.get('salesperson_id', ''),
-            'message': notification_message,
-            'timestamp': now,
-            'order_id': order_id,
-            'read': False
-        })
-        return redirect(url_for('dashboard', time='day'))
-    except Exception as e:
-        return f"Error updating order: {str(e)}", 500
         
 @app.route('/dashboard_stats', methods=['GET'])
 @no_cache
@@ -1913,8 +1821,6 @@ def download_loading_sheet():
     except Exception as e:
         print(f"Error generating PDF: {str(e)}")
         return f"Error generating PDF: {str(e)}", 500
-        
-# ... existing imports and setup ...
 
 @app.route('/create-loading-sheet')
 @login_required
@@ -1954,8 +1860,6 @@ def create_loading_sheet():
     
     log_user_action('Created New Loading Sheet', 'Started a fresh loading sheet')
     return redirect(url_for('loading_sheets'))
-
-# ... existing routes like /loading-sheets, /dashboard, etc. ...
 
 @app.route('/get_loading_sheet/<sheet_id>')
 @login_required
@@ -2483,3 +2387,25 @@ def export_report():
         mimetype='application/pdf',
         headers={"Content-Disposition": f"attachment;filename={filename}"}
     )
+    
+@app.route('/mark_notification_read/<notification_id>', methods=['POST'])
+@no_cache
+@login_required
+def mark_notification_read(notification_id):
+    try:
+        notification_ref = db.collection('notifications').document(notification_id)
+        notification_doc = notification_ref.get()
+        if not notification_doc.exists:
+            return "Notification not found", 404
+
+        # Verify the user has permission to update this notification
+        user_id = session['user'].get('id', '')
+        notification_dict = notification_doc.to_dict()
+        if notification_dict.get('recipient') != user_id:
+            return "Unauthorized: You can only mark your own notifications as read", 403
+
+        notification_ref.update({'read': True})
+        return '', 200
+    except Exception as e:
+        print(f"Error marking notification as read: {str(e)}")  # Log the error for debugging
+        return f"Error marking notification as read: {str(e)}", 500
