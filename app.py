@@ -850,6 +850,7 @@ def dashboard():
         retail_closed_orders=retail_closed_orders,
         wholesale_open_orders=wholesale_open_orders,
         wholesale_closed_orders=wholesale_closed_orders
+        firebase_config=firebase_config
     )
                
 @app.route('/orders', methods=['GET', 'POST'])
