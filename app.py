@@ -467,18 +467,23 @@ def auth_route():
                 # Fetch the user from Firebase Auth to get the UID
                 user = auth.get_user_by_email(email)
 
-                # Save additional user data to Firestore
+                # Save additional user data to Firestore with status as "pending"
                 db.collection('web_users').document(user.uid).set({
                     'email': email,
                     'firstName': first_name,
                     'lastName': last_name,
                     'phone': phone,
                     'role': role,
+                    'status': 'pending',  # Add status field
                     'created_at': firestore.SERVER_TIMESTAMP
                 })
 
-                # Return JSON success response
-                return jsonify({"status": "success", "message": "Signup successful! Verify your email."})
+                # Redirect to /awaiting with email as query parameter
+                return jsonify({
+                    "status": "success",
+                    "message": "Signup successful! Awaiting approval.",
+                    "redirect": f"/awaiting?email={email}"
+                })
 
             except auth.EmailAlreadyExistsError:
                 return jsonify({"status": "error", "error": "Email already exists. Try logging in."}), 400
@@ -489,6 +494,34 @@ def auth_route():
 
     # GET request: render the auth page
     return render_template('auth.html', error=None, signup_success=False)
+
+@app.route('/awaiting', methods=['GET'])
+def awaiting():
+    email = request.args.get('email')
+    if not email:
+        return redirect(url_for('auth_route'))  # Redirect to auth if no email is provided
+    return render_template('awaiting.html', user_email=email)
+
+@app.route('/check_approval_status', methods=['POST'])
+def check_approval_status():
+    try:
+        data = request.get_json()
+        email = data.get('email')
+        if not email:
+            return jsonify({"status": "error", "error": "Email is required"}), 400
+
+        # Query Firestore for the user
+        user_docs = db.collection('web_users').where('email', '==', email).limit(1).get()
+        if not user_docs:
+            return jsonify({"status": "error", "error": "User not found"}), 404
+
+        user_data = user_docs[0].to_dict()
+        status = user_data.get('status', 'pending')
+
+        return jsonify({"status": status})
+
+    except Exception as e:
+        return jsonify({"status": "error", "error": str(e)}), 500
     
 @app.route('/login', methods=['POST'])
 def login():

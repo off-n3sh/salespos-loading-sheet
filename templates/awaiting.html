@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dreamland Enterprises - Awaiting Approval</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="{{ url_for('static', filename='css/awaiting.css') }}" rel="stylesheet">
+</head>
+<body class="bg-gray-900 min-h-screen flex items-center justify-center">
+    <div class="fixed inset-0 overflow-hidden z-0">
+        <div class="absolute inset-0 bg-gradient-to-br from-blue-400 to-gray-900 opacity-80"></div>
+        <!-- Watermark: Powered by Off-Nesh Securities -->
+        <div class="absolute bottom-4 right-4 text-white opacity-50 text-sm flex items-center space-x-2">
+            <span>Powered by</span>
+            <span class="font-semibold">Off-Nesh Securities</span>
+        </div>
+    </div>
+
+    <div class="w-full max-w-md bg-white/10 backdrop-blur-sm p-8 rounded-lg shadow-xl z-10 animate-slide-in">
+        <div class="text-center">
+            <div class="flex items-center justify-center mb-4">
+                <div class="h-10 w-10 rounded-lg bg-blue-400 flex items-center justify-center">
+                    <i class="fas fa-star text-white text-lg"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-white ml-2">Dreamland Enterprises</h1>
+            </div>
+            <h2 class="text-xl font-semibold text-gray-100 mb-4">Awaiting Account Approval</h2>
+            <p class="text-sm text-gray-300 mb-6">Your account is pending approval. We've sent a verification email—please click the link to confirm your email. You'll be able to log in once an admin approves your account.</p>
+            <div class="loading-bar mb-4">
+                <div class="loading-bar-fill"></div>
+            </div>
+            <p class="text-sm text-gray-300 loading-text">Assigning roles & updating info...</p>
+            <p class="text-sm text-gray-400 mt-4">Check your inbox (and spam folder) for the verification email. Return to <a href="/login" class="text-blue-400 hover:underline">Login</a> after approval.</p>
+        </div>
+    </div>
+
+    <script>
+        // Function to check approval status
+        function checkApprovalStatus() {
+            fetch('/check_approval_status', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ email: "{{ user_email }}" })  // Pass email from template
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to check approval status');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.status === 'approved') {
+                    // Redirect to login page if approved
+                    window.location.href = '/login';
+                }
+            })
+            .catch(error => {
+                console.error('Error checking approval status:', error);
+            });
+        }
+
+        // Poll for approval status every 10 seconds
+        setInterval(checkApprovalStatus, 10000);
+
+        // Check immediately on page load
+        checkApprovalStatus();
+    </script>
+</body>
+</html>
