@@ -503,6 +503,7 @@ def awaiting():
     return render_template('awaiting.html', user_email=email)
 
 @app.route('/check_approval_status', methods=['POST'])
+@csrf.exempt
 def check_approval_status():
     try:
         data = request.get_json()
