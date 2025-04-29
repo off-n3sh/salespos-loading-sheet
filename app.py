@@ -132,7 +132,7 @@ def log_user_action(action_type, details):
         'user_name': user_name,
         'action_type': action_type,
         'details': details,
-        'timestamp': datetime.now(KENYA_TZ)
+        'timestamp': datetime.now(NAIROBI_TZ)
     })
     
 def process_items(items_value):
@@ -179,7 +179,7 @@ def log_stock_change(product_type, subtype, change_type, quantity, price_per_uni
         'change_type': change_type,
         'quantity': quantity,
         'price_per_unit': price_per_unit,
-        'timestamp': datetime.now(KENYA_TZ)
+        'timestamp': datetime.now(NAIROBI_TZ)
     })
 
 # Login required decorator
@@ -204,7 +204,7 @@ def expire_date_days_left(date_str):
         return None
     try:
         expiry_date = datetime.strptime(date_str, "%Y-%m-%d")
-        today = datetime.now(KENYA_TZ).replace(hour=0, minute=0, second=0, microsecond=0)
+        today = datetime.now(NAIROBI_TZ).replace(hour=0, minute=0, second=0, microsecond=0)
         days_left = (expiry_date - today).days
         return max(days_left, 0)  # Ensure no negative days
     except (ValueError, TypeError):
@@ -383,7 +383,7 @@ def clients():
 
     # Sort by last order date (None goes last)
     clients_list.sort(
-        key=lambda x: x['last_order_date'] or datetime.min.replace(tzinfo=KENYA_TZ),
+        key=lambda x: x['last_order_date'] or datetime.min.replace(tzinfo=NAIROBI_TZ),
         reverse=True
     )
 
@@ -415,7 +415,7 @@ def add_client():
     client_data = {
         'shop_name': shop_name,
         'debt': 0.0,
-        'created_at': datetime.now(KENYA_TZ),
+        'created_at': datetime.now(NAIROBI_TZ),
         'last_order_date': None,
         'recent_order_amount': None
     }
@@ -679,7 +679,7 @@ def dashboard():
     db = firestore.Client()
 
     # Current time in Kenyan timezone
-    now = datetime.now(KENYA_TZ)
+    now = datetime.now(NAIROBI_TZ)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     today_end = today_start + timedelta(days=1)
 
@@ -1045,9 +1045,9 @@ def orders():
             'items': items,
             'payment': min(amount_paid, total_amount),
             'balance': balance,
-            'date': datetime.now(KENYA_TZ),
+            'date': datetime.now(NAIROBI_TZ),
             'order_type': order_type,
-            'closed_date': datetime.now(KENYA_TZ) if balance == 0 else None
+            'closed_date': datetime.now(NAIROBI_TZ) if balance == 0 else None
         }
         
         # Write order to Firestore
@@ -1065,7 +1065,7 @@ def orders():
             db.collection('clients').document(shop_name.replace('/', '-')).set({
                 'shop_name': shop_name,
                 'debt': balance,
-                'created_at': datetime.now(KENYA_TZ),
+                'created_at': datetime.now(NAIROBI_TZ),
                 'location': None
             })
         
@@ -1175,7 +1175,7 @@ def stock():
                 'wholesale': wholesale_price,
                 'barprice': 0.0,
                 'category': final_category,
-                'date': datetime.now(KENYA_TZ).strftime('%Y-%m-%d %H:%M:%S'),
+                'date': datetime.now(NAIROBI_TZ).strftime('%Y-%m-%d %H:%M:%S'),
                 'expire_date': expire_date,
                 'uom': None,
                 'code': stock_id,
@@ -1255,7 +1255,7 @@ def stock():
                         db.collection('notifications').add({
                             'recipient': session['user']['uid'],
                             'message': notification_message,
-                            'timestamp': datetime.now(KENYA_TZ),
+                            'timestamp': datetime.now(NAIROBI_TZ),
                             'order_id': None,
                             'read': False
                         })
@@ -1345,7 +1345,7 @@ def receipt(order_id):
 @login_required
 def reports():
     time_filter = request.args.get('time', 'month')
-    now = datetime.now(KENYA_TZ)
+    now = datetime.now(NAIROBI_TZ)
 
     if time_filter == 'day':
         start = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -1441,7 +1441,7 @@ def mark_paid(order_id):
         current_payment = float(order_dict.get('payment', 0))
         current_balance = float(order_dict.get('balance', 0))
         amount_paid = float(request.form.get('amount_paid', 0))
-        now = datetime.now(KENYA_TZ)
+        now = datetime.now(NAIROBI_TZ)
 
         new_payment = current_payment + amount_paid
         new_balance = max(current_balance - amount_paid, 0)
@@ -1478,7 +1478,7 @@ def mark_paid(order_id):
 @no_cache
 @login_required
 def dashboard_stats():
-    now = datetime.now(KENYA_TZ)
+    now = datetime.now(NAIROBI_TZ)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     today_end = today_start + timedelta(days=1)
 
@@ -1587,7 +1587,7 @@ def return_stock(order_id):
                 'salesperson_id': order_dict.get('salesperson_id', ''),
                 'items': [{'name': item['name'], 'quantity': item['quantity'], 'price': item['price']} for item in returned_items],
                 'reason': 'Returned by shop',
-                'timestamp': datetime.now(KENYA_TZ)
+                'timestamp': datetime.now(NAIROBI_TZ)
             })
 
             for item in returned_items:
@@ -1604,17 +1604,17 @@ def return_stock(order_id):
                 'balance': new_balance
             }
             if not updated_items_raw:
-                update_data['closed_date'] = datetime.now(KENYA_TZ)
-                notification_message = f"Order #{order_id} fully returned and closed on {datetime.now(KENYA_TZ).strftime('%d/%m/%Y %H:%M')}"
+                update_data['closed_date'] = datetime.now(NAIROBI_TZ)
+                notification_message = f"Order #{order_id} fully returned and closed on {datetime.now(NAIROBI_TZ).strftime('%d/%m/%Y %H:%M')}"
             else:
-                notification_message = f"Order #{order_id} updated: {len(items_list) - len(returned_items)} item{'s' if len(items_list) - len(returned_items) != 1 else ''} remaining, new balance: KSh {new_balance} on {datetime.now(KENYA_TZ).strftime('%d/%m/%Y %H:%M')}"
+                notification_message = f"Order #{order_id} updated: {len(items_list) - len(returned_items)} item{'s' if len(items_list) - len(returned_items) != 1 else ''} remaining, new balance: KSh {new_balance} on {datetime.now(NAIROBI_TZ).strftime('%d/%m/%Y %H:%M')}"
 
             order_ref.update(update_data)
 
             db.collection('notifications').add({
                 'recipient': order_dict.get('salesperson_id', ''),
                 'message': notification_message,
-                'timestamp': datetime.now(KENYA_TZ),
+                'timestamp': datetime.now(NAIROBI_TZ),
                 'order_id': order_id,
                 'read': False
             })
@@ -1646,7 +1646,7 @@ def expenses():
             'description': description,
             'amount': amount,
             'category': category,
-            'date': datetime.now(KENYA_TZ)
+            'date': datetime.now(NAIROBI_TZ)
         })
         log_stock_change(category, description, 'expense', -amount, 1)
         return redirect(url_for('dashboard'))
@@ -1689,12 +1689,12 @@ def load_to_loading_sheet(receipt_id, action):
             try:
                 created_at = datetime.fromisoformat(created_at_str)
             except ValueError:
-                created_at = datetime.now(KENYA_TZ)
+                created_at = datetime.now(NAIROBI_TZ)
         else:
-            created_at = datetime.now(KENYA_TZ)
+            created_at = datetime.now(NAIROBI_TZ)
 
         # Generate a unique loading sheet ID
-        loading_sheet_id = f"LOAD_{datetime.now(KENYA_TZ).strftime('%Y%m%d_%H%M%S')}"
+        loading_sheet_id = f"LOAD_{datetime.now(NAIROBI_TZ).strftime('%Y%m%d_%H%M%S')}"
         
         # Save the current sheet to Firestore
         db.collection('loading_sheets').document(loading_sheet_id).set({
@@ -1724,14 +1724,14 @@ def load_to_loading_sheet(receipt_id, action):
         session['current_loading_sheet'] = {
             'items': current_items,
             'total_items': sum(item['quantity'] for item in current_items),
-            'created_at': session.get('current_loading_sheet', {}).get('created_at', datetime.now(KENYA_TZ).isoformat())
+            'created_at': session.get('current_loading_sheet', {}).get('created_at', datetime.now(NAIROBI_TZ).isoformat())
         }
     else:
         # Create a new loading sheet in session
         session['current_loading_sheet'] = {
             'items': items_list,
             'total_items': sum(item['quantity'] for item in items_list),
-            'created_at': datetime.now(KENYA_TZ).isoformat()
+            'created_at': datetime.now(NAIROBI_TZ).isoformat()
         }
 
     return redirect(url_for('loading_sheets'))
@@ -1751,9 +1751,9 @@ def loading_sheets():
             try:
                 created_at = datetime.fromisoformat(created_at_str)
             except ValueError:
-                created_at = datetime.now(KENYA_TZ)
+                created_at = datetime.now(NAIROBI_TZ)
         else:
-            created_at = current_loading_sheet.get('created_at', datetime.now(KENYA_TZ))
+            created_at = current_loading_sheet.get('created_at', datetime.now(NAIROBI_TZ))
     else:
         aggregated_items = []
         total_items = 0
@@ -1773,15 +1773,15 @@ def loading_sheets():
                 try:
                     sheet_data['created_at'] = datetime.fromisoformat(created_at_field)
                 except ValueError:
-                    sheet_data['created_at'] = datetime.now(KENYA_TZ)
+                    sheet_data['created_at'] = datetime.now(NAIROBI_TZ)
             else:
-                sheet_data['created_at'] = datetime.now(KENYA_TZ)
+                sheet_data['created_at'] = datetime.now(NAIROBI_TZ)
             recent_sheets.append(sheet_data)
     except Exception as e:
         print(f"Error fetching recent sheets: {e}")
         recent_sheets = []
 
-    now = datetime.now(KENYA_TZ)
+    now = datetime.now(NAIROBI_TZ)
     
     return render_template('loading_sheets.html', 
                           aggregated_items=aggregated_items, 
@@ -1819,9 +1819,9 @@ def view_loading_sheet():
             try:
                 created_at = datetime.fromisoformat(created_at_field)
             except ValueError:
-                created_at = datetime.now(KENYA_TZ)
+                created_at = datetime.now(NAIROBI_TZ)
         else:
-            created_at = datetime.now(KENYA_TZ)
+            created_at = datetime.now(NAIROBI_TZ)
         
         aggregated_items = sheet_data.get('items', [])
         total_items = sheet_data.get('total_items', 0)
@@ -1830,7 +1830,7 @@ def view_loading_sheet():
                               aggregated_items=aggregated_items,
                               total_items=total_items,
                               created_at=created_at,
-                              current_date=datetime.now(KENYA_TZ),
+                              current_date=datetime.now(NAIROBI_TZ),
                               sheet_id=sheet_id,
                               print_mode=print_mode)
     except Exception as e:
@@ -1864,9 +1864,9 @@ def download_loading_sheet():
                 try:
                     created_at = datetime.fromisoformat(created_at_field)
                 except ValueError:
-                    created_at = datetime.now(KENYA_TZ)
+                    created_at = datetime.now(NAIROBI_TZ)
             else:
-                created_at = datetime.now(KENYA_TZ)
+                created_at = datetime.now(NAIROBI_TZ)
         except Exception as e:
             print(f"Error fetching loading sheet: {str(e)}")
             return f"Error fetching loading sheet: {str(e)}", 500
@@ -1885,9 +1885,9 @@ def download_loading_sheet():
             try:
                 created_at = datetime.fromisoformat(created_at_str)
             except ValueError:
-                created_at = datetime.now(KENYA_TZ)
+                created_at = datetime.now(NAIROBI_TZ)
         else:
-            created_at = current_loading_sheet.get('created_at', datetime.now(KENYA_TZ))
+            created_at = current_loading_sheet.get('created_at', datetime.now(NAIROBI_TZ))
 
     try:
         # Generate PDF
@@ -1979,12 +1979,12 @@ def create_loading_sheet():
             try:
                 created_at = datetime.fromisoformat(created_at_str)
             except ValueError:
-                created_at = datetime.now(KENYA_TZ)
+                created_at = datetime.now(NAIROBI_TZ)
         else:
-            created_at = datetime.now(KENYA_TZ)
+            created_at = datetime.now(NAIROBI_TZ)
 
         # Generate a unique loading sheet ID
-        loading_sheet_id = f"LOAD_{datetime.now(KENYA_TZ).strftime('%Y%m%d_%H%M%S')}"
+        loading_sheet_id = f"LOAD_{datetime.now(NAIROBI_TZ).strftime('%Y%m%d_%H%M%S')}"
         
         # Save the current sheet to Firestore
         db.collection('loading_sheets').document(loading_sheet_id).set({
@@ -2128,7 +2128,7 @@ def edit_order(order_id):
             'salesperson_name': salesperson_name,
             'order_type': order_type,
             'receipt_id': order_data.get('receipt_id', order_id),
-            'date': order_data.get('date', datetime.now(KENYA_TZ).isoformat())
+            'date': order_data.get('date', datetime.now(NAIROBI_TZ).isoformat())
         }
         order_ref.set(updated_order)
 
@@ -2146,7 +2146,7 @@ def edit_order(order_id):
         log_user_action('Updated Order', f'Updated order {order_id} with {total_items} items')
         return jsonify({
             "status": "success",
-            "message": f"Order #{order_id} edited successfully on {datetime.now(KENYA_TZ).strftime('%d/%m/%Y')}",
+            "message": f"Order #{order_id} edited successfully on {datetime.now(NAIROBI_TZ).strftime('%d/%m/%Y')}",
             "subtotal": subtotal,
             "balance": balance
         }), 200
@@ -2191,12 +2191,12 @@ def delete_order(receipt_id):
         # Add a notification for salespeople
         notification_message = (
             f"Order #{receipt_id} deleted on "
-            f"{datetime.now(KENYA_TZ).strftime('%d/%m/%Y %H:%M')}"
+            f"{datetime.now(NAIROBI_TZ).strftime('%d/%m/%Y %H:%M')}"
         )
         db.collection('notifications').add({
             'user_id': order_dict['user_id'],  # Notify the salesperson who created the order
             'message': notification_message,
-            'timestamp': datetime.now(KENYA_TZ),
+            'timestamp': datetime.now(NAIROBI_TZ),
             'read': False
         })
 
@@ -2212,7 +2212,7 @@ def export_report():
     """Generate and export a PDF report based on the type and time filter."""
     report_type = request.args.get('type')
     time_filter = request.args.get('time', 'month')
-    now = datetime.now(KENYA_TZ)
+    now = datetime.now(NAIROBI_TZ)
 
     # Determine the time range based on filter
     if time_filter == 'day':
