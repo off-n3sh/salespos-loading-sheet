@@ -29,9 +29,10 @@ csrf = CSRFProtect(app)
 app.jinja_env.globals['csrf_token'] = lambda: session.get('_csrf_token', '')
 
 limiter = Limiter(
-    app,
+    app=app,
     key_func=get_remote_address,  # Rate limit based on IP address
     default_limits=["200 per day", "50 per hour"]  # Global limits for the app
+    storage_uri="memory://"
 )
 logger.info("Flask-Limiter initialized for rate limiting.")
 
