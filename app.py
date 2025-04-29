@@ -544,6 +544,12 @@ def login():
             return jsonify({'error': 'User not found in Firestore.'}), 400
 
         stored_user = user_doc[0].to_dict()
+        
+        # Check if the user's status is "approved"
+        status = stored_user.get('status', 'pending')  # Default to 'pending' if status is missing
+        if status != 'approved':
+            return jsonify({'error': 'Your account is not approved. Current status: ' + status}), 403
+
         # Set session
         session['user'] = {
             'uid': uid,
