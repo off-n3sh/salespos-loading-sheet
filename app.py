@@ -669,44 +669,34 @@ def login():
 @no_cache
 @login_required
 def dashboard():
-    """Render the dashboard with stats cards and sales history."""
     page = int(request.args.get('page', 1))
     per_page = 50
     time_filter = request.args.get('time', 'all')
-    status_filter = request.args.get('status', 'all')  # 'all', 'pending', 'completed', 'expenses'
+    status_filter = request.args.get('status', 'all')
     search_query = request.args.get('search', '').strip()
 
-    # Initialize Firestore client
     db = firestore.Client()
-
-    # Current time in Kenyan timezone
     now = datetime.now(NAIROBI_TZ)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     today_end = today_start + timedelta(days=1)
 
-    # Fetch all orders to calculate counts and stats
+    # Fetch all orders from Firestore
     all_orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING)
     all_orders = list(all_orders_ref.stream())
 
-    # Calculate total counts for filters (across all orders)
     total_orders = len(all_orders)
     pending_count = sum(1 for doc in all_orders if float(doc.to_dict().get('balance', 0)) > 0)
     completed_count = sum(1 for doc in all_orders if float(doc.to_dict().get('balance', 0)) == 0)
 
-    # Base query for filtered orders (no time filter applied here)
+    # Filter orders for sales history
     orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING)
-
-    # Apply status filter to query (only for sales history, not expenses)
     if status_filter == 'pending':
         orders_ref = orders_ref.where(filter=FieldFilter('balance', '>', 0))
     elif status_filter == 'completed':
         orders_ref = orders_ref.where(filter=FieldFilter('balance', '>=', -0.001)).where(filter=FieldFilter('balance', '<=', 0.001))
 
-    # Fetch all matching orders (before pagination)
     filtered_orders = []
     matching_order_ids = set()
-
-    # Apply search filter if provided
     if search_query:
         search_lower = search_query.lower()
         salesperson_orders = orders_ref.where('salesperson_name_lower', '>=', search_lower).where('salesperson_name_lower', '<=', search_lower + '\uf8ff').stream()
@@ -734,9 +724,7 @@ def dashboard():
                     'balance': balance,
                     'date': process_date(order_dict.get('date')),
                     'closed_date': closed_date,
-                    'order_type': order_dict.get('order_type', 'wholesale'),
-                    'final_payment': float(order_dict.get('final_payment', 0)),
-                    'last_payment_date': process_date(order_dict.get('last_payment_date', order_dict.get('date')))
+                    'order_type': order_dict.get('order_type', 'wholesale')
                 })
     else:
         for doc in orders_ref.stream():
@@ -756,24 +744,22 @@ def dashboard():
                 'balance': balance,
                 'date': process_date(order_dict.get('date')),
                 'closed_date': closed_date,
-                'order_type': order_dict.get('order_type', 'wholesale'),
-                'final_payment': float(order_dict.get('final_payment', 0)),
-                'last_payment_date': process_date(order_dict.get('last_payment_date', order_dict.get('date')))
+                'order_type': order_dict.get('order_type', 'wholesale')
             })
 
-    # Sort filtered orders by date (descending)
     filtered_orders.sort(key=lambda x: x['date'], reverse=True)
 
-    # Group orders by time period
+    # Group orders for sales history
     grouped_orders = []
     if time_filter == 'day':
         days = {}
         for order in filtered_orders:
-            sale_date = order['date']
-            day_key = sale_date.strftime('%Y-%m-%d')
+            # Use closed_date if the order was closed today, otherwise use order date
+            relevant_date = order['closed_date'] if (order['closed_date'] and order['closed_date'] >= today_start and order['closed_date'] < today_end and order['balance'] <= 0) else order['date']
+            day_key = relevant_date.strftime('%Y-%m-%d')
             if day_key not in days:
                 days[day_key] = {
-                    'label': f"Day: {sale_date.strftime('%d %b %Y')}",
+                    'label': f"Day: {relevant_date.strftime('%d %b %Y')}",
                     'rows': [],
                     'total': 0,
                     'debt': 0
@@ -836,22 +822,20 @@ def dashboard():
             years[year_key]['debt'] += order['balance']
         grouped_orders = list(years.values())
         grouped_orders.sort(key=lambda x: x['rows'][0]['date'], reverse=True)
-    else:  # time_filter == 'all'
+    else:
         total = sum(order['payment'] + order['balance'] for order in filtered_orders)
         debt = sum(order['balance'] for order in filtered_orders)
         grouped_orders = [{'label': 'All Orders', 'rows': filtered_orders, 'total': total, 'debt': debt}]
 
-    # Paginate the grouped orders
     flat_orders = []
     for group in grouped_orders:
         flat_orders.extend([(group['label'], order) for order in group['rows']])
-    total_items = len(flat_orders) if status_filter != 'expenses' else 0  # Will update for expenses later
+    total_items = len(flat_orders) if status_filter != 'expenses' else 0
     total_pages = (total_items + per_page - 1) // per_page if total_items > 0 else 1
     start_idx = (page - 1) * per_page
     end_idx = start_idx + per_page
     paginated_orders = flat_orders[start_idx:end_idx]
 
-    # Reconstruct grouped orders for the current page
     grouped_sales_history = []
     current_group = None
     for label, order in paginated_orders:
@@ -878,17 +862,21 @@ def dashboard():
     wholesale_open_orders = 0
     wholesale_closed_orders = 0
 
+    # Track orders that have had payments counted to avoid double-counting
+    orders_with_payment_counted = set()
+
     for order in all_orders:
+        order_id = order.id
         order_dict = order.to_dict()
         order_date = process_date(order_dict.get('date'))
-        last_payment_date = process_date(order_dict.get('last_payment_date', order_dict.get('date')))
-        order_type = order_dict.get('order_type', 'wholesale')
-        initial_payment = float(order_dict.get('payment', 0))
-        final_payment = float(order_dict.get('final_payment', 0))
-        balance = float(order_dict.get('balance', 0))
         closed_date = process_date(order_dict.get('closed_date'))
+        order_type = order_dict.get('order_type', 'wholesale')
+        payment = float(order_dict.get('payment', 0))
+        balance = float(order_dict.get('balance', 0))
         if balance > 0 and closed_date:
             closed_date = None
+
+        # Update open/closed counts
         if order_date >= today_start and order_date < today_end:
             if balance > 0:
                 open_orders_count += 1
@@ -902,28 +890,49 @@ def dashboard():
                     retail_closed_orders += 1
                 else:
                     wholesale_closed_orders += 1
+
+        # Update total debts
         if balance > 0:
             total_debts += balance
-        if order_date >= today_start and order_date < today_end and (not last_payment_date or last_payment_date == order_date):
-            if initial_payment > 0:
-                if order_type == 'retail':
-                    retail_sales_today += initial_payment
-                else:
-                    wholesale_sales_today += initial_payment
-        if last_payment_date and last_payment_date >= today_start and last_payment_date < today_end:
-            if final_payment > 0:
-                if order_type == 'retail':
-                    retail_sales_today += final_payment
-                else:
-                    wholesale_sales_today += final_payment
 
-    retail_sales_today += sum(
+        # Calculate today's sales
+        if order_date >= today_start and order_date < today_end:
+            # Order was created today
+            if payment > 0:
+                if order_type == 'retail':
+                    retail_sales_today += payment
+                    logger.debug(f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] Order {order_id} (created today): Added {payment} to retail_sales_today. Total now: {retail_sales_today}")
+                else:
+                    wholesale_sales_today += payment
+                    logger.debug(f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] Order {order_id} (created today): Added {payment} to wholesale_sales_today. Total now: {wholesale_sales_today}")
+                orders_with_payment_counted.add(order_id)
+        elif closed_date and closed_date >= today_start and closed_date < today_end:
+            # Order was pending and closed today
+            if order_id not in orders_with_payment_counted and payment > 0:
+                if order_type == 'retail':
+                    retail_sales_today += payment
+                    logger.debug(f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] Order {order_id} (pending, closed today): Added {payment} to retail_sales_today. Total now: {retail_sales_today}")
+                else:
+                    wholesale_sales_today += payment
+                    logger.debug(f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] Order {order_id} (pending, closed today): Added {payment} to wholesale_sales_today. Total now: {wholesale_sales_today}")
+                orders_with_payment_counted.add(order_id)
+
+    # Add amounts from the retail collection, excluding negative values
+    retail_collection_amounts = [
         float(r.to_dict().get('amount', 0))
         for r in db.collection('retail')
         .where('date', '==', now.strftime('%Y-%m-%d'))
         .stream()
-    )
+    ]
+    retail_collection_total = sum(amount for amount in retail_collection_amounts if amount > 0)
+    if retail_collection_total > 0:
+        logger.debug(f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] Added {retail_collection_total} from retail collection to retail_sales_today. Total now: {retail_sales_today + retail_collection_total}")
+    retail_sales_today += retail_collection_total
+
     total_sales_today = retail_sales_today + wholesale_sales_today
+
+    # Final summary log
+    logger.debug(f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] Final totals - Retail sales today: {retail_sales_today}, Wholesale sales today: {wholesale_sales_today}, Total sales today: {total_sales_today}, Total debts: {total_debts}")
 
     # Fetch expenses
     expenses_ref = db.collection('expenses').order_by('date', direction=firestore.Query.DESCENDING)
@@ -939,7 +948,6 @@ def dashboard():
     total_expenses = sum(e['amount'] for e in expenses)
     expenses_count = len(expenses)
 
-    # Adjust total_items and total_pages for expenses
     if status_filter == 'expenses':
         total_items = expenses_count
         total_pages = (total_items + per_page - 1) // per_page if total_items > 0 else 1
@@ -1476,51 +1484,110 @@ def mark_paid(order_id):
         return f"Error updating order: {str(e)}", 500@app.route('/mark_paid/<order_id>', methods=['POST'])
         
 @app.route('/dashboard_stats', methods=['GET'])
-@no_cache
 @login_required
 def dashboard_stats():
+    db = firestore.Client()
     now = datetime.now(NAIROBI_TZ)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     today_end = today_start + timedelta(days=1)
 
-    all_orders = db.collection('orders').stream()
-    retail_sales_today = 0
-    wholesale_sales_today = 0
-    total_debts = 0
+    # Fetch all orders from Firestore
+    all_orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING)
+    all_orders = list(all_orders_ref.stream())
+
+    retail_sales_today = 0.0
+    wholesale_sales_today = 0.0
+    total_debts = 0.0
+    open_orders_count = 0
+    closed_orders_count = 0
+    retail_open_orders = 0
+    retail_closed_orders = 0
+    wholesale_open_orders = 0
+    wholesale_closed_orders = 0
+
+    # Track orders that have had payments counted to avoid double-counting
+    orders_with_payment_counted = set()
 
     for order in all_orders:
+        order_id = order.id
         order_dict = order.to_dict()
         order_date = process_date(order_dict.get('date'))
-        last_payment_date = process_date(order_dict.get('last_payment_date', order_dict.get('date')))
+        closed_date = process_date(order_dict.get('closed_date'))
         order_type = order_dict.get('order_type', 'wholesale')
-        initial_payment = float(order_dict.get('payment', 0))
-        final_payment = float(order_dict.get('final_payment', 0))
+        payment = float(order_dict.get('payment', 0))
         balance = float(order_dict.get('balance', 0))
+        if balance > 0 and closed_date:
+            closed_date = None
 
+        # Update open/closed counts
         if order_date >= today_start and order_date < today_end:
-            if order_type == 'retail':
-                retail_sales_today += initial_payment
+            if balance > 0:
+                open_orders_count += 1
+                if order_type == 'retail':
+                    retail_open_orders += 1
+                else:
+                    wholesale_open_orders += 1
             else:
-                wholesale_sales_today += initial_payment
-        elif last_payment_date >= today_start and last_payment_date < today_end and final_payment > 0:
-            if order_type == 'retail':
-                retail_sales_today += final_payment
-            else:
-                wholesale_sales_today += final_payment
-        total_debts += balance
+                closed_orders_count += 1
+                if order_type == 'retail':
+                    retail_closed_orders += 1
+                else:
+                    wholesale_closed_orders += 1
 
-    retail_sales_today += sum(
-        r.to_dict().get('amount', 0) for r in db.collection('retail')
-        .where('date', '==', now.strftime('%Y-%m-%d')).get()
-    )
+        # Update total debts
+        if balance > 0:
+            total_debts += balance
+
+        # Calculate today's sales
+        if order_date >= today_start and order_date < today_end:
+            # Order was created today
+            if payment > 0:
+                if order_type == 'retail':
+                    retail_sales_today += payment
+                    logger.debug(f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] /dashboard_stats - Order {order_id} (created today): Added {payment} to retail_sales_today. Total now: {retail_sales_today}")
+                else:
+                    wholesale_sales_today += payment
+                    logger.debug(f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] /dashboard_stats - Order {order_id} (created today): Added {payment} to wholesale_sales_today. Total now: {wholesale_sales_today}")
+                orders_with_payment_counted.add(order_id)
+        elif closed_date and closed_date >= today_start and closed_date < today_end:
+            # Order was pending and closed today
+            if order_id not in orders_with_payment_counted and payment > 0:
+                if order_type == 'retail':
+                    retail_sales_today += payment
+                    logger.debug(f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] /dashboard_stats - Order {order_id} (pending, closed today): Added {payment} to retail_sales_today. Total now: {retail_sales_today}")
+                else:
+                    wholesale_sales_today += payment
+                    logger.debug(f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] /dashboard_stats - Order {order_id} (pending, closed today): Added {payment} to wholesale_sales_today. Total now: {wholesale_sales_today}")
+                orders_with_payment_counted.add(order_id)
+
+    # Add amounts from the retail collection, excluding negative values
+    retail_collection_amounts = [
+        float(r.to_dict().get('amount', 0))
+        for r in db.collection('retail')
+        .where('date', '==', now.strftime('%Y-%m-%d'))
+        .stream()
+    ]
+    retail_collection_total = sum(amount for amount in retail_collection_amounts if amount > 0)
+    if retail_collection_total > 0:
+        logger.debug(f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] /dashboard_stats - Added {retail_collection_total} from retail collection to retail_sales_today. Total now: {retail_sales_today + retail_collection_total}")
+    retail_sales_today += retail_collection_total
 
     total_sales_today = retail_sales_today + wholesale_sales_today
 
+    # Final summary log
+    logger.debug(f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] /dashboard_stats - Final totals - Retail sales today: {retail_sales_today}, Wholesale sales today: {wholesale_sales_today}, Total sales today: {total_sales_today}, Total debts: {total_debts}")
+
     return jsonify({
-        'total_sales_today': total_sales_today,
-        'retail_sales_today': retail_sales_today,
-        'wholesale_sales_today': wholesale_sales_today,
-        'total_debts': total_debts
+        'total_sales_today': round(total_sales_today, 2),
+        'retail_sales_today': round(retail_sales_today, 2),
+        'wholesale_sales_today': round(wholesale_sales_today, 2),
+        'total_debts': round(total_debts, 2),
+        'open_orders_count': open_orders_count,
+        'closed_orders_count': closed_orders_count,
+        'retail_open_orders': retail_open_orders,
+        'retail_closed_orders': retail_closed_orders,
+        'wholesale_open_orders': wholesale_open_orders,
+        'wholesale_closed_orders': wholesale_closed_orders
     })
 
 @app.route('/return_stock/<order_id>', methods=['POST'])

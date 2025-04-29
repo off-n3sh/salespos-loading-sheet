@@ -158,308 +158,311 @@
     </div>
 
     <!-- Sales History Section -->
-    <!-- Sales History Section -->
-<div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden mb-8">
-    <div class="p-5 border-b border-gray-200 dark:border-gray-700">
-        <h2 class="text-xl font-bold text-gray-900 dark:text-white">Sales History</h2>
-    </div>
-
-    <!-- Filter Controls -->
-    <div class="p-4 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex flex-wrap gap-3 items-center">
-        <div class="flex space-x-2">
-            <a href="{{ url_for('dashboard', page=1, per_page=per_page, time=time_filter, search=search, status='all') }}" id="all-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
-                All <span class="ml-2 bg-white bg-opacity-20 px-2 py-0.5 rounded-full text-xs">{{ total_orders }}</span>
-            </a>
-            <a href="{{ url_for('dashboard', page=1, per_page=per_page, time=time_filter, search=search, status='pending') }}" id="pending-btn" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
-                Pending <span class="ml-2 bg-white bg-opacity-20 px-2 py-0.5 rounded-full text-xs">{{ pending_count }}</span>
-            </a>
-            <a href="{{ url_for('dashboard', page=1, per_page=per_page, time=time_filter, search=search, status='completed') }}" id="completed-btn" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
-                Completed <span class="ml-2 bg-white bg-opacity-20 px-2 py-0.5 rounded-full text-xs">{{ completed_count }}</span>
-            </a>
-            <a href="{{ url_for('dashboard', page=1, per_page=per_page, time=time_filter, search=search, status='expenses') }}" id="expenses-btn" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
-                Expenses <span class="ml-2 bg-white bg-opacity-20 px-2 py-0.5 rounded-full text-xs">{{ expenses_count }}</span>
-            </a>
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden mb-8">
+        <div class="p-5 border-b border-gray-200 dark:border-gray-700">
+            <h2 class="text-xl font-bold text-gray-900 dark:text-white">Sales History</h2>
         </div>
 
-        <div class="ml-auto flex items-center space-x-3">
-            <label for="time-filter" class="text-sm font-medium text-gray-700 dark:text-gray-300">Time:</label>
-            <select id="time-filter" class="py-2 px-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
-                <option value="all" {% if time_filter == 'all' %}selected{% endif %}>All Time</option>
-                <option value="day" {% if time_filter == 'day' %}selected{% endif %}>Daily</option>
-                <option value="week" {% if time_filter == 'week' %}selected{% endif %}>Weekly</option>
-                <option value="month" {% if time_filter == 'month' %}selected{% endif %}>Monthly</option>
-                <option value="year" {% if time_filter == 'year' %}selected{% endif %}>Yearly</option>
-            </select>
-        </div>
-    </div>
+        <!-- Filter Controls -->
+        <div class="p-4 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex flex-wrap gap-3 items-center">
+            <div class="flex space-x-2">
+                <a href="{{ url_for('dashboard', page=1, per_page=per_page, time=time_filter, search=search, status='all') }}" id="all-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
+                    All <span class="ml-2 bg-white bg-opacity-20 px-2 py-0.5 rounded-full text-xs">{{ total_orders }}</span>
+                </a>
+                <a href="{{ url_for('dashboard', page=1, per_page=per_page, time=time_filter, search=search, status='pending') }}" id="pending-btn" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
+                    Pending <span class="ml-2 bg-white bg-opacity-20 px-2 py-0.5 rounded-full text-xs">{{ pending_count }}</span>
+                </a>
+                <a href="{{ url_for('dashboard', page=1, per_page=per_page, time=time_filter, search=search, status='completed') }}" id="completed-btn" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
+                    Completed <span class="ml-2 bg-white bg-opacity-20 px-2 py-0.5 rounded-full text-xs">{{ completed_count }}</span>
+                </a>
+                <a href="{{ url_for('dashboard', page=1, per_page=per_page, time=time_filter, search=search, status='expenses') }}" id="expenses-btn" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-sm font-medium flex items-center transition-colors">
+                    Expenses <span class="ml-2 bg-white bg-opacity-20 px-2 py-0.5 rounded-full text-xs">{{ expenses_count }}</span>
+                </a>
+            </div>
 
-    <!-- Combined Table Container -->
-    <div id="table-container" class="overflow-x-auto">
-        <!-- Sales History Table -->
-        <table id="sales-history" class="w-full {% if status_filter == 'expenses' %}hidden{% endif %}">
-            <thead class="bg-gray-50 dark:bg-gray-900">
-                <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"></th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Booked</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Closed</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Type</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Total Amount</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"></th>
-                </tr>
-            </thead>
-            <tbody id="sales-history-body" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {% for group in grouped_sales_history %}
-                    {% if time_filter != 'all' %}
-                    <tr class="bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white font-semibold">
-                        <td colspan="7" class="px-6 py-2">{{ group.label }} (Total: KSh {{ group.total | round(2) }}, Debt: KSh {{ group.debt | round(2) }})</td>
+            <div class="ml-auto flex items-center space-x-3">
+                <label for="time-filter" class="text-sm font-medium text-gray-700 dark:text-gray-300">Time:</label>
+                <select id="time-filter" class="py-2 px-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                    <option value="all" {% if time_filter == 'all' %}selected{% endif %}>All Time</option>
+                    <option value="day" {% if time_filter == 'day' %}selected{% endif %}>Daily</option>
+                    <option value="week" {% if time_filter == 'week' %}selected{% endif %}>Weekly</option>
+                    <option value="month" {% if time_filter == 'month' %}selected{% endif %}>Monthly</option>
+                    <option value="year" {% if time_filter == 'year' %}selected{% endif %}>Yearly</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Combined Table Container -->
+        <div id="table-container" class="overflow-x-auto">
+            <!-- Sales History Table -->
+            <table id="sales-history" class="w-full {% if status_filter == 'expenses' %}hidden{% endif %}">
+                <thead class="bg-gray-50 dark:bg-gray-900">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"></th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Booked</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Closed</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Type</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Total Amount</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"></th>
                     </tr>
-                    {% endif %}
-                    {% for sale in group.rows %}
-                    <tr data-date="{{ sale.date.strftime('%Y-%m-%d') }}"
-                        data-last-payment-date="{{ sale.last_payment_date.strftime('%Y-%m-%d') if sale.last_payment_date else '' }}"
-                        data-closed-date="{{ sale.closed_date.strftime('%Y-%m-%d') if sale.closed_date else '' }}"
-                        data-search="{{ sale.shop_name | lower }} {{ sale.salesperson_name | lower }}"
-                        data-order-type="{{ sale.order_type }}"
-                        data-initial-payment="{{ sale.payment }}"
-                        data-final-payment="{{ sale.final_payment }}"
-                        data-balance="{{ sale.balance }}"
-                        class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="w-10 h-10 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
-                                {% if sale.photoUrl %}
-                                    <img src="{{ sale.photoUrl }}" alt="Salesperson Photo" class="w-full h-full object-cover">
-                                {% else %}
-                                    <div class="text-gray-700 dark:text-white font-bold text-lg">
-                                        {{ sale.salesperson_name[0] | default('N') | upper }}
-                                    </div>
-                                {% endif %}
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="font-medium text-gray-900 dark:text-white">{{ sale.shop_name }}</div>
-                            <div class="text-sm text-gray-500 dark:text-gray-400">{{ sale.salesperson_name | default('N/A') }}</div>
-                            <div class="text-sm text-gray-500 dark:text-gray-400">{{ sale.date.strftime('%d/%m/%Y %H:%M:%S') }}</div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-200">
-                            {{ sale.closed_date.strftime('%d/%m/%Y %H:%M:%S') if sale.closed_date else 'Not Closed' }}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
-                            <span class="px-2 py-1 rounded-full text-xs font-medium {% if sale.order_type == 'retail' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% else %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200{% endif %}">
-                                {{ sale.order_type }}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
-                            {{ sale.payment | round(2) }}/{{ (sale.payment + sale.balance) | round(2) }}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="px-2 py-1 rounded-full text-xs font-medium {% if sale.balance > 0 %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200{% else %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% endif %}">
-                                {% if sale.balance > 0 %}Pending{% else %}Paid{% endif %}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
-                            <button class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none" onclick="toggleMenu('menu-{{ sale.receipt_id }}')">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                    <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                                </svg>
-                            </button>
-                            <div id="menu-{{ sale.receipt_id }}" class="hidden absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 border rounded-lg shadow-lg z-20">
-                                <a href="{{ url_for('receipt', order_id=sale.receipt_id) }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">View Receipt</a>
-                                {% if sale.order_type == 'wholesale' %}
-                                <div class="relative">
-                                    <a href="{{ url_for('load_to_loading_sheet', receipt_id=sale.receipt_id, action='current') }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Add to Current Loading Sheet</a>
-                                    <a href="{{ url_for('load_to_loading_sheet', receipt_id=sale.receipt_id, action='new') }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Start New Loading Sheet</a>
+                </thead>
+                <tbody id="sales-history-body" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for group in grouped_sales_history %}
+                        {% if time_filter != 'all' %}
+                        <tr class="bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white font-semibold">
+                            <td colspan="7" class="px-6 py-2">{{ group.label }} (Total: KSh {{ group.total | round(2) }}, Debt: KSh {{ group.debt | round(2) }})</td>
+                        </tr>
+                        {% endif %}
+                        {% for sale in group.rows %}
+                        <tr data-date="{{ sale.date.strftime('%Y-%m-%d') }}"
+                            data-closed-date="{{ sale.closed_date.strftime('%Y-%m-%d') if sale.closed_date else '' }}"
+                            data-search="{{ sale.shop_name | lower }} {{ sale.salesperson_name | lower }}"
+                            data-order-type="{{ sale.order_type }}"
+                            data-payment="{{ sale.payment }}"
+                            data-balance="{{ sale.balance }}"
+                            class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="w-10 h-10 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
+                                    {% if sale.photoUrl %}
+                                        <img src="{{ sale.photoUrl }}" alt="Salesperson Photo" class="w-full h-full object-cover">
+                                    {% else %}
+                                        <div class="text-gray-700 dark:text-white font-bold text-lg">
+                                            {{ sale.salesperson_name[0] | default('N') | upper }}
+                                        </div>
+                                    {% endif %}
                                 </div>
-                                {% endif %}
-                            </div>
-                        </td>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="font-medium text-gray-900 dark:text-white">{{ sale.shop_name }}</div>
+                                <div class="text-sm text-gray-500 dark:text-gray-400">{{ sale.salesperson_name | default('N/A') }}</div>
+                                <div class="text-sm text-gray-500 dark:text-gray-400">
+                                    Ordered: {{ sale.date.strftime('%d/%m/%Y %H:%M:%S') }}
+                                    {% if sale.closed_date and sale.closed_date >= today_start and sale.closed_date < today_end and sale.balance <= 0 %}
+                                        <br>Closed Today: {{ sale.closed_date.strftime('%d/%m/%Y %H:%M:%S') }}
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-200">
+                                {{ sale.closed_date.strftime('%d/%m/%Y %H:%M:%S') if sale.closed_date else 'Not Closed' }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
+                                <span class="px-2 py-1 rounded-full text-xs font-medium {% if sale.order_type == 'retail' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% else %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200{% endif %}">
+                                    {{ sale.order_type }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                                {{ sale.payment | round(2) }}/{{ (sale.payment + sale.balance) | round(2) }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 py-1 rounded-full text-xs font-medium {% if sale.balance > 0 %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200{% else %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% endif %}">
+                                    {% if sale.balance > 0 %}Pending{% else %}Paid{% endif %}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
+                                <button class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none" onclick="toggleMenu('menu-{{ sale.receipt_id }}')">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                                    </svg>
+                                </button>
+                                <div id="menu-{{ sale.receipt_id }}" class="hidden absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 border rounded-lg shadow-lg z-20">
+                                    <a href="{{ url_for('receipt', order_id=sale.receipt_id) }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">View Receipt</a>
+                                    {% if sale.order_type == 'wholesale' %}
+                                    <div class="relative">
+                                        <a href="{{ url_for('load_to_loading_sheet', receipt_id=sale.receipt_id, action='current') }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Add to Current Loading Sheet</a>
+                                        <a href="{{ url_for('load_to_loading_sheet', receipt_id=sale.receipt_id, action='new') }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Start New Loading Sheet</a>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <!-- Expenses Table -->
+            <table id="expenses-list" class="w-full {% if status_filter != 'expenses' %}hidden{% endif %}">
+                <thead class="bg-gray-50 dark:bg-gray-900">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Description</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Amount</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Category</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
+                    </tr>
+                </thead>
+                <tbody id="expenses-body">
+                    {% for expense in expenses %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" data-date="{{ expense.date.strftime('%Y-%m-%d') }}" data-search="{{ expense.description | lower }} {{ expense.category | lower }}">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-200">{{ expense.description }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600 dark:text-red-300">KSh {{ "%.2f" % expense.amount }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-200">{{ expense.category }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-200">{{ expense.date.strftime('%d/%m/%Y') }}</td>
                     </tr>
                     {% endfor %}
-                {% endfor %}
-            </tbody>
-        </table>
+                </tbody>
+            </table>
+        </div>
 
-        <!-- Expenses Table -->
-        <table id="expenses-list" class="w-full {% if status_filter != 'expenses' %}hidden{% endif %}">
-            <thead class="bg-gray-50 dark:bg-gray-900">
-                <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Description</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Amount</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Category</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
-                </tr>
-            </thead>
-            <tbody id="expenses-body">
-                {% for expense in expenses %}
-                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" data-date="{{ expense.date.strftime('%Y-%m-%d') }}" data-search="{{ expense.description | lower }} {{ expense.category | lower }}">
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-200">{{ expense.description }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600 dark:text-red-300">KSh {{ "%.2f" % expense.amount }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-200">{{ expense.category }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-200">{{ expense.date.strftime('%d/%m/%Y') }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+        <!-- Pagination Controls -->
+        <div class="p-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center">
+            <span id="page-entries" class="text-sm text-gray-600 dark:text-gray-400">
+                Showing {{ (page - 1) * per_page + 1 }} to {{ (page - 1) * per_page + (expenses | length if status_filter == 'expenses' else sales_history | length) }} of {{ total_items }} {% if status_filter == 'expenses' %}expenses{% else %}orders{% endif %}
+            </span>
+            <div class="flex items-center space-x-2">
+                <a id="prev-page" href="{{ url_for('dashboard', page=page-1, per_page=per_page, time=time_filter, search=search, status=status_filter) if page > 1 else '#' }}" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 {% if page <= 1 %}opacity-50 pointer-events-none{% endif %}">Previous</a>
+                <span id="page-info" class="text-sm text-gray-600 dark:text-gray-300">Page {{ page }} of {{ total_pages }}</span>
+                <a id="next-page" href="{{ url_for('dashboard', page=page+1, per_page=per_page, time=time_filter, search=search, status=status_filter) if page < total_pages else '#' }}" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 {% if page >= total_pages %}opacity-50 pointer-events-none{% endif %}">Next</a>
+            </div>
+        </div>
 
-    <!-- Pagination Controls -->
-    <div class="p-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center">
-        <span id="page-entries" class="text-sm text-gray-600 dark:text-gray-400">
-            Showing {{ (page - 1) * per_page + 1 }} to {{ (page - 1) * per_page + (expenses | length if status_filter == 'expenses' else sales_history | length) }} of {{ total_items }} {% if status_filter == 'expenses' %}expenses{% else %}orders{% endif %}
-        </span>
-        <div class="flex items-center space-x-2">
-            <a id="prev-page" href="{{ url_for('dashboard', page=page-1, per_page=per_page, time=time_filter, search=search, status=status_filter) if page > 1 else '#' }}" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 {% if page <= 1 %}opacity-50 pointer-events-none{% endif %}">Previous</a>
-            <span id="page-info" class="text-sm text-gray-600 dark:text-gray-300">Page {{ page }} of {{ total_pages }}</span>
-            <a id="next-page" href="{{ url_for('dashboard', page=page+1, per_page=per_page, time=time_filter, search=search, status=status_filter) if page < total_pages else '#' }}" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 {% if page >= total_pages %}opacity-50 pointer-events-none{% endif %}">Next</a>
+        <!-- Empty State for Filtered Data -->
+        <div id="empty-state" class="hidden p-8 text-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p class="mt-4 text-gray-600 dark:text-gray-400 text-lg">No data found for the selected filter</p>
+            <p class="text-gray-500 dark:text-gray-500 text-sm mt-2">Try changing your filter criteria</p>
         </div>
     </div>
-
-    <!-- Empty State for Filtered Data -->
-    <div id="empty-state" class="hidden p-8 text-center">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        <p class="mt-4 text-gray-600 dark:text-gray-400 text-lg">No data found for the selected filter</p>
-        <p class="text-gray-500 dark:text-gray-500 text-sm mt-2">Try changing your filter criteria</p>
-    </div>
-</div>
 
     <!-- Loading Overlay -->
     <div id="loading-overlay" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden z-40">
         <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-600"></div>
     </div>
-<!-- JavaScript -->
-<script>
-    const notificationBell = document.getElementById('notification-bell');
-    const notificationModal = document.getElementById('notification-modal');
-    const closeNotificationModal = document.getElementById('close-notification-modal');
-    const notificationContent = document.getElementById('notification-content');
-    const emptyState = document.getElementById('empty-state');
-    const loadingOverlay = document.getElementById('loading-overlay');
-    const searchInput = document.getElementById('search-input');
-    const timeFilter = document.getElementById('time-filter');
-    const prevPageBtn = document.getElementById('prev-page');
-    const nextPageBtn = document.getElementById('next-page');
-    const pageInfo = document.getElementById('page-info');
-    const pageEntries = document.getElementById('page-entries');
-    const currentStatusFilter = '{{ status_filter }}';
-    const totalItems = {{ total_items }};
-    const totalPages = {{ total_pages }};
-    const currentPage = {{ page }};
-    const perPage = {{ per_page }};
 
-    function updateTime() {
-        const now = new Date();
-        document.getElementById('time-display').textContent = now.toLocaleString('en-US', { timeZone: 'Africa/Nairobi' });
-    }
-    setInterval(updateTime, 1000);
-    updateTime();
+    <!-- JavaScript -->
+    <script>
+        const notificationBell = document.getElementById('notification-bell');
+        const notificationModal = document.getElementById('notification-modal');
+        const closeNotificationModal = document.getElementById('close-notification-modal');
+        const notificationContent = document.getElementById('notification-content');
+        const emptyState = document.getElementById('empty-state');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const searchInput = document.getElementById('search-input');
+        const timeFilter = document.getElementById('time-filter');
+        const prevPageBtn = document.getElementById('prev-page');
+        const nextPageBtn = document.getElementById('next-page');
+        const pageInfo = document.getElementById('page-info');
+        const pageEntries = document.getElementById('page-entries');
+        const currentStatusFilter = '{{ status_filter }}';
+        const totalItems = {{ total_items }};
+        const totalPages = {{ total_pages }};
+        const currentPage = {{ page }};
+        const perPage = {{ per_page }};
 
-    notificationBell.addEventListener('click', () => {
-        notificationModal.classList.toggle('hidden');
-        loadNotifications();
-    });
-    closeNotificationModal.addEventListener('click', () => notificationModal.classList.add('hidden'));
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('time-display').textContent = now.toLocaleString('en-US', { timeZone: 'Africa/Nairobi' });
+        }
+        setInterval(updateTime, 1000);
+        updateTime();
 
-    function showLoading() { loadingOverlay.classList.remove('hidden'); }
-    function hideLoading() { loadingOverlay.classList.add('hidden'); }
+        notificationBell.addEventListener('click', () => {
+            notificationModal.classList.toggle('hidden');
+            loadNotifications();
+        });
+        closeNotificationModal.addEventListener('click', () => notificationModal.classList.add('hidden'));
 
-    function loadNotifications() {
-        fetch('/notifications')
-            .then(response => response.json())
-            .then(data => {
-                notificationContent.innerHTML = '';
-                if (data.length > 0) {
-                    data.forEach(notification => {
-                        const div = document.createElement('div');
-                        div.className = `p-4 mb-2 border-b border-gray-200 dark:border-gray-700 ${notification.read ? '' : 'bg-blue-50 dark:bg-blue-900'}`;
-                        div.innerHTML = `
-                            <p class="text-sm text-gray-700 dark:text-gray-300">${notification.message}</p>
-                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">${new Date(notification.timestamp).toLocaleString('en-GB')}</p>
-                            <div class="mt-2 flex justify-between items-center">
-                                <a href="/receipt?order_id=${notification.order_id}" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">View Order</a>
-                                ${notification.read ? '' : `<button onclick="markNotificationRead('${notification.id}')" class="text-sm text-green-600 dark:text-green-400 hover:underline">Mark as Read</button>`}
-                            </div>
-                        `;
-                        notificationContent.appendChild(div);
-                    });
-                } else {
-                    notificationContent.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400">No notifications found.</p>';
-                }
-                const unreadCount = data.filter(n => !n.read).length;
-                const badge = notificationBell.querySelector('span');
-                if (unreadCount > 0) {
-                    if (!badge) {
-                        const newBadge = document.createElement('span');
-                        newBadge.className = 'absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full';
-                        newBadge.textContent = unreadCount;
-                        notificationBell.appendChild(newBadge);
+        function showLoading() { loadingOverlay.classList.remove('hidden'); }
+        function hideLoading() { loadingOverlay.classList.add('hidden'); }
+
+        function loadNotifications() {
+            fetch('/notifications')
+                .then(response => response.json())
+                .then(data => {
+                    notificationContent.innerHTML = '';
+                    if (data.length > 0) {
+                        data.forEach(notification => {
+                            const div = document.createElement('div');
+                            div.className = `p-4 mb-2 border-b border-gray-200 dark:border-gray-700 ${notification.read ? '' : 'bg-blue-50 dark:bg-blue-900'}`;
+                            div.innerHTML = `
+                                <p class="text-sm text-gray-700 dark:text-gray-300">${notification.message}</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">${new Date(notification.timestamp).toLocaleString('en-GB')}</p>
+                                <div class="mt-2 flex justify-between items-center">
+                                    <a href="/receipt?order_id=${notification.order_id}" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">View Order</a>
+                                    ${notification.read ? '' : `<button onclick="markNotificationRead('${notification.id}')" class="text-sm text-green-600 dark:text-green-400 hover:underline">Mark as Read</button>`}
+                                </div>
+                            `;
+                            notificationContent.appendChild(div);
+                        });
                     } else {
-                        badge.textContent = unreadCount;
+                        notificationContent.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400">No notifications found.</p>';
                     }
-                } else if (badge) {
-                    badge.remove();
+                    const unreadCount = data.filter(n => !n.read).length;
+                    const badge = notificationBell.querySelector('span');
+                    if (unreadCount > 0) {
+                        if (!badge) {
+                            const newBadge = document.createElement('span');
+                            newBadge.className = 'absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full';
+                            newBadge.textContent = unreadCount;
+                            notificationBell.appendChild(newBadge);
+                        } else {
+                            badge.textContent = unreadCount;
+                        }
+                    } else if (badge) {
+                        badge.remove();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading notifications:', error);
+                    notificationContent.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400">Error loading notifications.</p>';
+                });
+        }
+
+        timeFilter.addEventListener('change', () => {
+            showLoading();
+            window.location.href = `{{ url_for('dashboard') }}?page=1&per_page=${perPage}&time=${timeFilter.value}&search=${encodeURIComponent(searchInput.value)}&status=${currentStatusFilter}`;
+        });
+
+        searchInput.addEventListener('input', () => {
+            clearTimeout(searchInput.debounce);
+            searchInput.debounce = setTimeout(() => {
+                showLoading();
+                window.location.href = `{{ url_for('dashboard') }}?page=1&per_page=${perPage}&time=${timeFilter.value}&search=${encodeURIComponent(searchInput.value)}&status=${currentStatusFilter}`;
+            }, 300);
+        });
+
+        function markNotificationRead(notificationId) {
+            fetch(`/mark_notification_read/${notificationId}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            })
+            .then(response => {
+                if (response.ok) {
+                    loadNotifications();
+                } else {
+                    alert('Error marking notification as read');
                 }
             })
             .catch(error => {
-                console.error('Error loading notifications:', error);
-                notificationContent.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400">Error loading notifications.</p>';
-            });
-    }
-
-    timeFilter.addEventListener('change', () => {
-        showLoading();
-        window.location.href = `{{ url_for('dashboard') }}?page=1&per_page=${perPage}&time=${timeFilter.value}&search=${encodeURIComponent(searchInput.value)}&status=${currentStatusFilter}`;
-    });
-
-    searchInput.addEventListener('input', () => {
-        clearTimeout(searchInput.debounce);
-        searchInput.debounce = setTimeout(() => {
-            showLoading();
-            window.location.href = `{{ url_for('dashboard') }}?page=1&per_page=${perPage}&time=${timeFilter.value}&search=${encodeURIComponent(searchInput.value)}&status=${currentStatusFilter}`;
-        }, 300);
-    });
-
-    function markNotificationRead(notificationId) {
-        fetch(`/mark_notification_read/${notificationId}`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'}
-        })
-        .then(response => {
-            if (response.ok) {
-                loadNotifications();
-            } else {
+                console.error('Error:', error);
                 alert('Error marking notification as read');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error marking notification as read');
-        });
-    }
-
-    function toggleMenu(menuId) {
-        const menu = document.getElementById(menuId);
-        const allMenus = document.querySelectorAll('[id^="menu-"]');
-        allMenus.forEach(m => {
-            if (m.id !== menuId) m.classList.add('hidden');
-        });
-        menu.classList.toggle('hidden');
-    }
-
-    document.addEventListener('click', (e) => {
-        if (!e.target.closest('button[onclick^="toggleMenu"]')) {
-            document.querySelectorAll('[id^="menu-"]').forEach(menu => menu.classList.add('hidden'));
+            });
         }
-    });
 
-    // Initialize display
-    if (totalItems === 0) {
-        emptyState.classList.remove('hidden');
-        document.getElementById('sales-history').classList.add('hidden');
-        document.getElementById('expenses-list').classList.add('hidden');
-    }
+        function toggleMenu(menuId) {
+            const menu = document.getElementById(menuId);
+            const allMenus = document.querySelectorAll('[id^="menu-"]');
+            allMenus.forEach(m => {
+                if (m.id !== menuId) m.classList.add('hidden');
+            });
+            menu.classList.toggle('hidden');
+        }
 
-    hideLoading();
-</script>
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('button[onclick^="toggleMenu"]')) {
+                document.querySelectorAll('[id^="menu-"]').forEach(menu => menu.classList.add('hidden'));
+            }
+        });
+
+        // Initialize display
+        if (totalItems === 0) {
+            emptyState.classList.remove('hidden');
+            document.getElementById('sales-history').classList.add('hidden');
+            document.getElementById('expenses-list').classList.add('hidden');
+        }
+
+        hideLoading();
+    </script>
 {% endblock %}
