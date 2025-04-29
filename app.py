@@ -14,6 +14,9 @@ from functools import wraps
 from firebase_admin.auth import UserNotFoundError
 import logging
 from google.cloud.firestore_v1 import FieldFilter
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
 
 app = Flask(__name__)
 logger = logging.getLogger(__name__)
@@ -22,6 +25,14 @@ if not app.secret_key:
     raise ValueError("FLASK_SECRET_KEY environment variable must be set")
 csrf = CSRFProtect(app)
 app.jinja_env.globals['csrf_token'] = lambda: session.get('_csrf_token', '')
+
+limiter = Limiter(
+    app,
+    key_func=get_remote_address,  # Rate limit based on IP address
+    default_limits=["200 per day", "50 per hour"]  # Global limits for the app
+)
+logger.info("Flask-Limiter initialized for rate limiting.")
+
 
 # Initialize Firebase
 cred_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
@@ -44,7 +55,31 @@ stock_cache = {
 
 with open('firebase_config.json', 'r') as f:
     firebase_config = json.load(f)
-    
+
+# Counter to track writes to web_users collection
+# We'll store this in Firestore under a "metadata" collection for persistence
+def get_web_users_write_count():
+    try:
+        metadata_doc = db_signup.collection('metadata').document('write_counters').get()
+        if metadata_doc.exists:
+            return metadata_doc.to_dict().get('web_users_writes', 0)
+        else:
+            # Initialize the counter if it doesn't exist
+            db_signup.collection('metadata').document('write_counters').set({'web_users_writes': 0})
+            return 0
+    except Exception as e:
+        logger.error(f"Failed to fetch web_users write count: {str(e)}")
+        return 0  # Default to 0 on error to avoid blocking legitimate writes
+
+def increment_web_users_write_count():
+    try:
+        metadata_ref = db_signup.collection('metadata').document('write_counters')
+        current_count = get_web_users_write_count()
+        metadata_ref.set({'web_users_writes': current_count + 1}, merge=True)
+        logger.debug(f"Incremented web_users write count to {current_count + 1}")
+    except Exception as e:
+        logger.error(f"Failed to increment web_users write count: {str(e)}")
+           
 # Custom Jinja2 filter for pluralization
 def pluralize_filter(value, singular='', plural='s'):
     if isinstance(value, (int, float)) and value != 1:
@@ -448,9 +483,17 @@ def orders_data():
 
     return jsonify(orders_list)
 
+# Rate limit the /auth endpoint to prevent brute force attacks
 @app.route('/auth', methods=['GET', 'POST'])
+@limiter.limit("10 per minute;50 per hour")  # 10 requests per minute, 50 per hour per IP
 def auth_route():
+    # Log the request
+    ip_address = request.remote_addr
+    logger.debug(f"Received request to /auth from IP: {ip_address}, Method: {request.method}")
+
+    # Check if user is already logged in
     if 'user' in session:
+        logger.info(f"User already logged in, redirecting to dashboard. IP: {ip_address}")
         return redirect(url_for('dashboard'))
 
     if request.method == 'POST':
@@ -458,6 +501,16 @@ def auth_route():
 
         if form_type == 'signup':
             try:
+                # Check the current write count for web_users
+                write_count = get_web_users_write_count()
+                max_writes = 50  # Temporary limit
+                if write_count >= max_writes:
+                    logger.warning(f"Write limit of {max_writes} reached for web_users collection. Blocking signup. IP: {ip_address}")
+                    return jsonify({
+                        "status": "error",
+                        "error": "Signup limit reached. Please try again later or contact support."
+                    }), 429  # 429 Too Many Requests
+
                 email = request.form['email']
                 first_name = request.form['firstName']
                 last_name = request.form['lastName']
@@ -468,7 +521,7 @@ def auth_route():
                 user = auth.get_user_by_email(email)
 
                 # Save additional user data to Firestore with status as "pending"
-                db.collection('web_users').document(user.uid).set({
+                db_signup.collection('web_users').document(user.uid).set({
                     'email': email,
                     'firstName': first_name,
                     'lastName': last_name,
@@ -478,6 +531,10 @@ def auth_route():
                     'created_at': firestore.SERVER_TIMESTAMP
                 })
 
+                # Increment the write counter
+                increment_web_users_write_count()
+
+                logger.info(f"Signup successful for email: {email}, UID: {user.uid}, IP: {ip_address}")
                 # Redirect to /awaiting with email as query parameter
                 return jsonify({
                     "status": "success",
@@ -486,13 +543,28 @@ def auth_route():
                 })
 
             except auth.EmailAlreadyExistsError:
+                logger.warning(f"Signup failed: Email already exists. Email: {email}, IP: {ip_address}")
                 return jsonify({"status": "error", "error": "Email already exists. Try logging in."}), 400
-            except UserNotFoundError:
+            except auth.UserNotFoundError:
+                logger.warning(f"Signup failed: User not found in Firebase Auth. Email: {email}, IP: {ip_address}")
                 return jsonify({"status": "error", "error": "User not found. Did you sign up with Firebase first?"}), 404
             except Exception as e:
+                logger.error(f"Signup failed for email {email}: {str(e)}, IP: {ip_address}")
+                # Log failed attempt to Firestore for monitoring
+                try:
+                    db_signup.collection('failed_attempts').add({
+                        'error': str(e),
+                        'ip': ip_address,
+                        'timestamp': firestore.SERVER_TIMESTAMP,
+                        'context': 'signup'
+                    })
+                    logger.debug(f"Logged failed signup attempt for IP: {ip_address}")
+                except Exception as db_error:
+                    logger.error(f"Failed to log signup attempt to Firestore: {str(db_error)}")
                 return jsonify({"status": "error", "error": f"Signup failed: {str(e)}"}), 500
 
     # GET request: render the auth page
+    logger.debug(f"Rendering auth.html for IP: {ip_address}")
     return render_template('auth.html', error=None, signup_success=False)
 
 @app.route('/awaiting', methods=['GET'])
