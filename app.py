@@ -14,8 +14,10 @@ from functools import wraps
 from firebase_admin.auth import UserNotFoundError
 import logging
 from google.cloud.firestore_v1 import FieldFilter
+import flask_wtf
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+
 
 
 app = Flask(__name__)
@@ -44,8 +46,7 @@ else:
     firebase_admin.initialize_app()
 
 db = firestore.client()
-# Set Kenyan timezone
-KENYA_TZ = pytz.timezone('Africa/Nairobi')
+
 # In-memory cache
 stock_cache = {
     'data': None,
@@ -99,14 +100,30 @@ def no_cache(f):
         response.headers['Expires'] = '0'
         return response
     return decorated_function
-    
+
+# Set Kenyan timezone
+# Define Nairobi timezone (UTC+3, no DST)
+NAIROBI_TZ = pytz.timezone('Africa/Nairobi')  
 def process_date(date_value):
-    """Convert a date value to a datetime object in Kenyan timezone."""
-    if isinstance(date_value, datetime):
-        return KENYA_TZ.localize(date_value) if date_value.tzinfo is None else date_value
-    elif isinstance(date_value, str):
-        return KENYA_TZ.localize(datetime.strptime(date_value, '%Y-%m-%d'))
-    return datetime.now(KENYA_TZ)
+    """Convert a date value to a datetime object in Nairobi timezone."""
+    try:
+        if isinstance(date_value, datetime):
+            # If the datetime object has no timezone, localize it to Nairobi
+            if date_value.tzinfo is None:
+                return NAIROBI_TZ.localize(date_value)
+            # If it already has a timezone, convert it to Nairobi
+            return date_value.astimezone(NAIROBI_TZ)
+        elif isinstance(date_value, str):
+            # Parse the string and localize it to Nairobi
+            parsed_date = datetime.strptime(date_value, '%Y-%m-%d')
+            return NAIROBI_TZ.localize(parsed_date)
+        else:
+            # Return the current time in Nairobi
+            return datetime.now(NAIROBI_TZ)
+    except Exception as e:
+        logger.error(f"Error processing date: {str(e)}")
+        # Fallback to current Nairobi time on error
+        return datetime.now(NAIROBI_TZ)
 
 def log_user_action(action_type, details):
     """Log user actions to Firestore for auditing."""
@@ -596,46 +613,57 @@ def check_approval_status():
     except Exception as e:
         return jsonify({"status": "error", "error": str(e)}), 500
     
-@app.route('/login', methods=['POST'])
+@app.route('/login', methods=['GET', 'POST'])
 def login():
-    try:
-        id_token = request.form['id_token']
-        # Verify the ID token using Firebase Admin SDK
-        decoded_token = auth.verify_id_token(id_token)
-        uid = decoded_token['uid']
-        email = decoded_token['email']
+    """Handle both GET (render login page) and POST (process login)."""
+    if request.method == 'POST':
+        try:
+            id_token = request.form['id_token']
+            # Verify the ID token using Firebase Admin SDK
+            decoded_token = auth.verify_id_token(id_token)
+            uid = decoded_token['uid']
+            email = decoded_token['email']
 
-        # Check if email is verified
-        user = auth.get_user(uid)
-        if not user.email_verified:
-            return jsonify({'error': 'Please verify your email before logging in.'}), 403
+            # Check if email is verified
+            user = auth.get_user(uid)
+            if not user.email_verified:
+                logger.warning(f"Login attempt failed for email {email}: Email not verified")
+                return jsonify({'error': 'Please verify your email before logging in.'}), 403
 
-        # Fetch user data from Firestore
-        user_doc = db.collection('web_users').where('email', '==', email).limit(1).get()
-        if not user_doc:
-            return jsonify({'error': 'User not found in Firestore.'}), 400
+            # Fetch user data from Firestore
+            user_doc = db_signup.collection('web_users').where('email', '==', email).limit(1).get()
+            if not user_doc:
+                logger.warning(f"Login attempt failed: User with email {email} not found in Firestore")
+                return jsonify({'error': 'User not found in Firestore.'}), 400
 
-        stored_user = user_doc[0].to_dict()
-        
-        # Check if the user's status is "approved"
-        status = stored_user.get('status', 'pending')  # Default to 'pending' if status is missing
-        if status != 'approved':
-            return jsonify({'error': 'Your account is not approved. Current status: ' + status}), 403
+            stored_user = user_doc[0].to_dict()
+            
+            # Check if the user's status is "approved"
+            status = stored_user.get('status', 'pending')
+            if status != 'approved':
+                logger.warning(f"Login attempt failed for email {email}: Account not approved, status={status}")
+                return jsonify({'error': 'Your account is not approved. Current status: ' + status}), 403
 
-        # Set session
-        session['user'] = {
-            'uid': uid,
-            'email': email,
-            'role': stored_user.get('role', 'pending'),
-            'firstName': stored_user.get('firstName', ''),
-            'lastName': stored_user.get('lastName', '')
-        }
-        return jsonify({'status': 'success'}), 200
+            # Set session
+            session['user'] = {
+                'uid': uid,
+                'email': email,
+                'role': stored_user.get('role', 'pending'),
+                'firstName': stored_user.get('firstName', ''),
+                'lastName': stored_user.get('lastName', '')
+            }
+            logger.info(f"User logged in successfully: email={email}, uid={uid}")
+            return jsonify({'status': 'success', 'redirect': url_for('dashboard')}), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        except Exception as e:
+            logger.error(f"Login failed for email {email}: {str(e)}")
+            return jsonify({'error': str(e)}), 400
 
-# Placeholder for dashboard (ensure this exists	
+    # GET request: Render the login page
+    logger.debug("Serving login.html")
+    response = make_response(render_template('login.html', firebase_config=firebase_config))
+    return response
+    
 @app.route('/dashboard', methods=['GET'])
 @no_cache
 @login_required
