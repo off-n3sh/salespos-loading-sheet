@@ -58,29 +58,30 @@ stock_cache = {
 with open('firebase_config.json', 'r') as f:
     firebase_config = json.load(f)
 
-# Counter to track writes to web_users collection
-# We'll store this in Firestore under a "metadata" collection for persistence
+#get_web_users_write_count
 def get_web_users_write_count():
     try:
-        metadata_doc = db_signup.collection('metadata').document('write_counters').get()
+        metadata_doc = db.collection('metadata').document('write_counters').get()  # Use db
         if metadata_doc.exists:
             return metadata_doc.to_dict().get('web_users_writes', 0)
         else:
-            # Initialize the counter if it doesn't exist
-            db_signup.collection('metadata').document('write_counters').set({'web_users_writes': 0})
+            db.collection('metadata').document('write_counters').set({'web_users_writes': 0})  # Use db
             return 0
     except Exception as e:
         logger.error(f"Failed to fetch web_users write count: {str(e)}")
-        return 0  # Default to 0 on error to avoid blocking legitimate writes
-
+        return 0
+        
+#increment_web_users_write_count        
 def increment_web_users_write_count():
     try:
-        metadata_ref = db_signup.collection('metadata').document('write_counters')
+        metadata_ref = db.collection('metadata').document('write_counters')  # Use db
         current_count = get_web_users_write_count()
         metadata_ref.set({'web_users_writes': current_count + 1}, merge=True)
         logger.debug(f"Incremented web_users write count to {current_count + 1}")
     except Exception as e:
         logger.error(f"Failed to increment web_users write count: {str(e)}")
+
+
            
 # Custom Jinja2 filter for pluralization
 def pluralize_filter(value, singular='', plural='s'):
@@ -503,13 +504,11 @@ def orders_data():
 
 # Rate limit the /auth endpoint to prevent brute force attacks
 @app.route('/auth', methods=['GET', 'POST'])
-@limiter.limit("10 per minute;50 per hour")  # 10 requests per minute, 50 per hour per IP
+@limiter.limit("10 per minute;50 per hour")
 def auth_route():
-    # Log the request
     ip_address = request.remote_addr
     logger.debug(f"Received request to /auth from IP: {ip_address}, Method: {request.method}")
 
-    # Check if user is already logged in
     if 'user' in session:
         logger.info(f"User already logged in, redirecting to dashboard. IP: {ip_address}")
         return redirect(url_for('dashboard'))
@@ -519,15 +518,14 @@ def auth_route():
 
         if form_type == 'signup':
             try:
-                # Check the current write count for web_users
                 write_count = get_web_users_write_count()
-                max_writes = 50  # Temporary limit
+                max_writes = 50
                 if write_count >= max_writes:
                     logger.warning(f"Write limit of {max_writes} reached for web_users collection. Blocking signup. IP: {ip_address}")
                     return jsonify({
                         "status": "error",
                         "error": "Signup limit reached. Please try again later or contact support."
-                    }), 429  # 429 Too Many Requests
+                    }), 429
 
                 email = request.form['email']
                 first_name = request.form['firstName']
@@ -535,25 +533,22 @@ def auth_route():
                 phone = request.form['phone']
                 role = request.form['role']
 
-                # Fetch the user from Firebase Auth to get the UID
                 user = auth.get_user_by_email(email)
 
-                # Save additional user data to Firestore with status as "pending"
-                db_signup.collection('web_users').document(user.uid).set({
+                # Save additional user data to Firestore
+                db.collection('web_users').document(user.uid).set({  # Use db
                     'email': email,
                     'firstName': first_name,
                     'lastName': last_name,
                     'phone': phone,
                     'role': role,
-                    'status': 'pending',  # Add status field
+                    'status': 'pending',
                     'created_at': firestore.SERVER_TIMESTAMP
                 })
 
-                # Increment the write counter
                 increment_web_users_write_count()
 
                 logger.info(f"Signup successful for email: {email}, UID: {user.uid}, IP: {ip_address}")
-                # Redirect to /awaiting with email as query parameter
                 return jsonify({
                     "status": "success",
                     "message": "Signup successful! Awaiting approval.",
@@ -568,9 +563,8 @@ def auth_route():
                 return jsonify({"status": "error", "error": "User not found. Did you sign up with Firebase first?"}), 404
             except Exception as e:
                 logger.error(f"Signup failed for email {email}: {str(e)}, IP: {ip_address}")
-                # Log failed attempt to Firestore for monitoring
                 try:
-                    db_signup.collection('failed_attempts').add({
+                    db.collection('failed_attempts').add({  # Use db
                         'error': str(e),
                         'ip': ip_address,
                         'timestamp': firestore.SERVER_TIMESTAMP,
@@ -581,7 +575,6 @@ def auth_route():
                     logger.error(f"Failed to log signup attempt to Firestore: {str(db_error)}")
                 return jsonify({"status": "error", "error": f"Signup failed: {str(e)}"}), 500
 
-    # GET request: render the auth page
     logger.debug(f"Rendering auth.html for IP: {ip_address}")
     return render_template('auth.html', error=None, signup_success=False)
 
@@ -620,32 +613,28 @@ def login():
     if request.method == 'POST':
         try:
             id_token = request.form['id_token']
-            # Verify the ID token using Firebase Admin SDK
             decoded_token = auth.verify_id_token(id_token)
             uid = decoded_token['uid']
             email = decoded_token['email']
 
-            # Check if email is verified
             user = auth.get_user(uid)
             if not user.email_verified:
                 logger.warning(f"Login attempt failed for email {email}: Email not verified")
                 return jsonify({'error': 'Please verify your email before logging in.'}), 403
 
             # Fetch user data from Firestore
-            user_doc = db_signup.collection('web_users').where('email', '==', email).limit(1).get()
+            user_doc = db.collection('web_users').where('email', '==', email).limit(1).get()  # Use db
             if not user_doc:
                 logger.warning(f"Login attempt failed: User with email {email} not found in Firestore")
                 return jsonify({'error': 'User not found in Firestore.'}), 400
 
             stored_user = user_doc[0].to_dict()
             
-            # Check if the user's status is "approved"
             status = stored_user.get('status', 'pending')
             if status != 'approved':
                 logger.warning(f"Login attempt failed for email {email}: Account not approved, status={status}")
                 return jsonify({'error': 'Your account is not approved. Current status: ' + status}), 403
 
-            # Set session
             session['user'] = {
                 'uid': uid,
                 'email': email,
@@ -660,7 +649,6 @@ def login():
             logger.error(f"Login failed for email {email}: {str(e)}")
             return jsonify({'error': str(e)}), 400
 
-    # GET request: Render the login page
     logger.debug("Serving login.html")
     response = make_response(render_template('login.html', firebase_config=firebase_config))
     return response
@@ -677,7 +665,7 @@ def dashboard():
     search_query = request.args.get('search', '').strip()
 
     # Initialize Firestore client and set today's date range
-    db = firestore.Client()
+    #db = firestore.Client()
     now = datetime.now(NAIROBI_TZ)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     today_end = today_start + timedelta(days=1)
