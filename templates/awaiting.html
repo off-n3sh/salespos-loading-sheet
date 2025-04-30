@@ -7,10 +7,55 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link href="{{ url_for('static', filename='css/awaiting.css') }}" rel="stylesheet">
+    <style>
+        /* Animated gradient background */
+        body {
+            background: linear-gradient(45deg, #1e3a8a, #3b82f6, #1e3a8a, #3b82f6);
+            background-size: 400%;
+            animation: gradientAnimation 15s ease infinite;
+        }
+
+        @keyframes gradientAnimation {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* Subtle pulse animation for the card */
+        .card {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+        }
+
+        /* Loading bar animation */
+        .loading-bar {
+            background: #374151;
+            height: 4px;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .loading-bar-fill {
+            width: 0;
+            height: 100%;
+            background: #3b82f6;
+            animation: load 3s infinite;
+        }
+
+        @keyframes load {
+            0% { width: 0; }
+            50% { width: 100%; }
+            100% { width: 0; }
+        }
+    </style>
 </head>
-<body class="bg-gray-900 min-h-screen flex items-center justify-center">
+<body class="min-h-screen flex items-center justify-center">
     <div class="fixed inset-0 overflow-hidden z-0">
-        <div class="absolute inset-0 bg-gradient-to-br from-blue-400 to-gray-900 opacity-80"></div>
         <!-- Watermark: Powered by Off-Nesh Securities -->
         <div class="absolute bottom-4 right-4 text-white opacity-50 text-sm flex items-center space-x-2">
             <span>Powered by</span>
@@ -18,7 +63,7 @@
         </div>
     </div>
 
-    <div class="w-full max-w-md bg-white/10 backdrop-blur-sm p-8 rounded-lg shadow-xl z-10 animate-slide-in">
+    <div class="w-full max-w-md bg-white/10 backdrop-blur-sm p-8 rounded-lg shadow-xl z-10 card">
         <div class="text-center">
             <div class="flex items-center justify-center mb-4">
                 <div class="h-10 w-10 rounded-lg bg-blue-400 flex items-center justify-center">
@@ -31,40 +76,79 @@
             <div class="loading-bar mb-4">
                 <div class="loading-bar-fill"></div>
             </div>
-            <p class="text-sm text-gray-300 loading-text">Assigning roles & updating info...</p>
+            <p class="text-sm text-gray-300 loading-text">Checking user status...</p>
             <p class="text-sm text-gray-400 mt-4">Check your inbox (and spam folder) for the verification email. Return to <a href="/login" class="text-blue-400 hover:underline">Login</a> after approval.</p>
+            <!-- Catchy Tagline -->
+            <p class="text-lg font-semibold text-blue-300 mt-6 animate-pulse">"You Order at a Low Price, We Deliver High Value!"</p>
         </div>
     </div>
 
     <script>
-        // Function to check approval status
-        function checkApprovalStatus() {
+        // Dynamic loading messages
+        const loadingMessages = [
+            "Checking user status...",
+            "Verifying email confirmation...",
+            "Approving privileges...",
+            "Setting up your profile...",
+            "Assigning roles & permissions...",
+            "Syncing with admin panel...",
+            "Preparing your dashboard...",
+            "Ensuring secure access..."
+        ];
+
+        let messageIndex = 0;
+        const loadingText = document.querySelector('.loading-text');
+
+        function updateLoadingMessage() {
+            loadingText.textContent = loadingMessages[messageIndex];
+            messageIndex = (messageIndex + 1) % loadingMessages.length;
+        }
+
+        // Update loading message every 3 seconds
+        setInterval(updateLoadingMessage, 3000);
+        updateLoadingMessage();
+
+        // Function to check approval status with exponential backoff
+        function checkApprovalStatus(attempt = 1, maxAttempts = 20) {
             fetch('/check_approval_status', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ email: "{{ user_email }}" })  // Pass email from template
+                body: JSON.stringify({ email: "{{ user_email }}" })
             })
             .then(response => {
                 if (!response.ok) {
-                    throw new Error('Failed to check approval status');
+                    throw new Error(`HTTP error! Status: ${response.status}`);
                 }
                 return response.json();
             })
             .then(data => {
                 if (data.status === 'approved') {
-                    // Redirect to login page if approved
+                    console.log('User approved, redirecting to /login');
                     window.location.href = '/login';
+                } else {
+                    console.log('User status:', data.status);
+                    if (attempt < maxAttempts) {
+                        const delay = Math.min(10000 * Math.pow(2, attempt - 1), 300000);
+                        console.log(`Scheduling next check in ${delay/1000} seconds`);
+                        setTimeout(() => checkApprovalStatus(attempt + 1, maxAttempts), delay);
+                    } else {
+                        console.log('Max attempts reached, stopping polling');
+                        loadingText.textContent = 
+                            'Approval taking longer than expected. Please try logging in later or contact support.';
+                    }
                 }
             })
             .catch(error => {
                 console.error('Error checking approval status:', error);
+                if (attempt < maxAttempts) {
+                    const delay = Math.min(10000 * Math.pow(2, attempt - 1), 300000);
+                    console.log(`Error occurred, retrying in ${delay/1000} seconds`);
+                    setTimeout(() => checkApprovalStatus(attempt + 1, maxAttempts), delay);
+                }
             });
         }
-
-        // Poll for approval status every 10 seconds
-        setInterval(checkApprovalStatus, 10000);
 
         // Check immediately on page load
         checkApprovalStatus();
