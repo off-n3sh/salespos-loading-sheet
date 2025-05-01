@@ -1056,6 +1056,7 @@ def orders():
             'items': items,
             'payment': min(amount_paid, total_amount),
             'balance': balance,
+            'pending_payment': 0.0,  # Initialize pending_payment as 0
             'date': datetime.now(NAIROBI_TZ),
             'order_type': order_type,
             'closed_date': datetime.now(NAIROBI_TZ) if balance == 0 else None
@@ -1072,7 +1073,6 @@ def orders():
             new_debt = client_data.get('debt', 0) + balance
             db.collection('clients').document(client_doc.id).update({'debt': new_debt})
         else:
-            # If client doesn't exist, create a new client entry without phone
             db.collection('clients').document(shop_name.replace('/', '-')).set({
                 'shop_name': shop_name,
                 'debt': balance,
@@ -1083,7 +1083,7 @@ def orders():
         log_user_action('Opened Order', f"Order #{receipt_id} - {order_type} for {shop_name}")
         return '', 200
     
-    # GET method remains unchanged
+    # GET method unchanged
     orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).stream()
     orders = []
     for doc in orders_ref:
