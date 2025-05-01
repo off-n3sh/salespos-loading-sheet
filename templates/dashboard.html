@@ -68,9 +68,9 @@
                 <div class="flex items-center justify-between relative z-10">
                     <div>
                         <h3 class="text-lg font-medium text-blue-100">Today's Business Total Sales</h3>
-                        <p class="text-4xl font-bold mt-2">{{ total_sales_today | round(2) | default(0) }}</p>
+                        <p class="text-4xl font-bold mt-2">KSh {{ total_sales_today | round(2) | default(0) }}</p>
                         <p class="text-blue-100 mt-2 text-sm">
-                            Today's performance ({{ open_orders_count }} open, {{ closed_orders_count }} closed)
+                            Today's performance ({{ open_orders_count }} open, {{ closed_orders_count }} closed) - Resets daily at midnight
                         </p>
                     </div>
                     <div class="bg-white bg-opacity-20 p-4 rounded-full">
@@ -88,9 +88,9 @@
                     <div class="flex justify-between items-start">
                         <div>
                             <h3 class="text-gray-500 dark:text-gray-400 text-sm font-medium">Walk-in Customers</h3>
-                            <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ retail_sales_today | round(2) | default(0) }}</p>
+                            <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">KSh {{ retail_sales_today | round(2) | default(0) }}</p>
                             <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                {{ retail_open_orders }} open, {{ retail_closed_orders }} closed
+                                {{ retail_open_orders }} open, {{ retail_closed_orders }} closed - Includes partial payments made today
                             </div>
                         </div>
                         <div class="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
@@ -106,9 +106,9 @@
                     <div class="flex justify-between items-start">
                         <div>
                             <h3 class="text-gray-500 dark:text-gray-400 text-sm font-medium">Business Clients</h3>
-                            <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ wholesale_sales_today | round(2) | default(0) }}</p>
+                            <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">KSh {{ wholesale_sales_today | round(2) | default(0) }}</p>
                             <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                {{ wholesale_open_orders }} open, {{ wholesale_closed_orders }} closed
+                                {{ wholesale_open_orders }} open, {{ wholesale_closed_orders }} closed - Includes partial payments made today
                             </div>
                         </div>
                         <div class="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
@@ -133,7 +133,7 @@
                         </svg>
                     </div>
                 </div>
-                <p class="text-2xl font-bold text-red-600 dark:text-red-400 mt-3">{{ total_debts | round(2) | default(0) }}</p>
+                <p class="text-2xl font-bold text-red-600 dark:text-red-400 mt-3">KSh {{ total_debts | round(2) | default(0) }}</p>
                 <div class="mt-4 text-xs text-gray-500 dark:text-gray-400">
                     Total pending collections
                 </div>
@@ -149,7 +149,7 @@
                         </svg>
                     </div>
                 </div>
-                <p class="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-3">{{ total_expenses | round(2) | default(0) }}</p>
+                <p class="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-3">KSh {{ total_expenses | round(2) | default(0) }}</p>
                 <div class="mt-4 text-xs text-gray-500 dark:text-gray-400">
                     Business costs and expenses
                 </div>
@@ -238,6 +238,15 @@
                                 <div class="text-sm text-gray-500 dark:text-gray-400">{{ sale.salesperson_name | default('N/A') }}</div>
                                 <div class="text-sm text-gray-500 dark:text-gray-400">
                                     Ordered: {{ sale.date.strftime('%d/%m/%Y %H:%M:%S') }}
+                                    {% set payment_made_today = false %}
+                                    {% set payment_amount_today = 0 %}
+                                    {% for payment_entry in sale.payment_history %}
+                                        {% if payment_entry.date >= today_start and payment_entry.date < today_end %}
+                                            {% set payment_made_today = true %}
+                                            {% set payment_amount_today = payment_amount_today + payment_entry.amount %}
+                                            <br>Payment Today: KSh {{ payment_entry.amount | round(2) }} at {{ payment_entry.date.strftime('%d/%m/%Y %H:%M:%S') }}
+                                        {% endif %}
+                                    {% endfor %}
                                     {% if sale.closed_date and sale.closed_date >= today_start and sale.closed_date < today_end and sale.balance <= 0 %}
                                         <br>Closed Today: {{ sale.closed_date.strftime('%d/%m/%Y %H:%M:%S') }}
                                     {% endif %}
@@ -253,6 +262,9 @@
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
                                 {{ sale.payment | round(2) }}/{{ (sale.payment + sale.balance) | round(2) }}
+                                {% if payment_made_today %}
+                                    <br><span class="text-green-600 dark:text-green-400">(+{{ payment_amount_today | round(2) }} today)</span>
+                                {% endif %}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <span class="px-2 py-1 rounded-full text-xs font-medium {% if sale.balance > 0 %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200{% else %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% endif %}">
@@ -272,6 +284,9 @@
                                         <a href="{{ url_for('load_to_loading_sheet', receipt_id=sale.receipt_id, action='current') }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Add to Current Loading Sheet</a>
                                         <a href="{{ url_for('load_to_loading_sheet', receipt_id=sale.receipt_id, action='new') }}" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Start New Loading Sheet</a>
                                     </div>
+                                    {% endif %}
+                                    {% if sale.balance > 0 %}
+                                    <a href="#" onclick="showPaymentForm('{{ sale.receipt_id }}', '{{ sale.balance | round(2) }}')" class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Make Payment</a>
                                     {% endif %}
                                 </div>
                             </td>
@@ -302,6 +317,29 @@
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+
+        <!-- Payment Modal -->
+        <div id="payment-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">Make Payment</h3>
+                    <button id="close-payment-modal" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <form id="payment-form" class="mt-4">
+                    <input type="hidden" id="payment-order-id" name="order_id">
+                    <div class="mb-4">
+                        <label for="payment-amount" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Amount (KSh)</label>
+                        <input type="number" id="payment-amount" name="payment_amount" step="0.01" min="0" class="mt-1 p-2 w-full border rounded-md dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                        <p id="remaining-balance" class="text-sm text-gray-500 dark:text-gray-400 mt-1"></p>
+                    </div>
+                    <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 focus:outline-none">Submit Payment</button>
+                </form>
+            </div>
         </div>
 
         <!-- Pagination Controls -->
@@ -345,6 +383,12 @@
         const nextPageBtn = document.getElementById('next-page');
         const pageInfo = document.getElementById('page-info');
         const pageEntries = document.getElementById('page-entries');
+        const paymentModal = document.getElementById('payment-modal');
+        const closePaymentModal = document.getElementById('close-payment-modal');
+        const paymentForm = document.getElementById('payment-form');
+        const paymentOrderId = document.getElementById('payment-order-id');
+        const paymentAmount = document.getElementById('payment-amount');
+        const remainingBalance = document.getElementById('remaining-balance');
         const currentStatusFilter = '{{ status_filter }}';
         const totalItems = {{ total_items }};
         const totalPages = {{ total_pages }};
@@ -449,6 +493,42 @@
             });
             menu.classList.toggle('hidden');
         }
+
+        function showPaymentForm(orderId, balance) {
+            paymentOrderId.value = orderId;
+            paymentAmount.value = '';
+            remainingBalance.textContent = `Remaining Balance: KSh ${balance}`;
+            paymentModal.classList.remove('hidden');
+        }
+
+        closePaymentModal.addEventListener('click', () => {
+            paymentModal.classList.add('hidden');
+        });
+
+        paymentForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            showLoading();
+            const formData = new FormData(paymentForm);
+            fetch(`/make_payment/${paymentOrderId.value}`, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                if (data.success) {
+                    paymentModal.classList.add('hidden');
+                    window.location.reload();
+                } else {
+                    alert(data.error || 'Error making payment');
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                console.error('Error:', error);
+                alert('Error making payment');
+            });
+        });
 
         document.addEventListener('click', (e) => {
             if (!e.target.closest('button[onclick^="toggleMenu"]')) {
