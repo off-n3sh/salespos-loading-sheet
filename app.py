@@ -665,7 +665,6 @@ def dashboard():
     search_query = request.args.get('search', '').strip()
 
     # Initialize Firestore client and set today's date range
-    #db = firestore.Client()
     now = datetime.now(NAIROBI_TZ)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     today_end = today_start + timedelta(days=1)
@@ -716,7 +715,8 @@ def dashboard():
                     'balance': balance,
                     'date': process_date(order_dict.get('date')),
                     'closed_date': closed_date,
-                    'order_type': order_dict.get('order_type', 'wholesale')
+                    'order_type': order_dict.get('order_type', 'wholesale'),
+                    'payment_history': order_dict.get('payment_history', [])  # Add payment history
                 })
     else:
         for doc in orders_ref.stream():
@@ -736,7 +736,8 @@ def dashboard():
                 'balance': balance,
                 'date': process_date(order_dict.get('date')),
                 'closed_date': closed_date,
-                'order_type': order_dict.get('order_type', 'wholesale')
+                'order_type': order_dict.get('order_type', 'wholesale'),
+                'payment_history': order_dict.get('payment_history', [])  # Add payment history
             })
 
     # Sort filtered orders by date (descending)
@@ -748,6 +749,17 @@ def dashboard():
         days = {}
         for order in filtered_orders:
             relevant_date = order['closed_date'] if (order['closed_date'] and order['closed_date'] >= today_start and order['closed_date'] < today_end and order['balance'] <= 0) else order['date']
+            # Check payment_history for payments made today
+            payment_made_today = False
+            payment_amount_today = 0
+            for payment_entry in order['payment_history']:
+                payment_date = process_date(payment_entry['date'])
+                if payment_date >= today_start and payment_date < today_end:
+                    payment_made_today = True
+                    payment_amount_today += float(payment_entry['amount'])
+            if payment_made_today:
+                relevant_date = now  # Use today's date for display if a payment was made today
+
             day_key = relevant_date.strftime('%Y-%m-%d')
             if day_key not in days:
                 days[day_key] = {
@@ -866,6 +878,7 @@ def dashboard():
         payment = float(order_dict.get('payment', 0))
         balance = float(order_dict.get('balance', 0))
         pending_payment = float(order_dict.get('pending_payment', 0))
+        payment_history = order_dict.get('payment_history', [])
         if balance > 0 and closed_date:
             closed_date = None
 
@@ -899,6 +912,22 @@ def dashboard():
                     wholesale_sales_today += payment
                     logger.debug(f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] Order {order_id} (created today): Added {payment} to wholesale_sales_today. Total now: {wholesale_sales_today}")
                 orders_with_payment_counted.add(order_id)
+
+        # Check payment_history for payments made today
+        for payment_entry in payment_history:
+            payment_date = process_date(payment_entry['date'])
+            payment_amount = float(payment_entry['amount'])
+            if payment_date >= today_start and payment_date < today_end:
+                if order_id not in orders_with_payment_counted and payment_amount > 0:
+                    if order_type == 'retail':
+                        retail_sales_today += payment_amount
+                        logger.debug(f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] Order {order_id} (partial payment today): Added {payment_amount} to retail_sales_today. Total now: {retail_sales_today}")
+                    else:
+                        wholesale_sales_today += payment_amount
+                        logger.debug(f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] Order {order_id} (partial payment today): Added {payment_amount} to wholesale_sales_today. Total now: {wholesale_sales_today}")
+                    orders_with_payment_counted.add(order_id)
+
+        # Still account for orders fully closed today
         if closed_date and closed_date >= today_start and closed_date < today_end:
             # Order closed today (either new or pending)
             amount_to_add = pending_payment if pending_payment > 0 else payment
@@ -1038,10 +1067,11 @@ def dashboard_stats():
         payment = float(order_dict.get('payment', 0))
         balance = float(order_dict.get('balance', 0))
         pending_payment = float(order_dict.get('pending_payment', 0))
+        payment_history = order_dict.get('payment_history', [])
         if balance > 0 and closed_date:
             closed_date = None
 
-        # Update open/closed counts
+        # Update open/closed counts for today
         if order_date >= today_start and order_date < today_end:
             if balance > 0:
                 open_orders_count += 1
@@ -1071,6 +1101,22 @@ def dashboard_stats():
                     wholesale_sales_today += payment
                     logger.debug(f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] /dashboard_stats - Order {order_id} (created today): Added {payment} to wholesale_sales_today. Total now: {wholesale_sales_today}")
                 orders_with_payment_counted.add(order_id)
+
+        # Check payment_history for payments made today
+        for payment_entry in payment_history:
+            payment_date = process_date(payment_entry['date'])
+            payment_amount = float(payment_entry['amount'])
+            if payment_date >= today_start and payment_date < today_end:
+                if order_id not in orders_with_payment_counted and payment_amount > 0:
+                    if order_type == 'retail':
+                        retail_sales_today += payment_amount
+                        logger.debug(f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] /dashboard_stats - Order {order_id} (partial payment today): Added {payment_amount} to retail_sales_today. Total now: {retail_sales_today}")
+                    else:
+                        wholesale_sales_today += payment_amount
+                        logger.debug(f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] /dashboard_stats - Order {order_id} (partial payment today): Added {payment_amount} to wholesale_sales_today. Total now: {wholesale_sales_today}")
+                    orders_with_payment_counted.add(order_id)
+
+        # Orders fully closed today
         if closed_date and closed_date >= today_start and closed_date < today_end:
             # Order closed today (either new or pending)
             amount_to_add = pending_payment if pending_payment > 0 else payment
@@ -1114,7 +1160,8 @@ def dashboard_stats():
         'retail_closed_orders': retail_closed_orders,
         'wholesale_open_orders': wholesale_open_orders,
         'wholesale_closed_orders': wholesale_closed_orders
-    })              
+    })
+                
 @app.route('/orders', methods=['GET', 'POST'])
 @no_cache
 @login_required
@@ -1158,6 +1205,11 @@ def orders():
         
         receipt_id = get_next_receipt_id()
         balance = max(total_amount - amount_paid, 0)
+        # Initialize payment_history with the initial payment
+        payment_history = [{
+            'amount': min(amount_paid, total_amount),
+            'date': datetime.now(NAIROBI_TZ)
+        }] if amount_paid > 0 else []
         order_data = {
             'receipt_id': receipt_id,
             'salesperson_name': salesperson_name,
@@ -1167,7 +1219,8 @@ def orders():
             'items': items,
             'payment': min(amount_paid, total_amount),
             'balance': balance,
-            'pending_payment': 0.0,  # Initialize pending_payment as 0
+            'pending_payment': 0.0,
+            'payment_history': payment_history,  # Add payment history
             'date': datetime.now(NAIROBI_TZ),
             'order_type': order_type,
             'closed_date': datetime.now(NAIROBI_TZ) if balance == 0 else None
@@ -1227,7 +1280,84 @@ def orders():
     recent_activity = orders[:3]
     stock_items = [doc.to_dict() for doc in db.collection('stock').order_by('stock_name').get()]
     return render_template('orders.html', orders=orders, recent_activity=recent_activity, stock_items=stock_items)
-        
+@app.route('/mark_paid/<order_id>', methods=['POST'])
+@no_cache
+@login_required
+def mark_paid(order_id):
+    orders_ref = db.collection('orders').where('receipt_id', '==', order_id).limit(1).stream()
+    order_doc = next(orders_ref, None)
+    if not order_doc:
+        return "Order not found", 404
+
+    try:
+        order_ref = db.collection('orders').document(order_doc.id)
+        order_dict = order_doc.to_dict()
+        current_payment = float(order_dict.get('payment', 0))
+        current_balance = float(order_dict.get('balance', 0))
+        amount_paid = float(request.form.get('amount_paid', 0))
+        now = datetime.now(NAIROBI_TZ)
+
+        if amount_paid <= 0:
+            return "Payment amount must be greater than 0", 400
+        if current_balance <= 0:
+            return "Order is already fully paid", 400
+
+        # Calculate new payment and balance
+        new_payment = current_payment + amount_paid
+        new_balance = max(current_balance - amount_paid, 0)
+        final_payment = amount_paid  # Only the new payment amount
+
+        # Update payment_history
+        payment_history = order_dict.get('payment_history', [])
+        payment_entry = {
+            'amount': amount_paid,
+            'date': now
+        }
+        payment_history.append(payment_entry)
+
+        # Prepare update data
+        update_data = {
+            'payment': new_payment,
+            'balance': new_balance,
+            'final_payment': final_payment,  # Overwrite with latest payment
+            'last_payment_date': now,
+            'payment_history': payment_history,  # Add to payment history
+            'pending_payment': amount_paid  # Set pending_payment for dashboard calculation
+        }
+
+        # Set closed_date if fully paid
+        if new_balance == 0 and current_balance > 0:
+            update_data['closed_date'] = now
+            notification_message = f"Order #{order_id} fully paid and closed on {now.strftime('%d/%m/%Y %H:%M')}"
+            log_user_action('Closed Order', f"Order #{order_id} marked fully paid")
+        else:
+            notification_message = f"Order #{order_id} partially paid. New balance: KSh {new_balance} on {now.strftime('%d/%m/%Y %H:%M')}"
+            log_user_action('Marked Paid', f"Order #{order_id} - Paid {amount_paid} KES, New Balance {new_balance} KES")
+
+        # Update the order in Firestore
+        order_ref.update(update_data)
+
+        # Update client's debt
+        shop_name = order_dict.get('shop_name')
+        client_ref = db.collection('clients').where('shop_name', '==', shop_name).limit(1).get()
+        if client_ref:
+            client_doc = client_ref[0]
+            client_data = client_doc.to_dict()
+            new_debt = max(client_data.get('debt', 0) - amount_paid, 0)
+            db.collection('clients').document(client_doc.id).update({'debt': new_debt})
+
+        # Create a notification
+        db.collection('notifications').add({
+            'recipient': order_dict.get('salesperson_id', ''),
+            'message': notification_message,
+            'timestamp': now,
+            'order_id': order_id,
+            'read': False
+        })
+
+        return redirect(url_for('dashboard', time='day'))
+    except Exception as e:
+        return f"Error updating order: {str(e)}", 500        
 # Updated /stock route
 @app.route('/stock', methods=['GET', 'POST'])
 @no_cache
@@ -1547,54 +1677,6 @@ def reports():
 
     return render_template('reports.html', orders=orders, stock_logs=stock_logs, expenses=expenses, user_actions=user_actions,
                           recent_activity=recent_activity, chart_data=chart_data, time_filter=time_filter, total_debt=total_debt)
-
-@app.route('/mark_paid/<order_id>', methods=['POST'])
-@no_cache
-@login_required
-def mark_paid(order_id):
-    orders_ref = db.collection('orders').where('receipt_id', '==', order_id).limit(1).stream()
-    order_doc = next(orders_ref, None)
-    if not order_doc:
-        return "Order not found", 404
-
-    try:
-        order_ref = db.collection('orders').document(order_doc.id)
-        order_dict = order_doc.to_dict()
-        current_payment = float(order_dict.get('payment', 0))
-        current_balance = float(order_dict.get('balance', 0))
-        amount_paid = float(request.form.get('amount_paid', 0))
-        now = datetime.now(NAIROBI_TZ)
-
-        new_payment = current_payment + amount_paid
-        new_balance = max(current_balance - amount_paid, 0)
-        final_payment = amount_paid  # Only the new payment amount
-
-        update_data = {
-            'payment': new_payment,
-            'balance': new_balance,
-            'final_payment': final_payment,  # Overwrite with latest payment
-            'last_payment_date': now
-        }
-        if new_balance == 0 and current_balance > 0:
-            update_data['closed_date'] = now
-            notification_message = f"Order #{order_id} fully paid and closed on {now.strftime('%d/%m/%Y %H:%M')}"
-            log_user_action('Closed Order', f"Order #{order_id} marked fully paid")
-        else:
-            notification_message = f"Order #{order_id} partially paid. New balance: KSh {new_balance} on {now.strftime('%d/%m/%Y %H:%M')}"
-            log_user_action('Marked Paid', f"Order #{order_id} - Paid {amount_paid} KES, New Balance {new_balance} KES")
-
-        order_ref.update(update_data)
-
-        db.collection('notifications').add({
-            'recipient': order_dict.get('salesperson_id', ''),
-            'message': notification_message,
-            'timestamp': now,
-            'order_id': order_id,
-            'read': False
-        })
-        return redirect(url_for('dashboard', time='day'))
-    except Exception as e:
-        return f"Error updating order: {str(e)}", 500@app.route('/mark_paid/<order_id>', methods=['POST'])
         
 
 @app.route('/return_stock/<order_id>', methods=['POST'])
