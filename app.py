@@ -2712,8 +2712,7 @@ def mark_notification_read(notification_id):
     except Exception as e:
         print(f"Error marking notification as read: {str(e)}")  # Log the error for debugging
         return f"Error marking notification as read: {str(e)}", 500
-
-// apis
+# apis
 # Middleware to verify Firebase token and role
 def require_firebase_auth(f):
     @wraps(f)
