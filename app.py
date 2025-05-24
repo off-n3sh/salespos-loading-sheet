@@ -17,10 +17,12 @@ from google.cloud.firestore_v1 import FieldFilter
 import flask_wtf
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-
+from flask_cors import CORS
+from firebase_admin import auth as firebase_auth
 
 
 app = Flask(__name__)
+CORS(app, origins=["https://loading-sheet-service-659593870090.europe-west1.run.app"])
 logger = logging.getLogger(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY')
 if not app.secret_key:
@@ -1205,7 +1207,6 @@ def orders():
         
         receipt_id = get_next_receipt_id()
         balance = max(total_amount - amount_paid, 0)
-        # Initialize payment_history with the initial payment
         payment_history = [{
             'amount': min(amount_paid, total_amount),
             'date': datetime.now(NAIROBI_TZ)
@@ -1220,16 +1221,19 @@ def orders():
             'payment': min(amount_paid, total_amount),
             'balance': balance,
             'pending_payment': 0.0,
-            'payment_history': payment_history,  # Add payment history
+            'payment_history': payment_history,
             'date': datetime.now(NAIROBI_TZ),
             'order_type': order_type,
-            'closed_date': datetime.now(NAIROBI_TZ) if balance == 0 else None
+            'closed_date': datetime.now(NAIROBI_TZ) if balance == 0 else None,
+            'tracking': {  # Add tracking field
+                'status': 'pending',
+                'last_updated': datetime.now(NAIROBI_TZ),
+                'notes': 'Order received, awaiting dispatch'
+            }
         }
         
-        # Write order to Firestore
         db.collection('orders').add(order_data)
         
-        # Check if client exists in the clients collection
         client_ref = db.collection('clients').where('shop_name', '==', shop_name).limit(1).get()
         if client_ref:
             client_doc = client_ref[0]
@@ -1280,6 +1284,7 @@ def orders():
     recent_activity = orders[:3]
     stock_items = [doc.to_dict() for doc in db.collection('stock').order_by('stock_name').get()]
     return render_template('orders.html', orders=orders, recent_activity=recent_activity, stock_items=stock_items)
+
 @app.route('/mark_paid/<order_id>', methods=['POST'])
 @no_cache
 @login_required
@@ -2707,3 +2712,396 @@ def mark_notification_read(notification_id):
     except Exception as e:
         print(f"Error marking notification as read: {str(e)}")  # Log the error for debugging
         return f"Error marking notification as read: {str(e)}", 500
+
+// apis
+# Middleware to verify Firebase token and role
+def require_firebase_auth(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        token = request.headers.get('Authorization', '').replace('Bearer ', '')
+        if not token:
+            return jsonify({"error": "Authorization token required"}), 401
+        try:
+            decoded_token = firebase_auth.verify_id_token(token)
+            request.user = decoded_token
+        except Exception as e:
+            logger.error(f"Token verification failed: {str(e)}")
+            return jsonify({"error": "Invalid token"}), 401
+        return f(*args, **kwargs)
+    return decorated_function
+
+def require_admin(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        user_id = request.user['uid']
+        user_doc = db.collection('users').document(user_id).get()
+        if not user_doc.exists or user_doc.to_dict().get('role') != 'admin':
+            return jsonify({"error": "Admin access required"}), 403
+        return f(*args, **kwargs)
+    return decorated_function
+
+# POST /api/orders - Remote users submit orders
+@app.route('/api/orders', methods=['POST'])
+@require_firebase_auth
+@no_cache
+@limiter.limit("10 per minute;50 per hour")  # Rate limit to prevent abuse
+def api_orders():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Request body must be JSON"}), 400
+
+        # Extract order details
+        shop_name = data.get('shop_name', 'Retail Direct')
+        salesperson_name = data.get('salesperson_name', 'N/A')
+        order_type = data.get('order_type', 'wholesale')
+        amount_paid = float(data.get('payment', 0) or 0)
+        items_raw = data.get('items', [])
+        payment_method = data.get('payment_method', 'N/A')
+        paybill_number = data.get('paybill_number', None)
+        account_number = data.get('account_number', None)
+        location = data.get('location', 'Unknown')
+
+        # Validate items
+        items = []
+        total_amount = 0
+        for i in range(0, len(items_raw), 2):
+            try:
+                if items_raw[i] != 'product':
+                    continue
+                product_name = items_raw[i + 1]
+                qty_index = i + 3 if i + 2 < len(items_raw) and items_raw[i + 2] == 'quantity' else None
+                price_index = i + 5 if i + 4 < len(items_raw) and items_raw[i + 4] == 'price' else None
+                if qty_index is None or price_index is None:
+                    continue
+                quantity = int(items_raw[qty_index]) if isinstance(items_raw[qty_index], (int, str)) else 0
+                price = float(items_raw[price_index]) if isinstance(items_raw[price_index], (int, float, str)) else 0
+                amount = quantity * price
+                if quantity > 0:
+                    total_amount += amount
+                    items.extend(['product', product_name, 'quantity', quantity, 'price', price])
+                    stock_ref = db.collection('stock').where('stock_name', '==', product_name).limit(1).get()
+                    if stock_ref:
+                        stock_doc = stock_ref[0]
+                        current_quantity = stock_doc.to_dict().get('stock_quantity', 0)
+                        if current_quantity >= quantity:
+                            db.collection('stock').document(stock_doc.id).update({'stock_quantity': current_quantity - quantity})
+                            log_stock_change(stock_doc.to_dict().get('category', 'Unknown'), product_name, 'order_reduction', -quantity, price)
+                        else:
+                            return jsonify({"error": f"Insufficient stock for {product_name}"}), 400
+                    else:
+                        return jsonify({"error": f"Stock item {product_name} not found"}), 404
+            except (IndexError, ValueError) as e:
+                logger.error(f"Error processing item {items_raw[i:i+6]}: {str(e)}")
+                continue
+
+        if not items:
+            return jsonify({"error": "No valid items in order"}), 400
+
+        receipt_id = get_next_receipt_id()
+        balance = max(total_amount - amount_paid, 0)
+        payment_history = [{
+            'amount': min(amount_paid, total_amount),
+            'date': datetime.now(NAIROBI_TZ)
+        }] if amount_paid > 0 else []
+
+        order_data = {
+            'receipt_id': receipt_id,
+            'salesperson_name': salesperson_name,
+            'shop_name': shop_name,
+            'salesperson_name_lower': salesperson_name.lower(),
+            'shop_name_lower': shop_name.lower(),
+            'items': items,
+            'payment': min(amount_paid, total_amount),
+            'balance': balance,
+            'pending_payment': 0.0,
+            'payment_history': payment_history,
+            'date': datetime.now(NAIROBI_TZ),
+            'order_type': order_type,
+            'closed_date': datetime.now(NAIROBI_TZ) if balance == 0 else None,
+            'payment_method': payment_method,
+            'paybill_number': paybill_number,
+            'account_number': account_number,
+            'location': location,
+            'tracking': {
+                'status': 'pending',
+                'last_updated': datetime.now(NAIROBI_TZ),
+                'notes': 'Order received, awaiting dispatch'
+            }
+        }
+
+        # Write order to Firestore
+        db.collection('orders').add(order_data)
+
+        # Update client debt
+        client_ref = db.collection('clients').where('shop_name', '==', shop_name).limit(1).get()
+        if client_ref:
+            client_doc = client_ref[0]
+            client_data = client_doc.to_dict()
+            new_debt = client_data.get('debt', 0) + balance
+            db.collection('clients').document(client_doc.id).update({'debt': new_debt})
+        else:
+            db.collection('clients').document(shop_name.replace('/', '-')).set({
+                'shop_name': shop_name,
+                'debt': balance,
+                'created_at': datetime.now(NAIROBI_TZ),
+                'location': location
+            })
+
+        log_user_action('Opened Order (API)', f"Order #{receipt_id} - {order_type} for {shop_name} via API")
+
+        # Return the order details as a receipt
+        return jsonify({
+            "receipt_id": receipt_id,
+            "shop_name": shop_name,
+            "salesperson_name": salesperson_name,
+            "items": items,
+            "payment": min(amount_paid, total_amount),
+            "balance": balance,
+            "date": order_data['date'].isoformat(),
+            "payment_method": payment_method,
+            "location": location
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error in /api/orders: {str(e)}")
+        return jsonify({"error": f"Failed to create order: {str(e)}"}), 500
+
+# GET /api/orders/history - Fetch user's order history
+@app.route('/api/orders/history', methods=['GET'])
+@require_firebase_auth
+@no_cache
+@limiter.limit("20 per minute;100 per hour")
+def api_order_history():
+    try:
+        user_id = request.user['uid']
+        time_filter = request.args.get('time_filter', 'all')
+        limit = int(request.args.get('limit', 50))
+
+        # Apply time filter
+        now = datetime.now(NAIROBI_TZ)
+        start = now
+        if time_filter == 'day':
+            start = now.replace(hour=0, minute=0, second=0)
+        elif time_filter == 'week':
+            start = now - timedelta(days=now.weekday())
+        elif time_filter == 'month':
+            start = now.replace(day=1)
+        elif time_filter == 'year':
+            start = now.replace(month=1, day=1)
+
+        query = (db.collection('orders')
+                 .where('salesperson_name', '==', f'User_{user_id}')
+                 .order_by('date', direction=firestore.Query.DESCENDING))
+        if time_filter != 'all':
+            query = query.where('date', '>=', start)
+
+        orders = []
+        for doc in query.limit(limit).stream():
+            order_dict = doc.to_dict()
+            order_dict['status'] = 'closed' if order_dict.get('closed_date') else ('pending' if order_dict.get('balance', 0) > 0 else 'delivered')
+            order_dict['date'] = process_date(order_dict.get('date')).isoformat()
+            orders.append({
+                "receipt_id": order_dict.get('receipt_id', doc.id),
+                "shop_name": order_dict.get('shop_name', 'Unknown Shop'),
+                "salesperson_name": order_dict.get('salesperson_name', 'N/A'),
+                "items": order_dict.get('items', []),
+                "payment": float(order_dict.get('payment', 0)),
+                "balance": float(order_dict.get('balance', 0)),
+                "date": order_dict['date'],
+                "status": order_dict['status'],
+                "payment_method": order_dict.get('payment_method', 'N/A'),
+                "location": order_dict.get('location', 'Unknown')
+            })
+
+        return jsonify(orders), 200
+
+    except Exception as e:
+        logger.error(f"Error in /api/orders/history: {str(e)}")
+        return jsonify({"error": f"Failed to fetch order history: {str(e)}"}), 500
+
+# GET /api/orders/<receipt_id> - Fetch a single order's details (for receipt or tracking)
+@app.route('/api/orders/<receipt_id>', methods=['GET'])
+@require_firebase_auth
+@no_cache
+@limiter.limit("20 per minute;100 per hour")
+def api_order_details(receipt_id):
+    try:
+        user_id = request.user['uid']
+        order_ref = db.collection('orders').where('receipt_id', '==', receipt_id).limit(1).get()
+        if not order_ref:
+            return jsonify({"error": "Order not found"}), 404
+
+        order_dict = order_ref[0].to_dict()
+        # Verify user owns the order (unless admin)
+        if order_dict['salesperson_name'] != f'User_{user_id}':
+            user_doc = db.collection('users').document(user_id).get()
+            if not user_doc.exists or user_doc.to_dict().get('role') != 'admin':
+                return jsonify({"error": "Unauthorized"}), 403
+
+        order_dict['status'] = 'closed' if order_dict.get('closed_date') else ('pending' if order_dict.get('balance', 0) > 0 else 'delivered')
+        order_dict['date'] = process_date(order_dict.get('date')).isoformat()
+
+        return jsonify({
+            "receipt_id": order_dict.get('receipt_id', order_ref[0].id),
+            "shop_name": order_dict.get('shop_name', 'Unknown Shop'),
+            "salesperson_name": order_dict.get('salesperson_name', 'N/A'),
+            "items": order_dict.get('items', []),
+            "payment": float(order_dict.get('payment', 0)),
+            "balance": float(order_dict.get('balance', 0)),
+            "date": order_dict['date'],
+            "status": order_dict['status'],
+            "payment_method": order_dict.get('payment_method', 'N/A'),
+            "location": order_dict.get('location', 'Unknown'),
+            "tracking": order_dict.get('tracking', {})
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error in /api/orders/{receipt_id}: {str(e)}")
+        return jsonify({"error": f"Failed to fetch order details: {str(e)}"}), 500
+
+# GET /api/admin/orders - Admins fetch all orders
+@app.route('/api/admin/orders', methods=['GET'])
+@require_firebase_auth
+@require_admin
+@no_cache
+@limiter.limit("20 per minute;100 per hour")
+def api_admin_orders():
+    try:
+        time_filter = request.args.get('time_filter', 'all')
+        limit = int(request.args.get('limit', 100))
+
+        now = datetime.now(NAIROBI_TZ)
+        start = now
+        if time_filter == 'day':
+            start = now.replace(hour=0, minute=0, second=0)
+        elif time_filter == 'week':
+            start = now - timedelta(days=now.weekday())
+        elif time_filter == 'month':
+            start = now.replace(day=1)
+        elif time_filter == 'year':
+            start = now.replace(month=1, day=1)
+
+        query = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING)
+        if time_filter != 'all':
+            query = query.where('date', '>=', start)
+
+        orders = []
+        for doc in query.limit(limit).stream():
+            order_dict = doc.to_dict()
+            order_dict['status'] = 'closed' if order_dict.get('closed_date') else ('pending' if order_dict.get('balance', 0) > 0 else 'delivered')
+            order_dict['date'] = process_date(order_dict.get('date')).isoformat()
+            orders.append({
+                "receipt_id": order_dict.get('receipt_id', doc.id),
+                "shop_name": order_dict.get('shop_name', 'Unknown Shop'),
+                "salesperson_name": order_dict.get('salesperson_name', 'N/A'),
+                "items": order_dict.get('items', []),
+                "payment": float(order_dict.get('payment', 0)),
+                "balance": float(order_dict.get('balance', 0)),
+                "date": order_dict['date'],
+                "status": order_dict['status'],
+                "payment_method": order_dict.get('payment_method', 'N/A'),
+                "location": order_dict.get('location', 'Unknown')
+            })
+
+        return jsonify(orders), 200
+
+    except Exception as e:
+        logger.error(f"Error in /api/admin/orders: {str(e)}")
+        return jsonify({"error": f"Failed to fetch admin orders: {str(e)}"}), 500
+
+# GET /api/admin/stock - Admins fetch stock levels
+@app.route('/api/admin/stock', methods=['GET'])
+@require_firebase_auth
+@require_admin
+@no_cache
+@limiter.limit("20 per minute;100 per hour")
+def api_admin_stock():
+    try:
+        stock_items = [
+            {
+                "stock_name": doc.to_dict()['stock_name'],
+                "stock_quantity": float(doc.to_dict()['stock_quantity'] or 0),
+                "price": float(doc.to_dict()['selling_price'] or 0),
+                "category": doc.to_dict().get('category', 'Unknown')
+            }
+            for doc in db.collection('stock').order_by('stock_name').get()
+        ]
+
+        # Remove duplicates by stock_name
+        seen = set()
+        unique_stock_items = []
+        for item in stock_items:
+            stock_name = item['stock_name']
+            if stock_name not in seen:
+                seen.add(stock_name)
+                unique_stock_items.append(item)
+
+        return jsonify(unique_stock_items), 200
+
+    except Exception as e:
+        logger.error(f"Error in /api/admin/stock: {str(e)}")
+        return jsonify({"error": f"Failed to fetch stock data: {str(e)}"}), 500
+
+# GET /api/admin/clients - Admins fetch client data
+@app.route('/api/admin/clients', methods=['GET'])
+@require_firebase_auth
+@require_admin
+@no_cache
+@limiter.limit("20 per minute;100 per hour")
+def api_admin_clients():
+    try:
+        clients = [
+            {
+                "shop_name": doc.to_dict().get('shop_name', 'Unknown Shop'),
+                "debt": float(doc.to_dict().get('debt', 0)),
+                "created_at": process_date(doc.to_dict().get('created_at')).isoformat(),
+                "location": doc.to_dict().get('location', None)
+            }
+            for doc in db.collection('clients').get()
+        ]
+
+        return jsonify(clients), 200
+
+    except Exception as e:
+        logger.error(f"Error in /api/admin/clients: {str(e)}")
+        return jsonify({"error": f"Failed to fetch client data: {str(e)}"}), 500
+
+# POST /orders/<receipt_id>/update - Update order tracking status (for staff via web app)
+@app.route('/orders/<receipt_id>/update', methods=['POST'])
+@no_cache
+@login_required
+def update_order_tracking(receipt_id):
+    try:
+        if session['user']['role'] != 'manager':
+            return jsonify({"error": "Unauthorized: Only managers can update order tracking"}), 403
+
+        order_ref = db.collection('orders').where('receipt_id', '==', receipt_id).limit(1).get()
+        if not order_ref:
+            return jsonify({"error": "Order not found"}), 404
+
+        order_doc = order_ref[0]
+        order_dict = order_doc.to_dict()
+        tracking_status = request.form.get('tracking_status')
+        tracking_notes = request.form.get('tracking_notes', '')
+
+        if tracking_status not in ['pending', 'in_transit', 'delivered']:
+            return jsonify({"error": "Invalid tracking status"}), 400
+
+        tracking_update = {
+            'status': tracking_status,
+            'last_updated': datetime.now(NAIROBI_TZ),
+            'notes': tracking_notes
+        }
+
+        db.collection('orders').document(order_doc.id).update({
+            'tracking': tracking_update
+        })
+
+        log_user_action('Updated Order Tracking', f"Order #{receipt_id} tracking updated to {tracking_status}")
+
+        return jsonify({"message": "Tracking updated successfully"}), 200
+
+    except Exception as e:
+        logger.error(f"Error in /orders/{receipt_id}/update: {str(e)}")
+        return jsonify({"error": f"Failed to update tracking: {str(e)}"}), 500
