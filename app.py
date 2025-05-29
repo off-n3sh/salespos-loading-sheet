@@ -687,20 +687,41 @@ def dashboard():
         orders_ref = orders_ref.where(filter=FieldFilter('balance', '>=', -0.001)).where(filter=FieldFilter('balance', '<=', 0.001))
 
     # Apply search query if provided
- # Apply search query if provided
-filtered_orders = []
-if search_query:
-    search_lower = search_query.lower()
-    matching_order_ids = set()
-    salesperson_orders = orders_ref.where('salesperson_name_lower', '>=', search_lower).where('salesperson_name_lower', '<=', search_lower + '\uf8ff').stream()
-    shop_orders = orders_ref.where('shop_name_lower', '>=', search_lower).where('shop_name_lower', '<=', search_lower + '\uf8ff').stream()
-    for doc in salesperson_orders:
-        matching_order_ids.add(doc.id)
-    for doc in shop_orders:
-        matching_order_ids.add(doc.id)
-    for doc_id in matching_order_ids:
-        doc = db.collection('orders').document(doc_id).get()
-        if doc.exists:
+    filtered_orders = []
+    if search_query:
+        search_lower = search_query.lower()
+        matching_order_ids = set()
+        salesperson_orders = orders_ref.where('salesperson_name_lower', '>=', search_lower).where('salesperson_name_lower', '<=', search_lower + '\uf8ff').stream()
+        shop_orders = orders_ref.where('shop_name_lower', '>=', search_lower).where('shop_name_lower', '<=', search_lower + '\uf8ff').stream()
+        for doc in salesperson_orders:
+            matching_order_ids.add(doc.id)
+        for doc in shop_orders:
+            matching_order_ids.add(doc.id)
+        for doc_id in matching_order_ids:
+            doc = db.collection('orders').document(doc_id).get()
+            if doc.exists:
+                order_dict = doc.to_dict()
+                balance = float(order_dict.get('balance', 0))
+                closed_date = process_date(order_dict.get('closed_date'))
+                if balance > 0 and closed_date:
+                    closed_date = None
+                filtered_orders.append({
+                    'doc': doc,
+                    'receipt_id': order_dict.get('receipt_id', doc.id),
+                    'salesperson_name': order_dict.get('salesperson_name', 'N/A'),
+                    'shop_name': order_dict.get('shop_name', 'Unknown Shop'),
+                    'items': json.dumps(order_dict.get('items', [])),
+                    'photoUrl': order_dict.get('photoUrl', ''),
+                    'payment': float(order_dict.get('payment', 0)),
+                    'balance': balance,
+                    'date': process_date(order_dict.get('date')),
+                    'closed_date': closed_date,
+                    'order_type': order_dict.get('order_type', 'wholesale'),
+                    'payment_history': order_dict.get('payment_history', []),
+                    'notes': order_dict.get('notes', '')
+                })
+    else:
+        for doc in orders_ref.stream():
             order_dict = doc.to_dict()
             balance = float(order_dict.get('balance', 0))
             closed_date = process_date(order_dict.get('closed_date'))
@@ -720,29 +741,8 @@ if search_query:
                 'order_type': order_dict.get('order_type', 'wholesale'),
                 'payment_history': order_dict.get('payment_history', []),
                 'notes': order_dict.get('notes', '')
-            })  # Ensure proper closing of the dictionary
-else:
-    for doc in orders_ref.stream():
-        order_dict = doc.to_dict()
-        balance = float(order_dict.get('balance', 0))
-        closed_date = process_date(order_dict.get('closed_date'))
-        if balance > 0 and closed_date:
-            closed_date = None
-        filtered_orders.append({
-            'doc': doc,
-            'receipt_id': order_dict.get('receipt_id', doc.id),
-            'salesperson_name': order_dict.get('salesperson_name', 'N/A'),
-            'shop_name': order_dict.get('shop_name', 'Unknown Shop'),
-            'items': json.dumps(order_dict.get('items', [])),
-            'photoUrl': order_dict.get('photoUrl', ''),
-            'payment': float(order_dict.get('payment', 0)),
-            'balance': balance,
-            'date': process_date(order_dict.get('date')),
-            'closed_date': closed_date,
-            'order_type': order_dict.get('order_type', 'wholesale'),
-            'payment_history': order_dict.get('payment_history', []),
-            'notes': order_dict.get('notes', '')
-        })  # Ensure proper closing of the dictionary
+            })
+
     # Sort filtered orders by date (descending)
     filtered_orders.sort(key=lambda x: x['date'], reverse=True)
 
