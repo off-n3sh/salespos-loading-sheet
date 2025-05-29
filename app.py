@@ -708,7 +708,7 @@ def dashboard():
                 filtered_orders.append({
                     'doc': doc,
                     'receipt_id': order_dict.get('receipt_id', doc.id),
-                    'salesperson_name': order includes both retail and app orders_dict.get('salesperson_name', 'N/A'),
+                    'salesperson_name': order_dict.get('salesperson_name', 'N/A')
                     'shop_name': order_dict.get('shop_name', 'Unknown Shop'),
                     'items': json.dumps(order_dict.get('items', [])),
                     'photoUrl': order_dict.get('photoUrl', ''),
