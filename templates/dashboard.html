@@ -88,7 +88,7 @@
                             <h3 class="text-gray-500 dark:text-gray-400 text-xs sm:text-sm font-medium">Walk-in Customers</h3>
                             <p class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mt-1">KSh {{ retail_sales_today | round(2) | default(0) }}</p>
                             <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                {{ retail_open_orders }} open, {{ retail_closed_orders }} closed - Includes partial payments
+                                {{ retail_open_orders }} open, {{ retail_closed_orders }} closed - Includes app orders & partial payments
                             </div>
                         </div>
                         <div class="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
@@ -211,11 +211,11 @@
                         {% for sale in group.rows %}
                         <tr data-date="{{ sale.date.strftime('%Y-%m-%d') }}"
                             data-closed-date="{{ sale.closed_date.strftime('%Y-%m-%d') if sale.closed_date else '' }}"
-                            data-search="{{ sale.shop_name | lower }} {{ sale.salesperson_name | lower }}"
+                            data-search="{{ sale.salesperson_name | lower }} {{ sale.shop_name | lower }}"
                             data-order-type="{{ sale.order_type }}"
                             data-payment="{{ sale.payment }}"
                             data-balance="{{ sale.balance }}"
-                            class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                            class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors {% if sale.highlight %}bg-blue-50 dark:bg-blue-900{% endif %}">
                             <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
                                 <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
                                     {% if sale.photoUrl %}
@@ -228,37 +228,44 @@
                                 </div>
                             </td>
                             <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
-                                <div class="font-medium text-gray-900 dark:text-white text-sm sm:text-base">{{ sale.shop_name }}</div>
-                                <div class="text-xs text-gray-500 dark:text-gray-400">{{ sale.salesperson_name | default('N/A') }}</div>
+                                <div class="font-medium text-gray-900 dark:text-white text-sm sm:text-base">{{ sale.salesperson_name | default('N/A') }}</div>
+                                <div class="text-xs text-gray-500 dark:text-gray-400">Location: {{ sale.shop_name }}</div>
                                 <div class="text-xs text-gray-500 dark:text-gray-400">
                                     Ordered: {{ sale.date.strftime('%d/%m/%Y %H:%M:%S') }}
-                                    {% set payment_made_today = false %}
-                                    {% set payment_amount_today = 0 %}
-                                    {% for payment_entry in sale.payment_history %}
-                                        {% if payment_entry.date >= today_start and payment_entry.date < today_end %}
-                                            {% set payment_made_today = true %}
-                                            {% set payment_amount_today = payment_amount_today + payment_entry.amount %}
-                                            <div class="mt-1">
-                                                <span class="inline-block bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-xs px-2 py-0.5 rounded-full">
-                                                    Paid Today: KSh {{ payment_entry.amount | round(2) }} at {{ payment_entry.date.strftime('%H:%M:%S') }}
-                                                </span>
-                                            </div>
-                                        {% endif %}
-                                    {% endfor %}
-                                    {% if sale.closed_date and sale.closed_date >= today_start and sale.closed_date < today_end and sale.balance <= 0 %}
+                                </div>
+                                {% if sale.notes %}
+                                <div class="mt-1">
+                                    <span class="inline-block bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 text-xs px-2 py-0.5 rounded-full">
+                                        Note: {{ sale.notes | truncate(20, True, '...') }}
+                                    </span>
+                                </div>
+                                {% endif %}
+                                {% set payment_made_today = false %}
+                                {% set payment_amount_today = 0 %}
+                                {% for payment_entry in sale.payment_history %}
+                                    {% if payment_entry.date >= today_start and payment_entry.date < today_end %}
+                                        {% set payment_made_today = true %}
+                                        {% set payment_amount_today = payment_amount_today + payment_entry.amount %}
                                         <div class="mt-1">
-                                            <span class="inline-block bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs px-2 py-0.5 rounded-full">
-                                                Closed Today: {{ sale.closed_date.strftime('%H:%M:%S') }}
+                                            <span class="inline-block bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-xs px-2 py-0.5 rounded-full">
+                                                Paid Today: KSh {{ payment_entry.amount | round(2) }} at {{ payment_entry.date.strftime('%H:%M:%S') }}
                                             </span>
                                         </div>
                                     {% endif %}
-                                </div>
+                                {% endfor %}
+                                {% if sale.closed_date and sale.closed_date >= today_start and sale.closed_date < today_end and sale.balance <= 0 %}
+                                    <div class="mt-1">
+                                        <span class="inline-block bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs px-2 py-0.5 rounded-full">
+                                            Closed Today: {{ sale.closed_date.strftime('%H:%M:%S') }}
+                                        </span>
+                                    </div>
+                                {% endif %}
                             </td>
                             <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-600 dark:text-gray-200">
                                 {{ sale.closed_date.strftime('%d/%m/%Y %H:%M:%S') if sale.closed_date else 'Not Closed' }}
                             </td>
                             <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-600 dark:text-gray-300">
-                                <span class="px-2 py-1 rounded-full text-xs font-medium {% if sale.order_type == 'retail' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% else %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200{% endif %}">
+                                <span class="px-2 py-1 rounded-full text-xs font-medium {% if sale.order_type == 'retail' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% elif sale.order_type == 'app' %}bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200{% else %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200{% endif %}">
                                     {{ sale.order_type }}
                                 </span>
                             </td>
