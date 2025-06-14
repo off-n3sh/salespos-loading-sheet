@@ -30,7 +30,13 @@
                 <div>Date: {{ order.date.strftime('%d/%m/%Y') }}</div>
                 <div>Time: {{ order.date.strftime('%H:%M:%S') }}</div>
             </div>
-            <div><strong>Customer:</strong> {{ order.shop_name }}</div>
+            <div><strong>Customer:</strong> 
+                {% if order.order_type == 'app' %}
+                    {{ order.salesperson_name }}
+                {% else %}
+                    {{ order.shop_name }}
+                {% endif %}
+            </div>
         </div>
 
         <!-- Items Table -->
@@ -45,14 +51,25 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for item in order.order_items %}
-                    <tr style="border-bottom: 1px dotted #ccc;">
-                        <td style="text-align: left; padding: 4px 2px;">{{ item.name }}</td>
-                        <td style="text-align: center; padding: 4px 2px;">{{ item.quantity }}</td>
-                        <td style="text-align: right; padding: 4px 2px;">{{ item.price }}</td>
-                        <td style="text-align: right; padding: 4px 2px;">{{ item.amount }}</td>
-                    </tr>
-                    {% endfor %}
+                    {% if order.order_type == 'app' %}
+                        {% for item in order.items %}
+                        <tr style="border-bottom: 1px dotted #ccc;">
+                            <td style="text-align: left; padding: 4px 2px;">{{ item.product }}</td>
+                            <td style="text-align: center; padding: 4px 2px;">{{ item.quantity }}</td>
+                            <td style="text-align: right; padding: 4px 2px;">{{ item.price }}</td>
+                            <td style="text-align: right; padding: 4px 2px;">{{ item.quantity * item.price }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        {% for item in order.order_items %}
+                        <tr style="border-bottom: 1px dotted #ccc;">
+                            <td style="text-align: left; padding: 4px 2px;">{{ item.name }}</td>
+                            <td style="text-align: center; padding: 4px 2px;">{{ item.quantity }}</td>
+                            <td style="text-align: right; padding: 4px 2px;">{{ item.price }}</td>
+                            <td style="text-align: right; padding: 4px 2px;">{{ item.amount }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% endif %}
                 </tbody>
             </table>
         </div>
@@ -61,15 +78,33 @@
         <div class="mb-3">
             <div class="flex justify-between mb-1">
                 <div>Subtotal:</div>
-                <div>{{ order.order_items | sum(attribute='amount') }}</div>
+                <div>
+                    {% if order.order_type == 'app' %}
+                        {{ order.items | sum(attribute='quantity') | float * order.items | sum(attribute='price') | float }}
+                    {% else %}
+                        {{ order.order_items | sum(attribute='amount') }}
+                    {% endif %}
+                </div>
             </div>
             <div class="flex justify-between mb-1">
                 <div>Tax (16% VAT):</div>
-                <div>{{ ((order.order_items | sum(attribute='amount') * 0.16) / 1.16) | round(2) }}</div>
+                <div>
+                    {% if order.order_type == 'app' %}
+                        {{ ((order.items | sum(attribute='quantity') | float * order.items | sum(attribute='price') | float * 0.16) / 1.16) | round(2) }}
+                    {% else %}
+                        {{ ((order.order_items | sum(attribute='amount') * 0.16) / 1.16) | round(2) }}
+                    {% endif %}
+                </div>
             </div>
             <div class="flex justify-between font-bold" style="border-top: 1px solid #000; padding-top: 4px;">
                 <div>Total Items:</div>
-                <div>{{ order.total_items }}</div>
+                <div>
+                    {% if order.order_type == 'app' %}
+                        {{ order.items | length }}
+                    {% else %}
+                        {{ order.order_items | length }}
+                    {% endif %}
+                </div>
             </div>
         </div>
 
@@ -129,12 +164,11 @@
             display: none;
         }
         @page {
-            size: 80mm auto; /* Width fixed, height adjusts to content */
+            size: 80mm auto;
             margin: 0;
         }
     }
     
-    /* Flex utilities */
     .flex { display: flex; }
     .justify-between { justify-content: space-between; }
     .text-center { text-align: center; }
