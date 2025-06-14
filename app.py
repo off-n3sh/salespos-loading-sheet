@@ -792,7 +792,7 @@ def login():
     logger.debug("Serving login.html")
     response = make_response(render_template('login.html', firebase_config=firebase_config))
     return response
-@dashboard_bp.route('/dashboard', methods=['GET'])
+@app.route('/dashboard', methods=['GET'])
 @no_cache
 @login_required
 def dashboard():
@@ -1067,7 +1067,7 @@ def dashboard():
         firebase_config={}  # Replace with actual config if needed
     )
  
-@dashboard_bp.route('/dashboard_stats', methods=['GET'])
+@app.route('/dashboard_stats', methods=['GET'])
 @login_required
 def dashboard_stats():
     # Set today's date range
