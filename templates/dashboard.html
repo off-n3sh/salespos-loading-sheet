@@ -228,7 +228,14 @@
                                 </div>
                             </td>
                             <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
-                                <div class="font-medium text-gray-900 dark:text-white text-sm sm:text-base">{{ sale.salesperson_name | default('N/A') }}</div>
+                                <div class="font-medium text-gray-900 dark:text-white text-sm sm:text-base">
+                                    {{ sale.salesperson_name | default('N/A') }}
+                                    {% if sale.order_type == 'app' and sale.salesperson_name | lower == 'anonymous' %}
+                                        <span class="inline-block bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 text-xs px-2 py-0.5 rounded-full">
+                                            App User
+                                        </span>
+                                    {% endif %}
+                                </div>
                                 <div class="text-xs text-gray-500 dark:text-gray-400">Location: {{ sale.shop_name }}</div>
                                 <div class="text-xs text-gray-500 dark:text-gray-400">
                                     Ordered: {{ sale.date.strftime('%d/%m/%Y %H:%M:%S') }}
@@ -266,7 +273,7 @@
                             </td>
                             <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-600 dark:text-gray-300">
                                 <span class="px-2 py-1 rounded-full text-xs font-medium {% if sale.order_type == 'retail' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% elif sale.order_type == 'app' %}bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200{% else %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200{% endif %}">
-                                    {{ sale.order_type }}
+                                    {{ sale.order_type | capitalize }}
                                 </span>
                             </td>
                             <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-gray-900 dark:text-gray-100">
@@ -276,8 +283,8 @@
                                 {% endif %}
                             </td>
                             <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
-                                <span class="px-2 py-1 rounded-full text-xs font-medium {% if sale.balance > 0 %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200{% else %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% endif %}">
-                                    {% if sale.balance > 0 %}Pending{% else %}Paid{% endif %}
+                                <span class="px-2 py-1 rounded-full text-xs font-medium {% if sale.status == 'pending' or sale.balance > 0 %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200{% else %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% endif %}">
+                                    {% if sale.status == 'pending' or sale.balance > 0 %}Pending{% else %}Paid{% endif %}
                                 </span>
                             </td>
                             <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-right text-sm font-medium relative">
@@ -317,7 +324,7 @@
                 </thead>
                 <tbody id="expenses-body">
                     {% for expense in expenses %}
-                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" data-date="{{ expense.date.strftime('%Y-%m-%d') }}" data-search="{{ expense.description | lower }} {{ expense.category | lower }}">
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-7 transition-colors" data-date="{{ expense.date.strftime('%Y-%m-%d') }}" data-search="{{ expense.description | lower }} {{ expense.category | lower }}">
                         <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-600 dark:text-gray-200">{{ expense.description }}</td>
                         <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-red-600 dark:text-red-300">KSh {{ "%.2f" % expense.amount }}</td>
                         <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-600 dark:text-gray-200">{{ expense.category }}</td>
