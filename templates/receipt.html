@@ -2,6 +2,11 @@
 {% block title %}Receipt - {{ order.receipt_id }}{% endblock %}
 {% block content %}
 <div class="receipt-container p-0 mx-auto" style="width: 72mm; background-color: #ffffff; color: #000000;">
+    <!-- Debug Output (hidden, for inspection) -->
+    <div style="display: none;">
+        Debug Order: {{ order | tojson }}
+    </div>
+
     <!-- Print Button (only visible on screen) -->
     <div class="print-control text-center mb-3">
         <button id="printButton" onclick="printpage()" class="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-900 focus:outline-none">
@@ -32,9 +37,9 @@
             </div>
             <div><strong>Customer:</strong> 
                 {% if order.order_type == 'app' %}
-                    {{ order.salesperson_name }}
+                    {{ order.salesperson_name | default('Unknown') }}
                 {% else %}
-                    {{ order.shop_name }}
+                    {{ order.shop_name | default('Unknown') }}
                 {% endif %}
             </div>
         </div>
@@ -80,7 +85,11 @@
                 <div>Subtotal:</div>
                 <div>
                     {% if order.order_type == 'app' %}
-                        {{ order.items | sum(attribute='quantity') | float * order.items | sum(attribute='price') | float }}
+                        {% set subtotal = 0 %}
+                        {% for item in order.items %}
+                            {% set subtotal = subtotal + (item.quantity * item.price) %}
+                        {% endfor %}
+                        {{ subtotal }}
                     {% else %}
                         {{ order.order_items | sum(attribute='amount') }}
                     {% endif %}
@@ -90,7 +99,7 @@
                 <div>Tax (16% VAT):</div>
                 <div>
                     {% if order.order_type == 'app' %}
-                        {{ ((order.items | sum(attribute='quantity') | float * order.items | sum(attribute='price') | float * 0.16) / 1.16) | round(2) }}
+                        {{ (subtotal * 0.16 / 1.16) | round(2) }}
                     {% else %}
                         {{ ((order.order_items | sum(attribute='amount') * 0.16) / 1.16) | round(2) }}
                     {% endif %}
