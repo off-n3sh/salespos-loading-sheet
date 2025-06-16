@@ -1107,134 +1107,148 @@ def dashboard_stats():
 @no_cache
 @login_required
 def orders():
+    db = firestore.Client()
+    logger.info("Processing /orders route")
+
     if request.method == 'POST':
-        shop_name = request.form.get('shop_name', 'Retail Direct')
-        salesperson_name = request.form.get('salesperson_name', 'N/A')
-        order_type = request.form.get('order_type', 'wholesale')
-        amount_paid = float(request.form.get('amount_paid', '0') or 0)
-        items_raw = request.form.getlist('items[]')
-        
-        items = []
-        total_amount = 0
-        
-        for i in range(0, len(items_raw), 2):
-            try:
-                product_data = items_raw[i].split('|')
-                if len(product_data) >= 6 and product_data[0] == 'product':
-                    product_name = product_data[1]
-                    qty_str = items_raw[i + 1] if i + 1 < len(items_raw) else '0'
-                    quantity = int(qty_str) if qty_str.isdigit() else 0
-                    price = float(product_data[5])
-                    amount = quantity * price
-                    if quantity > 0:
-                        total_amount += amount
-                        items.extend(['product', product_name, 'quantity', quantity, 'price', price])
-                        stock_ref = db.collection('stock').where('stock_name', '==', product_name).limit(1).get()
-                        if stock_ref:
-                            stock_doc = stock_ref[0]
-                            current_quantity = stock_doc.to_dict().get('stock_quantity', 0)
-                            if current_quantity >= quantity:
-                                db.collection('stock').document(stock_doc.id).update({'stock_quantity': current_quantity - quantity})
-                                log_stock_change(stock_doc.to_dict().get('category', 'Unknown'), product_name, 'order_reduction', -quantity, price)
-                            else:
-                                return f"Insufficient stock for {product_name}", 400
-            except (IndexError, ValueError):
-                continue
-        
-        if not items:
-            return "No valid items in order", 400
-        
-        receipt_id = get_next_receipt_id()
-        balance = max(total_amount - amount_paid, 0)
-        payment_history = [{
-            'amount': min(amount_paid, total_amount),
-            'date': datetime.now(NAIROBI_TZ)
-        }] if amount_paid > 0 else []
-        order_data = {
-            'receipt_id': receipt_id,
-            'salesperson_name': salesperson_name,
-            'shop_name': shop_name,
-            'salesperson_name_lower': salesperson_name.lower(),
-            'shop_name_lower': shop_name.lower(),
-            'items': items,
-            'payment': min(amount_paid, total_amount),
-            'balance': balance,
-            'pending_payment': 0.0,
-            'payment_history': payment_history,
-            'date': datetime.now(NAIROBI_TZ),
-            'order_type': order_type,
-            'closed_date': datetime.now(NAIROBI_TZ) if balance == 0 else None,
-            'tracking': {  # Add tracking field
-                'status': 'pending',
-                'last_updated': datetime.now(NAIROBI_TZ),
-                'notes': 'Order received, awaiting dispatch'
-            }
-        }
-        
-        db.collection('orders').add(order_data)
-        
-        client_ref = db.collection('clients').where('shop_name', '==', shop_name).limit(1).get()
-        if client_ref:
-            client_doc = client_ref[0]
-            client_data = client_doc.to_dict()
-            new_debt = client_data.get('debt', 0) + balance
-            db.collection('clients').document(client_doc.id).update({'debt': new_debt})
-        else:
-            db.collection('clients').document(shop_name.replace('/', '-')).set({
+        try:
+            shop_name = request.form.get('shop_name', 'Retail Direct')
+            salesperson_name = request.form.get('salesperson_name', 'N/A')
+            order_type = request.form.get('order_type', 'wholesale')
+            amount_paid = float(request.form.get('amount_paid', '0') or 0)
+            items_raw = request.form.getlist('items[]')
+
+            items = []
+            total_amount = 0
+
+            for i in range(0, len(items_raw), 2):
+                try:
+                    product_data = items_raw[i].split('|')
+                    if len(product_data) >= 6 and product_data[0] == 'product':
+                        product_name = product_data[1]
+                        qty_str = items_raw[i + 1] if i + 1 < len(items_raw) else '0'
+                        quantity = int(qty_str) if qty_str.isdigit() else 0
+                        price = float(product_data[5])
+                        amount = quantity * price
+                        if quantity > 0:
+                            total_amount += amount
+                            items.extend(['product', product_name, 'quantity', quantity, 'price', price])
+                            stock_ref = db.collection('stock').where('stock_name', '==', product_name).limit(1).get()
+                            if stock_ref:
+                                stock_doc = stock_ref[0]
+                                current_quantity = stock_doc.to_dict().get('stock_quantity', 0)
+                                if current_quantity >= quantity:
+                                    db.collection('stock').document(stock_doc.id).update({'stock_quantity': firestore.Increment(-quantity)})
+                                    log_stock_change(stock_doc.to_dict().get('category', 'Unknown'), product_name, 'order_reduction', -quantity, price)
+                                else:
+                                    return jsonify({'error': f"Insufficient stock for {product_name}"}), 400
+                except (IndexError, ValueError) as e:
+                    logger.error(f"Error processing item: {e}")
+                    continue
+
+            if not items:
+                return jsonify({'error': 'No valid items in order'}), 400
+
+            receipt_id = get_next_receipt_id()
+            balance = max(total_amount - amount_paid, 0)
+            payment_history = [{
+                'amount': min(amount_paid, total_amount),
+                'date': datetime.now(NAIROBI_TZ)
+            }] if amount_paid > 0 else []
+            order_data = {
+                'receipt_id': receipt_id,
+                'salesperson_name': salesperson_name,
                 'shop_name': shop_name,
-                'debt': balance,
-                'created_at': datetime.now(NAIROBI_TZ),
-                'location': None
-            })
-        
-        log_user_action('Opened Order', f"Order #{receipt_id} - {order_type} for {shop_name}")
-        return '', 200
-    
-    # GET method unchanged
- orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).stream()
-orders = []
-for doc in orders_ref:
-    order_dict = doc.to_dict()
-    items_raw = order_dict.get('items', [])
-    items_list = []
+                'salesperson_name_lower': salesperson_name.lower(),
+                'shop_name_lower': shop_name.lower(),
+                'items': items,
+                'payment': min(amount_paid, total_amount),
+                'balance': balance,
+                'pending_payment': 0.0,
+                'payment_history': payment_history,
+                'date': datetime.now(NAIROBI_TZ),
+                'order_type': order_type,
+                'closed_date': datetime.now(NAIROBI_TZ) if balance == 0 else None,
+                'tracking': {
+                    'status': 'pending',
+                    'last_updated': datetime.now(NAIROBI_TZ),
+                    'notes': 'Order received, awaiting dispatch'
+                }
+            }
 
-    if order_dict.get('order_type') == 'app' and isinstance(items_raw, list) and items_raw:
-        # App order: items is a list of maps
-        for item in items_raw:
-            items_list.append({
-                'name': item.get('product', 'Unknown'),
-                'quantity': item.get('quantity', 0),
-                'price': item.get('price', 0)
-            })
-    else:
-        # Web order: flat array
-        i = 0
-        while i < len(items_raw):
-            if items_raw[i] == 'product':
-                product_name = items_raw[i + 1]
-                quantity = items_raw[i + 3] if i + 2 < len(items_raw) and items_raw[i + 2] == 'quantity' else 0
-                price = items_raw[i + 5] if i + 4 < len(items_raw) and items_raw[i + 4] == 'price' else 0
-                items_list.append({'name': product_name, 'quantity': quantity, 'price': price})
-                i += 6
+            db.collection('orders').add(order_data)
+
+            client_ref = db.collection('clients').where('shop_name', '==', shop_name).limit(1).get()
+            if client_ref:
+                client_doc = client_ref[0]
+                client_data = client_doc.to_dict()
+                new_debt = client_data.get('debt', 0) + balance
+                db.collection('clients').document(client_doc.id).update({'debt': new_debt})
             else:
-                i += 1
+                db.collection('clients').document(shop_name.replace('/', '-')).set({
+                    'shop_name': shop_name,
+                    'debt': balance,
+                    'created_at': datetime.now(NAIROBI_TZ),
+                    'location': None
+                })
 
-    orders.append({
-        'receipt_id': order_dict.get('receipt_id', doc.id),
-        'salesperson_name': order_dict.get('salesperson_name', 'N/A'),
-        'salesperson_id': order_dict.get('salesperson_id', ''),
-        'shop_name': order_dict.get('shop_name', 'Unknown Shop'),
-        'total_items': process_items(order_dict.get('items')),
-        'items_list': items_list,
-        'payment': order_dict.get('payment', 0),
-        'balance': order_dict.get('balance', 0),
-        'date': process_date(order_dict.get('date')),
-        'closed_date': process_date(order_dict.get('closed_date', None)) if order_dict.get('closed_date') else None,
-        'order_type': order_dict.get('order_type', 'wholesale')
-    })
-recent_activity = orders[:3]
-stock_items = [doc.to_dict() for doc in db.collection('stock').order_by('stock_name').get()]
-return render_template('orders.html', orders=orders, recent_activity=recent_activity, stock_items=stock_items)
+            log_user_action('Opened Order', f"Order #{receipt_id} - {order_type} for {shop_name}")
+            return jsonify({'message': 'Order created successfully', 'receipt_id': receipt_id}), 200
+        except Exception as e:
+            logger.error(f"Error creating order: {e}")
+            return jsonify({'error': str(e)}), 500
+
+    # GET method
+    try:
+        orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).stream()
+        orders = []
+        for doc in orders_ref:
+            order_dict = doc.to_dict()
+            items_raw = order_dict.get('items', [])
+            items_list = []
+
+            if order_dict.get('order_type') == 'app' and isinstance(items_raw, list) and items_raw and isinstance(items_raw[0], dict):
+                # App order: items is a list of maps
+                for item in items_raw:
+                    items_list.append({
+                        'name': item.get('product', 'Unknown'),
+                        'quantity': item.get('quantity', 0),
+                        'price': item.get('price', 0),
+                        'amount': item.get('quantity', 0) * item.get('price', 0)
+                    })
+            else:
+                # Web order: flat array
+                i = 0
+                while i < len(items_raw):
+                    if items_raw[i] == 'product':
+                        product_name = items_raw[i + 1]
+                        quantity = items_raw[i + 3] if i + 2 < len(items_raw) and items_raw[i + 2] == 'quantity' else 0
+                        price = items_raw[i + 5] if i + 4 < len(items_raw) and items_raw[i + 4] == 'price' else 0
+                        items_list.append({'name': product_name, 'quantity': quantity, 'price': price, 'amount': quantity * price})
+                        i += 6
+                    else:
+                        i += 1
+
+            orders.append({
+                'receipt_id': order_dict.get('receipt_id', doc.id),
+                'salesperson_name': order_dict.get('salesperson_name', 'N/A'),
+                'salesperson_id': order_dict.get('salesperson_id', ''),
+                'shop_name': order_dict.get('shop_name', 'Unknown Shop'),
+                'total_items': process_items(order_dict.get('items')),
+                'items_list': items_list,
+                'payment': order_dict.get('payment', 0),
+                'balance': order_dict.get('balance', 0),
+                'date': process_date(order_dict.get('date')),
+                'closed_date': process_date(order_dict.get('closed_date', None)) if order_dict.get('closed_date') else None,
+                'order_type': order_dict.get('order_type', 'wholesale')
+            })
+
+        recent_activity = orders[:3]
+        stock_items = [doc.to_dict() for doc in db.collection('stock').order_by('stock_name').get()]
+        return render_template('orders.html', orders=orders, recent_activity=recent_activity, stock_items=stock_items)
+    except Exception as e:
+        logger.error(f"Error fetching orders: {e}")
+        return render_template('error.html', message=f"Failed to load orders: {str(e)}"), 500
 
 @app.route('/mark_paid/<order_id>', methods=['POST'])
 @no_cache
