@@ -300,6 +300,24 @@ def process_items(items_value):
             return 0
     return 0
 
+def process_items(items_raw):
+    if not items_raw:
+        return 0
+    try:
+        if isinstance(items_raw[0], dict):  # App order format
+            return len(items_raw)
+        else:  # Web order format
+            count = 0
+            i = 0
+            while i < len(items_raw):
+                if items_raw[i] == 'product':
+                    count += 1
+                    i += 6
+                else:
+                    i += 1
+            return count
+    except Exception:
+        return 0
 
 def get_next_receipt_id():
     """Generate the next receipt ID using a counter in Firestore."""
@@ -1173,12 +1191,23 @@ def orders():
         return '', 200
     
     # GET method unchanged
-    orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).stream()
-    orders = []
-    for doc in orders_ref:
-        order_dict = doc.to_dict()
-        items_raw = order_dict.get('items', [])
-        items_list = []
+ orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).stream()
+orders = []
+for doc in orders_ref:
+    order_dict = doc.to_dict()
+    items_raw = order_dict.get('items', [])
+    items_list = []
+
+    if order_dict.get('order_type') == 'app' and isinstance(items_raw, list) and items_raw:
+        # App order: items is a list of maps
+        for item in items_raw:
+            items_list.append({
+                'name': item.get('product', 'Unknown'),
+                'quantity': item.get('quantity', 0),
+                'price': item.get('price', 0)
+            })
+    else:
+        # Web order: flat array
         i = 0
         while i < len(items_raw):
             if items_raw[i] == 'product':
@@ -1189,22 +1218,23 @@ def orders():
                 i += 6
             else:
                 i += 1
-        orders.append({
-            'receipt_id': order_dict.get('receipt_id', doc.id),
-            'salesperson_name': order_dict.get('salesperson_name', 'N/A'),
-            'salesperson_id': order_dict.get('salesperson_id', ''),
-            'shop_name': order_dict.get('shop_name', 'Unknown Shop'),
-            'total_items': process_items(order_dict.get('items')),
-            'items_list': items_list,
-            'payment': order_dict.get('payment', 0),
-            'balance': order_dict.get('balance', 0),
-            'date': process_date(order_dict.get('date')),
-            'closed_date': process_date(order_dict.get('closed_date', None)) if order_dict.get('closed_date') else None,
-            'order_type': order_dict.get('order_type', 'wholesale')
-        })
-    recent_activity = orders[:3]
-    stock_items = [doc.to_dict() for doc in db.collection('stock').order_by('stock_name').get()]
-    return render_template('orders.html', orders=orders, recent_activity=recent_activity, stock_items=stock_items)
+
+    orders.append({
+        'receipt_id': order_dict.get('receipt_id', doc.id),
+        'salesperson_name': order_dict.get('salesperson_name', 'N/A'),
+        'salesperson_id': order_dict.get('salesperson_id', ''),
+        'shop_name': order_dict.get('shop_name', 'Unknown Shop'),
+        'total_items': process_items(order_dict.get('items')),
+        'items_list': items_list,
+        'payment': order_dict.get('payment', 0),
+        'balance': order_dict.get('balance', 0),
+        'date': process_date(order_dict.get('date')),
+        'closed_date': process_date(order_dict.get('closed_date', None)) if order_dict.get('closed_date') else None,
+        'order_type': order_dict.get('order_type', 'wholesale')
+    })
+recent_activity = orders[:3]
+stock_items = [doc.to_dict() for doc in db.collection('stock').order_by('stock_name').get()]
+return render_template('orders.html', orders=orders, recent_activity=recent_activity, stock_items=stock_items)
 
 @app.route('/mark_paid/<order_id>', methods=['POST'])
 @no_cache

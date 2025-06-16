@@ -7,7 +7,7 @@
         Debug Order: {{ order | tojson }}
     </div>
 
-    <!-- Print Button (only visible on screen) -->
+    <!-- Print Button -->
     <div class="print-control text-center mb-3">
         <button id="printButton" onclick="printpage()" class="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-900 focus:outline-none">
             Print Receipt
@@ -32,8 +32,8 @@
                 <div>Till: 123456</div>
             </div>
             <div class="flex justify-between mb-1">
-                <div>Date: {{ order.date.strftime('%d/%m/%Y') }}</div>
-                <div>Time: {{ order.date.strftime('%H:%M:%S') }}</div>
+                <div>Date: {{ order.date.strftime('%d/%m/%Y') if order.date else 'N/A' }}</div>
+                <div>Time: {{ order.date.strftime('%H:%M:%S') if order.date else 'N/A' }}</div>
             </div>
             <div><strong>Customer:</strong> 
                 {% if order.order_type == 'app' %}
@@ -56,24 +56,32 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% if order.order_type == 'app' %}
-                        {% for item in order.items %}
-                        <tr style="border-bottom: 1px dotted #ccc;">
-                            <td style="text-align: left; padding: 4px 2px;">{{ item.product }}</td>
-                            <td style="text-align: center; padding: 4px 2px;">{{ item.quantity }}</td>
-                            <td style="text-align: right; padding: 4px 2px;">{{ item.price }}</td>
-                            <td style="text-align: right; padding: 4px 2px;">{{ item.quantity * item.price }}</td>
-                        </tr>
-                        {% endfor %}
+                    {% if order.order_type == 'app' or order.order_type == 'wholesale' %}
+                        {% if order.items_list is iterable and order.items_list is not string %}
+                            {% for item in order.items_list %}
+                            <tr style="border-bottom: 1px dotted #ccc;">
+                                <td style="text-align: left; padding: 4px 2px;">{{ item.name | default('Unknown') }}</td>
+                                <td style="text-align: center; padding: 4px 2px;">{{ item.quantity | default(0) }}</td>
+                                <td style="text-align: right; padding: 4px 2px;">{{ item.price | default(0) }}</td>
+                                <td style="text-align: right; padding: 4px 2px;">{{ (item.quantity | default(0) * item.price | default(0)) | round(2) }}</td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr><td colspan="4" style="text-align: center; padding: 4px 2px;">No items available</td></tr>
+                        {% endif %}
                     {% else %}
-                        {% for item in order.order_items %}
-                        <tr style="border-bottom: 1px dotted #ccc;">
-                            <td style="text-align: left; padding: 4px 2px;">{{ item.name }}</td>
-                            <td style="text-align: center; padding: 4px 2px;">{{ item.quantity }}</td>
-                            <td style="text-align: right; padding: 4px 2px;">{{ item.price }}</td>
-                            <td style="text-align: right; padding: 4px 2px;">{{ item.amount }}</td>
-                        </tr>
-                        {% endfor %}
+                        {% if order.order_items is iterable and order.order_items is not string %}
+                            {% for item in order.order_items %}
+                            <tr style="border-bottom: 1px dotted #ccc;">
+                                <td style="text-align: left; padding: 4px 2px;">{{ item.name | default('Unknown') }}</td>
+                                <td style="text-align: center; padding: 4px 2px;">{{ item.quantity | default(0) }}</td>
+                                <td style="text-align: right; padding: 4px 2px;">{{ item.price | default(0) }}</td>
+                                <td style="text-align: right; padding: 4px 2px;">{{ item.amount | default(0) }}</td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr><td colspan="4" style="text-align: center; padding: 4px 2px;">No items available</td></tr>
+                        {% endif %}
                     {% endif %}
                 </tbody>
             </table>
@@ -84,34 +92,36 @@
             <div class="flex justify-between mb-1">
                 <div>Subtotal:</div>
                 <div>
-                    {% if order.order_type == 'app' %}
+                    {% if order.order_type == 'app' or order.order_type == 'wholesale' %}
                         {% set subtotal = 0 %}
-                        {% for item in order.items %}
-                            {% set subtotal = subtotal + (item.quantity * item.price) %}
-                        {% endfor %}
-                        {{ subtotal }}
+                        {% if order.items_list is iterable and order.items_list is not string %}
+                            {% for item in order.items_list %}
+                                {% set subtotal = subtotal + (item.quantity | default(0) * item.price | default(0)) %}
+                            {% endfor %}
+                        {% endif %}
+                        {{ subtotal | round(2) }}
                     {% else %}
-                        {{ order.order_items | sum(attribute='amount') }}
+                        {{ (order.order_items | sum(attribute='amount') if order.order_items is iterable and order.order_items is not string else 0) | round(2) }}
                     {% endif %}
                 </div>
             </div>
             <div class="flex justify-between mb-1">
                 <div>Tax (16% VAT):</div>
                 <div>
-                    {% if order.order_type == 'app' %}
-                        {{ (subtotal * 0.16 / 1.16) | round(2) }}
+                    {% if order.order_type == 'app' or order.order_type == 'wholesale' %}
+                        {{ ((subtotal * 0.16) / 1.16) | round(2) if subtotal else 0 }}
                     {% else %}
-                        {{ ((order.order_items | sum(attribute='amount') * 0.16) / 1.16) | round(2) }}
+                        {{ (((order.order_items | sum(attribute='amount') * 0.16) / 1.16) if order.order_items is iterable and order.order_items is not string else 0) | round(2) }}
                     {% endif %}
                 </div>
             </div>
             <div class="flex justify-between font-bold" style="border-top: 1px solid #000; padding-top: 4px;">
                 <div>Total Items:</div>
                 <div>
-                    {% if order.order_type == 'app' %}
-                        {{ order.items | length }}
+                    {% if order.order_type == 'app' or order.order_type == 'wholesale' %}
+                        {{ order.items_list | length if order.items_list is iterable and order.items_list is not string else 0 }}
                     {% else %}
-                        {{ order.order_items | length }}
+                        {{ order.order_items | length if order.order_items is iterable and order.order_items is not string else 0 }}
                     {% endif %}
                 </div>
             </div>
@@ -121,11 +131,11 @@
         <div class="mb-3" style="border-top: 1px dashed #ccc; border-bottom: 1px dashed #ccc; padding: 6px 0;">
             <div class="flex justify-between font-bold mb-1">
                 <div>Paid Amount:</div>
-                <div>{{ order.payment }}</div>
+                <div>{{ order.payment | default(0) }}</div>
             </div>
             <div class="flex justify-between font-bold mb-1">
                 <div>Balance:</div>
-                <div>{{ order.balance }}</div>
+                <div>{{ order.balance | default(0) }}</div>
             </div>
             <div class="flex justify-between font-bold">
                 <div>Change:</div>
@@ -135,7 +145,7 @@
 
         <!-- Footer -->
         <div class="text-center" style="font-size: 11px;">
-            <div>You were served by: {{ order.salesperson_name }}</div>
+            <div>You were served by: {{ order.salesperson_name | default('Unknown') }}</div>
             <div>Prices inclusive of VAT where applicable</div>
             <div>Once goods sold, no return</div>
             <div class="mt-2 font-bold">Thank you for your business!</div>
@@ -153,31 +163,12 @@
 
 <style>
     @media print {
-        body * {
-            visibility: hidden;
-        }
-        .receipt-container, .receipt-container * {
-            visibility: visible;
-        }
-        .receipt-container {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 72mm;
-            margin: 0;
-            padding: 0;
-            border: none;
-            box-shadow: none;
-        }
-        .print-control {
-            display: none;
-        }
-        @page {
-            size: 80mm auto;
-            margin: 0;
-        }
+        body * { visibility: hidden; }
+        .receipt-container, .receipt-container * { visibility: visible; }
+        .receipt-container { position: absolute; left: 0; top: 0; width: 72mm; margin: 0; padding: 0; border: none; box-shadow: none; }
+        .print-control { display: none; }
+        @page { size: 80mm auto; margin: 0; }
     }
-    
     .flex { display: flex; }
     .justify-between { justify-content: space-between; }
     .text-center { text-align: center; }
