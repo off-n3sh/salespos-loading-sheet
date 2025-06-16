@@ -1521,6 +1521,7 @@ def receipts():
 def receipt(order_id):
     """Display a specific receipt."""
     try:
+        db = firestore.Client()
         orders_ref = db.collection('orders').where('receipt_id', '==', order_id).limit(1).stream()
         order_doc = next(orders_ref, None)
         if not order_doc:
@@ -1528,46 +1529,68 @@ def receipt(order_id):
         order_dict = order_doc.to_dict()
         items_raw = order_dict.get('items', [])
         items_list = []
-        total_amount = 0
-        i = 0
-        while i < len(items_raw):
-            if items_raw[i] == 'product':
-                product_name = items_raw[i + 1]
-                quantity = items_raw[i + 3] if i + 2 < len(items_raw) and items_raw[i + 2] == 'quantity' else 0
-                price = items_raw[i + 5] if i + 4 < len(items_raw) and items_raw[i + 4] == 'price' else 0
-                amount = quantity * price
-                total_amount += amount
-                items_list.append({'name': product_name, 'quantity': quantity, 'price': price, 'amount': amount})
-                i += 6
-            else:
-                i += 1
+
+        # Process items_raw based on order_type
+        if order_dict.get('order_type') == 'app' and isinstance(items_raw, list) and items_raw and isinstance(items_raw[0], dict):
+            # App order: items is a list of maps
+            for item in items_raw:
+                items_list.append({
+                    'name': item.get('product', 'Unknown'),
+                    'quantity': int(item.get('quantity', '0')),
+                    'price': float(item.get('price', '0.0')),
+                    'amount': int(item.get('quantity', '0')) * float(item.get('price', '0.0'))
+                })
+        else:
+            # Web order: flat array
+            i = 0
+            total_amount = 0
+            while i < len(items_raw):
+                if items_raw[i] == 'product':
+                    product_name = items_raw[i + 1]
+                    quantity_str = str(items_raw[i + 3]) if i + 2 < len(items_raw) and items_raw[i + 2] == 'quantity' else '0'
+                    price_str = str(items_raw[i + 5]) if i + 4 < len(items_raw) and items_raw[i + 4] == 'price' else '0'
+                    quantity = int(quantity_str) if quantity_str.isdigit() else 0
+                    price = float(price_str) if price_str.replace('.', '').replace('-', '').isdigit() else 0.0
+                    amount = quantity * price
+                    total_amount += amount
+                    items_list.append({
+                        'name': product_name,
+                        'quantity': quantity,
+                        'price': price,
+                        'amount': amount
+                    })
+                    i += 6
+                else:
+                    i += 1
+
         shop_name = order_dict.get('shop_name', 'Unknown Shop')
         try:
             shop_address = next((doc.to_dict().get('address', 'No address') for doc in db.collection('shops').where('name', '==', shop_name).limit(1).stream()), 'No address')
         except Exception as e:
-            print(f"Error fetching shop address: {str(e)}")
+            logger.error(f"Error fetching shop address: {str(e)}")
             shop_address = 'No address available'
+
         order = {
             'receipt_id': order_dict.get('receipt_id', order_doc.id),
             'salesperson_name': order_dict.get('salesperson_name', 'N/A'),
             'shop_name': shop_name,
             'shop_address': shop_address,
-            'order_items': items_list,
+            'items_list': items_list,  # Changed from 'order_items' to 'items_list'
             'total_items': process_items(order_dict.get('items')),
-            'total_amount': total_amount,
+            'total_amount': total_amount,  # Use calculated total_amount
             'payment': order_dict.get('payment', 0),
             'balance': order_dict.get('balance', 0),
             'date': process_date(order_dict.get('date')),
             'order_type': order_dict.get('order_type', 'wholesale')
         }
         recent_activity = [{'receipt_id': doc.to_dict().get('receipt_id', doc.id), 'salesperson_name': doc.to_dict().get('salesperson_name', 'N/A'), 
-                            'shop_name': doc.to_dict().get('shop_name', 'Unknown Shop'), 'date': process_date(doc.to_dict().get('date'))} 
-                           for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).limit(3).get()]
-        print(f"Order data for {order_id}: {order}")  # Debug log
+                           'shop_name': doc.to_dict().get('shop_name', 'Unknown Shop'), 'date': process_date(doc.to_dict().get('date'))} 
+                          for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).limit(3).get()]
+        logger.info(f"Order data for {order_id}: {order}")  # Debug log
         return render_template('receipt.html', order=order, recent_activity=recent_activity)
     except Exception as e:
-        print(f"Error in receipt route for {order_id}: {str(e)}")
-        return f"Internal Server Error: {str(e)}", 500
+        logger.error(f"Error in receipt route for {order_id}: {str(e)}")
+        return render_template('error.html', message=f"Internal Server Error: {str(e)}"), 500
 
 @app.route('/reports')
 @no_cache
