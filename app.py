@@ -1212,8 +1212,8 @@ def orders():
                 for item in items_raw:
                     items_list.append({
                         'name': item.get('product', 'Unknown'),
-                        'quantity': item.get('quantity', 0),
-                        'price': item.get('price', 0),
+                        'quantity': int(item.get('quantity', 0)),
+                        'price': float(item.get('price', 0)),
                         'amount': item.get('quantity', 0) * item.get('price', 0)
                     })
             else:
