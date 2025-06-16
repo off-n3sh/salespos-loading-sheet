@@ -1212,9 +1212,9 @@ def orders():
                 for item in items_raw:
                     items_list.append({
                         'name': item.get('product', 'Unknown'),
-                        'quantity': int(item.get('quantity', 0)),
-                        'price': float(item.get('price', 0)),
-                        'amount': item.get('quantity', 0) * item.get('price', 0)
+                        'quantity': int(item.get('quantity', '0')),  # Ensure integer conversion
+                        'price': float(item.get('price', '0.0')),   # Ensure float conversion
+                        'amount': int(item.get('quantity', '0')) * float(item.get('price', '0.0'))
                     })
             else:
                 # Web order: flat array
@@ -1222,9 +1222,16 @@ def orders():
                 while i < len(items_raw):
                     if items_raw[i] == 'product':
                         product_name = items_raw[i + 1]
-                        quantity = items_raw[i + 3] if i + 2 < len(items_raw) and items_raw[i + 2] == 'quantity' else 0
-                        price = items_raw[i + 5] if i + 4 < len(items_raw) and items_raw[i + 4] == 'price' else 0
-                        items_list.append({'name': product_name, 'quantity': quantity, 'price': price, 'amount': quantity * price})
+                        quantity_str = str(items_raw[i + 3]) if i + 2 < len(items_raw) and items_raw[i + 2] == 'quantity' else '0'
+                        price_str = str(items_raw[i + 5]) if i + 4 < len(items_raw) and items_raw[i + 4] == 'price' else '0'
+                        quantity = int(quantity_str) if quantity_str.isdigit() else 0
+                        price = float(price_str) if price_str.replace('.', '').isdigit() or price_str.replace('.', '').replace('-', '').isdigit() else 0.0
+                        items_list.append({
+                            'name': product_name,
+                            'quantity': quantity,
+                            'price': price,
+                            'amount': quantity * price
+                        })
                         i += 6
                     else:
                         i += 1
