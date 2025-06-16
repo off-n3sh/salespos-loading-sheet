@@ -1529,21 +1529,25 @@ def receipt(order_id):
         order_dict = order_doc.to_dict()
         items_raw = order_dict.get('items', [])
         items_list = []
+        total_amount = 0  # Initialize total_amount here
 
         # Process items_raw based on order_type
         if order_dict.get('order_type') == 'app' and isinstance(items_raw, list) and items_raw and isinstance(items_raw[0], dict):
             # App order: items is a list of maps
             for item in items_raw:
+                quantity = int(item.get('quantity', '0'))
+                price = float(item.get('price', '0.0'))
+                amount = quantity * price
+                total_amount += amount  # Accumulate total_amount
                 items_list.append({
                     'name': item.get('product', 'Unknown'),
-                    'quantity': int(item.get('quantity', '0')),
-                    'price': float(item.get('price', '0.0')),
-                    'amount': int(item.get('quantity', '0')) * float(item.get('price', '0.0'))
+                    'quantity': quantity,
+                    'price': price,
+                    'amount': amount
                 })
         else:
             # Web order: flat array
             i = 0
-            total_amount = 0
             while i < len(items_raw):
                 if items_raw[i] == 'product':
                     product_name = items_raw[i + 1]
@@ -1552,7 +1556,7 @@ def receipt(order_id):
                     quantity = int(quantity_str) if quantity_str.isdigit() else 0
                     price = float(price_str) if price_str.replace('.', '').replace('-', '').isdigit() else 0.0
                     amount = quantity * price
-                    total_amount += amount
+                    total_amount += amount  # Accumulate total_amount
                     items_list.append({
                         'name': product_name,
                         'quantity': quantity,
@@ -1575,9 +1579,9 @@ def receipt(order_id):
             'salesperson_name': order_dict.get('salesperson_name', 'N/A'),
             'shop_name': shop_name,
             'shop_address': shop_address,
-            'items_list': items_list,  # Changed from 'order_items' to 'items_list'
+            'items_list': items_list,
             'total_items': process_items(order_dict.get('items')),
-            'total_amount': total_amount,  # Use calculated total_amount
+            'total_amount': total_amount,
             'payment': order_dict.get('payment', 0),
             'balance': order_dict.get('balance', 0),
             'date': process_date(order_dict.get('date')),
@@ -1586,7 +1590,7 @@ def receipt(order_id):
         recent_activity = [{'receipt_id': doc.to_dict().get('receipt_id', doc.id), 'salesperson_name': doc.to_dict().get('salesperson_name', 'N/A'), 
                            'shop_name': doc.to_dict().get('shop_name', 'Unknown Shop'), 'date': process_date(doc.to_dict().get('date'))} 
                           for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).limit(3).get()]
-        logger.info(f"Order data for {order_id}: {order}")  # Debug log
+        logger.info(f"Order data for {order_id}: {order}")
         return render_template('receipt.html', order=order, recent_activity=recent_activity)
     except Exception as e:
         logger.error(f"Error in receipt route for {order_id}: {str(e)}")
