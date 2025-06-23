@@ -9,9 +9,9 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
     <!-- Firebase JS SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js" defer></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js" defer></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js" defer></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             // Fetch and initialize Firebase
@@ -23,25 +23,38 @@
                         console.error("Firebase config is empty or not loaded");
                     } else {
                         try {
-                            firebase.initializeApp(config);
+                            // Initialize Firebase App
+                            const app = firebase.initializeApp(config);
                             console.log("Firebase initialized successfully in base.html");
 
-                            // Initialize Firebase Messaging with VAPID key
-                            const messaging = firebase.messaging();
+                            // Initialize Firebase Messaging
+                            const { getMessaging, getToken, onMessage } = firebase.messaging;
+                            const messaging = getMessaging(app);
                             const vapidKey = "BGFTJX3UU265YoQbXrZSTgorWZUOo7hyvMhOlUzMLAill4DsLr_AVL2qFq_9M6KYUczF7MfBntVGCT2nxGx-H24"; // Replace with your VAPID key
-                            messaging.requestPermission()
-                                .then(() => {
+
+                            // Request permission and get token
+                            Notification.requestPermission().then((permission) => {
+                                if (permission === 'granted') {
                                     console.log("Notification permission granted.");
-                                    return messaging.getToken({ vapidKey: vapidKey });
-                                })
-                                .then((token) => {
+                                    return getToken(messaging, { vapidKey: vapidKey });
+                                }
+                            }).then((token) => {
+                                if (token) {
                                     console.log("FCM Token:", token);
                                     // Placeholder for sending token to backend
                                     console.log("Token ready to send to /save-fcm-token");
-                                })
-                                .catch((err) => {
-                                    console.error("FCM setup failed:", err);
-                                });
+                                } else {
+                                    console.log('No registration token available. Request permission to generate one.');
+                                }
+                            }).catch((err) => {
+                                console.error("FCM setup failed:", err);
+                            });
+
+                            // Handle incoming messages
+                            onMessage(messaging, (payload) => {
+                                console.log('Message received. ', payload);
+                                // Optionally show a notification here
+                            });
 
                             // Auth state listener
                             firebase.auth().onAuthStateChanged((user) => {
