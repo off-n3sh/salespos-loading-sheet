@@ -8,23 +8,37 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
-    <!-- Firebase JS SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script>
-    const firebaseConfigRaw = {{ firebase_config | default({}) | tojson | safe }};
-    console.log("Raw firebaseConfig from Jinja2:", firebaseConfigRaw);
-    if (!firebaseConfigRaw || Object.keys(firebaseConfigRaw).length === 0) {
-        console.error("Firebase config is empty or not loaded in base.html");
-    } else {
-        try {
-            firebase.initializeApp(firebaseConfigRaw);
-            console.log("Firebase initialized successfully in base.html");
-        } catch (error) {
-            console.error("Firebase initialization failed in base.html:", error);
-        }
+const firebaseConfigRaw = {{ firebase_config | default({}) | tojson | safe }};
+console.log("Raw firebaseConfig from Jinja2:", firebaseConfigRaw);
+if (!firebaseConfigRaw || Object.keys(firebaseConfigRaw).length === 0) {
+    console.error("Firebase config is empty or not loaded in base.html");
+} else {
+    try {
+        firebase.initializeApp(firebaseConfigRaw);
+        console.log("Firebase initialized successfully in base.html");
+        
+        // Initialize Firebase Messaging with VAPID key
+        const messaging = firebase.messaging();
+        const vapidKey = "BGFTJX3UU265YoQbXrZSTgorWZUOo7hyvMhOlUzMLAill4DsLr_AVL2qFq_9M6KYUczF7MfBntVGCT2nxGx-H24"; // Replace with your VAPID key
+        messaging.requestPermission()
+            .then(() => {
+                console.log("Notification permission granted.");
+                return messaging.getToken({ vapidKey: vapidKey });
+            })
+            .then((token) => {
+                console.log("FCM Token:", token);
+                // Placeholder for sending token to backend
+                console.log("Token ready to send to /save-fcm-token");
+            })
+            .catch((err) => {
+                console.error("FCM setup failed:", err);
+            });
+    } catch (error) {
+        console.error("Firebase initialization failed in base.html:", error);
     }
-    </script>
+}
+</script>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-white transition-colors duration-300 font-sans">
     <div class="flex h-screen">
