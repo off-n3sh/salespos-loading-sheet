@@ -8,19 +8,20 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
-    <!-- Firebase JS SDK (Modular) -->
+    <!-- Firebase JS SDK (Placeholder until VAPID key is added) -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js" defer></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js" defer></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js" defer></script>
     <script type="module">
         document.addEventListener('DOMContentLoaded', async function() {
-            // Import Firebase modules
+            // Import Firebase modules (will be completed with VAPID key later)
             const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
             const { getAuth, onAuthStateChanged } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js');
             const { getMessaging, getToken, onMessage } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js');
 
-            // Fetch and initialize Firebase
-            fetch('/firebase-config')
+            // Fetch and initialize Firebase (placeholder)
+  
+	        fetch('/firebase-config')
                 .then(response => response.json())
                 .then(config => {
                     console.log("Raw firebaseConfig from /firebase-config:", config);
@@ -37,7 +38,7 @@
 
                             // Initialize Messaging
                             const messaging = getMessaging(app);
-                            const vapidKey = "YOUR_VAPID_PUBLIC_KEY"; // Replace with your VAPID key
+                            const vapidKey = "BGFTJX3UU265YoQbXrZSTgorWZUOo7hyvMhOlUzMLAill4DsLr_AVL2qFq_9M6KYUczF7MfBntVGCT2nxGx-H24"; // Replace with your VAPID key
 
                             // Request permission and get token
                             Notification.requestPermission().then((permission) => {
@@ -77,7 +78,6 @@
                 .catch(error => {
                     console.error("Failed to fetch Firebase config:", error);
                 });
-
             // Theme toggle logic
             const isDark = localStorage.getItem('theme') === 'dark' || 
                 (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -196,7 +196,7 @@
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-white transition-colors duration-300 font-sans min-h-screen flex flex-col">
     <!-- Sidebar -->
-    <div id="sidebar" class="w-64 bg-blue-800 dark:bg-gradient-to-b dark:from-orange-600 dark:to-gray-700 shadow-lg p-4 flex flex-col h-full transition-all duration-300 transform -translate-x-full fixed z-20 h-screen md:static md:translate-x-0 md:w-64">
+    <div id="sidebar" class="w-64 bg-blue-800 dark:bg-gradient-to-b dark:from-orange-600 dark:to-gray-700 shadow-lg p-4 flex flex-col h-full fixed left-0 z-20 md:static md:w-64">
         <div class="flex justify-between items-center mb-6">
             <h1 class="text-xl md:text-2xl font-bold text-white">Dreamland</h1>
             <button id="sidebar-close" class="text-white hover:text-orange-200 focus:outline-none md:hidden">
@@ -263,7 +263,7 @@
                 </button>
             </div>
         </header>
-        <main class="p-4 md:p-6 flex-1 overflow-y-auto md:ml-64">
+        <main class="p-4 md:p-6 flex-1 overflow-y-auto ml-0 md:ml-64">
             {% block content %}{% endblock %}
         </main>
     </div>
