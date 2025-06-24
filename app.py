@@ -1257,14 +1257,14 @@ def orders():
         logger.error(f"Error fetching orders: {e}")
         return render_template('error.html', message=f"Failed to load orders: {str(e)}"), 500
 
-@app.route('/mark_paid/<order_id>', methods=['POST'])
-@no_cache
-@login_required
-def mark_paid(order_id):
-    orders_ref = db.collection('orders').where('userId', '==', order_id).limit(1).stream()
+
+@app.route('/mark_paid/<receipt_id>', methods=['POST'])
+def mark_paid(receipt_id):
+    # Query order by receipt_id field
+    orders_ref = db.collection('orders').where('receipt_id', '==', receipt_id).limit(1).stream()
     order_doc = next(orders_ref, None)
     if not order_doc:
-        return "Order {order_id} not found", 404
+        return f"Order with receipt_id {receipt_id} not found", 404
 
     try:
         order_ref = db.collection('orders').document(order_doc.id)
@@ -1274,54 +1274,54 @@ def mark_paid(order_id):
         amount_paid = float(request.form.get('amount_paid', 0))
         now = datetime.now(NAIROBI_TZ)
 
+        # Validation
         if amount_paid <= 0:
             return "Payment amount must be greater than 0", 400
         if current_balance <= 0:
             return "Order is already fully paid", 400
 
-        # Calculate new payment and balance
+        # Update payment and balance
         new_payment = current_payment + amount_paid
         new_balance = max(current_balance - amount_paid, 0)
 
-        # Prepare update data
         update_data = {
             'payment': new_payment,
-            'balance': new_balance,
+            'balance': new_balance
         }
-
-        # Set notification message
         if new_balance == 0:
-            notification_message = f"Order #{order_id} fully paid on {now.strftime('%d/%m/%Y %H:%M')}"
-            log_user_action('Closed Order', f"Order #{order_id} marked fully paid")
-        else:
-            notification_message = f"Order #{order_id} partially paid. New balance: KSh {new_balance} on {now.strftime('%d/%m/%Y %H:%M')}"
-            log_user_action('Marked Paid', f"Order #{order_id} - Paid {amount_paid} KES, New Balance {new_balance} KES")
+            update_data['closed_date'] = now  # Optional: set closed_date when fully paid
 
-        # Update the order in Firestore
+        # Update order
         order_ref.update(update_data)
 
-        # Update client's debt
+        # Update client debt
         shop_name = order_dict.get('shop_name')
         client_ref = db.collection('clients').where('shop_name', '==', shop_name).limit(1).get()
         if client_ref:
             client_doc = client_ref[0]
             client_data = client_doc.to_dict()
-            new_debt = max(client_data.get('debt', 0) - amount_paid, 0)
+            new_debt = max(float(client_data.get('debt', 0)) - amount_paid, 0)
             db.collection('clients').document(client_doc.id).update({'debt': new_debt})
 
-        # Create a notification
-        db.collection('users').document(order_dict.get('user_id')).collection('notifications').add({
-            'message': notification_message,
-            'timestamp': now,
-            'order_id': order_id,
-            'read': False,
-            'type': 'payment_closed' if new_balance == 0 else 'payment_partial'
-        })
+        # Create notification
+        user_id = order_dict.get('user_id')
+        if user_id:
+            notification_message = (
+                f"Order #{receipt_id} fully paid on {now.strftime('%d/%m/%Y %H:%M')}"
+                if new_balance == 0 else
+                f"Order #{receipt_id} partially paid. New balance: KSh {new_balance} on {now.strftime('%d/%m/%Y %H:%M')}"
+            )
+            db.collection('users').document(user_id).collection('notifications').add({
+                'message': notification_message,
+                'timestamp': now,
+                'order_id': receipt_id,
+                'read': False,
+                'type': 'payment_closed' if new_balance == 0 else 'payment_partial'
+            })
 
-        return redirect(url_for('dashboard', time='day'))
+        return redirect(url_for('dashboard'))
     except Exception as e:
         return f"Error updating order: {str(e)}", 500
-
 
     
 # Updated /stock route
