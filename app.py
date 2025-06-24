@@ -812,8 +812,8 @@ def login():
             logger.error(f"Login failed for email {email}: {str(e)}")
             return jsonify({'error': str(e)}), 400
 
-    logger.debug("Serving login.html")
-    response = make_response(render_template('login.html', firebase_config=firebase_config))
+    logger.debug("Serving auth.html")
+    response = make_response(render_template('auth.html', firebase_config=firebase_config))
     return response
 @app.route('/dashboard', methods=['GET'])
 @no_cache
