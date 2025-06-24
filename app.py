@@ -342,17 +342,12 @@ def log_stock_change(product_type, subtype, change_type, quantity, price_per_uni
         'timestamp': datetime.now(NAIROBI_TZ)
     })
 
+# Login required decorator
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        user_id = session.get('user_id')
-        if not user_id:
-            return redirect(url_for('login'))
-        # Check role and status in web_users
-        user_ref = db.collection('web_users').document(user_id)
-        user_doc = user_ref.get()
-        if not user_doc.exists or user_doc.to_dict().get('role') != 'manager' or user_doc.to_dict().get('status') != 'approved':
-            abort(403)  # Forbidden
+        if 'user' not in session:
+            return redirect(url_for('auth_route'))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -812,8 +807,8 @@ def login():
             logger.error(f"Login failed for email {email}: {str(e)}")
             return jsonify({'error': str(e)}), 400
 
-    logger.debug("Serving auth.html")
-    response = make_response(render_template('dashboard.html', firebase_config=firebase_config))
+    logger.debug("Serving login.html")
+    response = make_response(render_template('login.html', firebase_config=firebase_config))
     return response
 @app.route('/dashboard', methods=['GET'])
 @no_cache
@@ -1278,7 +1273,6 @@ def mark_paid(order_id):
         current_balance = float(order_dict.get('balance', 0))
         amount_paid = float(request.form.get('amount_paid', 0))
         now = datetime.now(NAIROBI_TZ)
-        user_id = order_dict.get('user_id')  # User ID for notifications
 
         if amount_paid <= 0:
             return "Payment amount must be greater than 0", 400
@@ -1288,7 +1282,7 @@ def mark_paid(order_id):
         # Calculate new payment and balance
         new_payment = current_payment + amount_paid
         new_balance = max(current_balance - amount_paid, 0)
-        final_payment = amount_paid
+        final_payment = amount_paid  # Only the new payment amount
 
         # Update payment_history
         payment_history = order_dict.get('payment_history', [])
@@ -1302,26 +1296,22 @@ def mark_paid(order_id):
         update_data = {
             'payment': new_payment,
             'balance': new_balance,
-            'final_payment': final_payment,
+            'final_payment': final_payment,  # Overwrite with latest payment
             'last_payment_date': now,
-            'payment_history': payment_history,
-            'pending_payment': amount_paid
+            'payment_history': payment_history,  # Add to payment history
+            'pending_payment': amount_paid  # Set pending_payment for dashboard calculation
         }
 
-        # Set closed_date and notification details if fully paid
+        # Set closed_date if fully paid
         if new_balance == 0 and current_balance > 0:
             update_data['closed_date'] = now
             notification_message = f"Order #{order_id} fully paid and closed on {now.strftime('%d/%m/%Y %H:%M')}"
             log_user_action('Closed Order', f"Order #{order_id} marked fully paid")
-            notification_type = 'payment_closed'
-            notification_title = 'Order Fully Paid'
         else:
             notification_message = f"Order #{order_id} partially paid. New balance: KSh {new_balance} on {now.strftime('%d/%m/%Y %H:%M')}"
             log_user_action('Marked Paid', f"Order #{order_id} - Paid {amount_paid} KES, New Balance {new_balance} KES")
-            notification_type = 'payment_partial'
-            notification_title = 'Order Partially Paid'
 
-        # Update order in Firestore
+        # Update the order in Firestore
         order_ref.update(update_data)
 
         # Update client's debt
@@ -1333,7 +1323,7 @@ def mark_paid(order_id):
             new_debt = max(client_data.get('debt', 0) - amount_paid, 0)
             db.collection('clients').document(client_doc.id).update({'debt': new_debt})
 
-        # Create global notification
+        # Create a notification
         db.collection('notifications').add({
             'recipient': order_dict.get('salesperson_id', ''),
             'message': notification_message,
@@ -1342,25 +1332,9 @@ def mark_paid(order_id):
             'read': False
         })
 
-        # Create user-specific notification
-        if user_id:
-            db.collection('users').document(user_id).collection('notifications').add({
-                'id': f"notif_{order_id}_{now.timestamp()}",
-                'type': notification_type,
-                'title': notification_title,
-                'body': notification_message,
-                'timestamp': now,
-                'read': False,
-                'visible': True,
-                'data': {
-                    'orderId': order_id
-                }
-            })
-
         return redirect(url_for('dashboard', time='day'))
     except Exception as e:
-        return f"Error updating order: {str(e)}", 500
-       
+        return f"Error updating order: {str(e)}", 500        
 # Updated /stock route
 @app.route('/stock', methods=['GET', 'POST'])
 @no_cache
