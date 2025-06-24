@@ -1261,10 +1261,10 @@ def orders():
 @no_cache
 @login_required
 def mark_paid(order_id):
-    orders_ref = db.collection('orders').where('receipt_id', '==', order_id).limit(1).stream()
+    orders_ref = db.collection('orders').where('userId', '==', order_id).limit(1).stream()
     order_doc = next(orders_ref, None)
     if not order_doc:
-        return "Order not found", 404
+        return "Order {order_id} not found", 404
 
     try:
         order_ref = db.collection('orders').document(order_doc.id)
@@ -1282,30 +1282,16 @@ def mark_paid(order_id):
         # Calculate new payment and balance
         new_payment = current_payment + amount_paid
         new_balance = max(current_balance - amount_paid, 0)
-        final_payment = amount_paid  # Only the new payment amount
-
-        # Update payment_history
-        payment_history = order_dict.get('payment_history', [])
-        payment_entry = {
-            'amount': amount_paid,
-            'date': now
-        }
-        payment_history.append(payment_entry)
 
         # Prepare update data
         update_data = {
             'payment': new_payment,
             'balance': new_balance,
-            'final_payment': final_payment,  # Overwrite with latest payment
-            'last_payment_date': now,
-            'payment_history': payment_history,  # Add to payment history
-            'pending_payment': amount_paid  # Set pending_payment for dashboard calculation
         }
 
-        # Set closed_date if fully paid
-        if new_balance == 0 and current_balance > 0:
-            update_data['closed_date'] = now
-            notification_message = f"Order #{order_id} fully paid and closed on {now.strftime('%d/%m/%Y %H:%M')}"
+        # Set notification message
+        if new_balance == 0:
+            notification_message = f"Order #{order_id} fully paid on {now.strftime('%d/%m/%Y %H:%M')}"
             log_user_action('Closed Order', f"Order #{order_id} marked fully paid")
         else:
             notification_message = f"Order #{order_id} partially paid. New balance: KSh {new_balance} on {now.strftime('%d/%m/%Y %H:%M')}"
@@ -1324,17 +1310,20 @@ def mark_paid(order_id):
             db.collection('clients').document(client_doc.id).update({'debt': new_debt})
 
         # Create a notification
-        db.collection('notifications').add({
-            'recipient': order_dict.get('salesperson_id', ''),
+        db.collection('users').document(order_dict.get('user_id')).collection('notifications').add({
             'message': notification_message,
             'timestamp': now,
             'order_id': order_id,
-            'read': False
+            'read': False,
+            'type': 'payment_closed' if new_balance == 0 else 'payment_partial'
         })
 
         return redirect(url_for('dashboard', time='day'))
     except Exception as e:
-        return f"Error updating order: {str(e)}", 500        
+        return f"Error updating order: {str(e)}", 500
+
+
+    
 # Updated /stock route
 @app.route('/stock', methods=['GET', 'POST'])
 @no_cache
