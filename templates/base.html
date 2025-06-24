@@ -15,188 +15,203 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js" defer></script>
     <!-- Firebase Initialization and Notification Logic -->
     <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        fetch('/firebase-config')
-            .then(response => response.json())
-            .then(config => {
-                if (!config || Object.keys(config).length === 0) {
-                    console.error("Firebase config is empty or not loaded");
-                    return;
-                }
-                try {
-                    firebase.initializeApp(config);
-                    console.log("Firebase initialized successfully in base.html");
+        document.addEventListener('DOMContentLoaded', function() {
+            fetch('/firebase-config')
+                .then(response => response.json())
+                .then(config => {
+                    if (!config || Object.keys(config).length === 0) {
+                        console.error("Firebase config is empty or not loaded");
+                        return;
+                    }
+                    try {
+                        firebase.initializeApp(config);
+                        console.log("Firebase initialized successfully in base.html");
 
-                    // Initialize Firestore
-                    const db = firebase.firestore();
+                        // Initialize Firestore
+                        const db = firebase.firestore();
 
-                    // Notification elements
-                    const notificationButton = document.getElementById('notifications');
-                    const notificationDropdown = document.getElementById('notification-dropdown');
-                    const notificationList = document.getElementById('notification-list');
-                    const notificationCount = document.getElementById('notification-count');
-                    const clearNotificationsButton = document.getElementById('clear-notifications');
+                        // Notification elements
+                        const notificationButton = document.getElementById('notifications');
+                        const notificationDropdown = document.getElementById('notification-dropdown');
+                        const notificationList = document.getElementById('notification-list');
+                        const notificationCount = document.getElementById('notification-count');
+                        const clearNotificationsButton = document.getElementById('clear-notifications');
 
-                    // Toggle dropdown visibility
-                    notificationButton.addEventListener('click', () => {
-                        notificationDropdown.classList.toggle('hidden');
-                    });
+                        // Toggle dropdown visibility
+                        notificationButton.addEventListener('click', () => {
+                            notificationDropdown.classList.toggle('hidden');
+                        });
 
-                    // Fetch and display notifications in real-time
-                    db.collection('notifications')
-                        .where('recipient', '==', firebase.auth().currentUser?.uid || 'anonymous')
-                        .onSnapshot(snapshot => {
-                            let unreadCount = 0;
-                            notificationList.innerHTML = '';
-                            snapshot.forEach(doc => {
-                                const data = doc.data();
-                                if (!data.read) unreadCount++;
-                                const li = document.createElement('li');
-                                li.className = 'p-4 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer';
-                                li.innerHTML = `
-                                    <div class="flex justify-between">
-                                        <p class="text-sm text-gray-800 dark:text-gray-200">${data.message}</p>
-                                        <span class="text-xs text-gray-500 dark:text-gray-400">${new Date(data.timestamp?.toDate()).toLocaleString()}</span>
-                                    </div>
-                                `;
-                                li.addEventListener('click', async () => {
-                                    await db.collection('notifications').doc(doc.id).update({ read: true });
+                        // Track displayed orders to simulate "read" status
+                        const displayedOrders = new Set();
+
+                        // Fetch and display orders as notifications in real-time
+                        db.collection('orders')
+                            .where('salesperson_name_lower', '==', firebase.auth().currentUser?.displayName?.toLowerCase() || 'anonymous')
+                            .onSnapshot(snapshot => {
+                                let unreadCount = 0;
+                                notificationList.innerHTML = '';
+                                snapshot.forEach(doc => {
+                                    const order = doc.data();
+                                    const orderId = doc.id;
+
+                                    // Skip if already displayed (simulating read status)
+                                    if (displayedOrders.has(orderId)) return;
+
+                                    // Handle different order structures
+                                    let message = `New ${order.order_type || 'unknown'} order #${order.receipt_id || 'N/A'}`;
+                                    const balance = order.balance !== undefined ? order.balance : order.pending_payment || 0;
+                                    if (balance > 0) {
+                                        message += ` with pending balance of ${balance}`;
+                                    } else {
+                                        message += ` (fully paid)`;
+                                    }
+                                    message += ` at ${order.shop_name || 'unknown shop'}.`;
+
+                                    // Extract items for additional context
+                                    let itemsText = '';
+                                    if (order.order_type === 'app' && Array.isArray(order.items)) {
+                                        itemsText = order.items.map(item => `${item.quantity} x ${item.product}`).join(', ');
+                                    } else if (order.order_type === 'retail' || order.order_type === 'wholesale') {
+                                        // Parse retail/wholesale items array
+                                        for (let i = 0; i < order.items.length; i += 6) {
+                                            const product = order.items[i + 1];
+                                            const quantity = order.items[i + 3];
+                                            if (product && quantity) {
+                                                itemsText += itemsText ? ', ' : '';
+                                                itemsText += `${quantity} x ${product}`;
+                                            }
+                                        }
+                                    }
+                                    if (itemsText) {
+                                        message += ` Items: ${itemsText}.`;
+                                    }
+
+                                    // Create notification list item
+                                    const li = document.createElement('li');
+                                    li.className = 'p-4 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer';
+                                    li.innerHTML = `
+                                        <div class="flex justify-between">
+                                            <p class="text-sm text-gray-800 dark:text-gray-200">${message}</p>
+                                            <span class="text-xs text-gray-500 dark:text-gray-400">${new Date(order.date?.toDate()).toLocaleString()}</span>
+                                        </div>
+                                    `;
+                                    li.addEventListener('click', () => {
+                                        displayedOrders.add(orderId);
+                                        notificationCount.textContent = Math.max(0, notificationCount.textContent - 1);
+                                        notificationCount.classList.toggle('hidden', notificationCount.textContent == 0);
+                                    });
+                                    notificationList.appendChild(li);
+                                    unreadCount++;
                                 });
-                                notificationList.appendChild(li);
+                                notificationCount.textContent = unreadCount;
+                                notificationCount.classList.toggle('hidden', unreadCount === 0);
+                            }, err => {
+                                console.error("Error fetching orders for notifications:", err);
+                                notificationList.innerHTML = '<li class="p-4 text-sm text-red-600 dark:text-red-400">Error loading notifications</li>';
                             });
-                            notificationCount.textContent = unreadCount;
-                            notificationCount.classList.toggle('hidden', unreadCount === 0);
-                        }, err => {
-                            console.error("Error fetching notifications:", err);
+
+                        // Clear all notifications (mark all as displayed)
+                        clearNotificationsButton.addEventListener('click', async () => {
+                            const snapshot = await db.collection('orders')
+                                .where('salesperson_name_lower', '==', firebase.auth().currentUser?.displayName?.toLowerCase() || 'anonymous')
+                                .get();
+                            snapshot.forEach(doc => {
+                                displayedOrders.add(doc.id);
+                            });
+                            notificationList.innerHTML = '';
+                            notificationCount.textContent = 0;
+                            notificationCount.classList.add('hidden');
+                            notificationDropdown.classList.add('hidden');
                         });
 
-                    // Clear all notifications
-                    clearNotificationsButton.addEventListener('click', async () => {
-                        const batch = db.batch();
-                        const snapshot = await db.collection('notifications')
-                            .where('recipient', '==', firebase.auth().currentUser?.uid || 'anonymous')
-                            .get();
-                        snapshot.forEach(doc => {
-                            batch.update(doc.ref, { read: true });
-                        });
-                        await batch.commit();
-                        notificationDropdown.classList.add('hidden');
-                    });
+                        // Initialize Firebase Messaging
+                        const messaging = firebase.messaging();
+                        const vapidKey = "YOUR_VAPID_PUBLIC_KEY"; // Replace with your VAPID key
+                        messaging.requestPermission()
+                            .then(() => {
+                                console.log("Notification permission granted.");
+                                return messaging.getToken({ vapidKey: vapidKey });
+                            })
+                            .then((token) => {
+                                console.log("FCM Token:", token);
+                            })
+                            .catch((err) => {
+                                console.error("FCM setup failed:", err);
+                            });
 
-                    // Listen for new orders and create notifications
-                    db.collection('orders').onSnapshot(snapshot => {
-                        snapshot.docChanges().forEach(change => {
-                            if (change.type === 'added') {
-                                const order = change.doc.data();
-                                const userId = firebase.auth().currentUser?.uid || 'anonymous';
-                                let message = `New ${order.order_type || 'unknown'} order #${order.receipt_id || 'N/A'}`;
-                                if (order.balance > 0) {
-                                    message += ` with pending balance of ${order.balance}`;
-                                } else {
-                                    message += ` (fully paid)`;
-                                }
-                                message += ` at ${order.shop_name || 'unknown shop'}.`;
-                                db.collection('notifications').add({
-                                    recipient: userId,
-                                    message: message,
-                                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                                    read: false
-                                }).catch(err => {
-                                    console.error("Error creating notification for new order:", err);
-                                });
+                        // Auth state listener
+                        firebase.auth().onAuthStateChanged((user) => {
+                            if (!user) {
+                                window.location.href = "{{ url_for('auth_route') }}";
                             }
                         });
-                    }, err => {
-                        console.error("Error listening to orders:", err);
-                    });
+                    } catch (error) {
+                        console.error("Firebase initialization failed in base.html:", error);
+                    }
+                })
+                .catch(error => {
+                    console.error("Failed to fetch Firebase config:", error);
+                });
 
-                    // Initialize Firebase Messaging
-                    const messaging = firebase.messaging();
-                    const vapidKey = "YOUR_VAPID_PUBLIC_KEY"; // Replace with your VAPID key
-                    messaging.requestPermission()
-                        .then(() => {
-                            console.log("Notification permission granted.");
-                            return messaging.getToken({ vapidKey: vapidKey });
-                        })
-                        .then((token) => {
-                            console.log("FCM Token:", token);
-                        })
-                        .catch((err) => {
-                            console.error("FCM setup failed:", err);
-                        });
+            // Theme handling
+            if (localStorage.getItem('theme') === 'dark' || 
+                (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.body.classList.add('dark');
+                updateThemeIcon(true);
+            } else {
+                document.body.classList.remove('dark');
+                updateThemeIcon(false);
+            }
 
-                    // Auth state listener
-                    firebase.auth().onAuthStateChanged((user) => {
-                        if (!user) {
-                            window.location.href = "{{ url_for('auth_route') }}";
-                        }
-                    });
-                } catch (error) {
-                    console.error("Firebase initialization failed in base.html:", error);
+            function updateThemeIcon(isDark) {
+                const themeToggle = document.getElementById('theme-toggle');
+                if (themeToggle) {
+                    themeToggle.innerHTML = isDark 
+                        ? '<i class="fas fa-sun mr-2"></i> Light Mode'
+                        : '<i class="fas fa-moon mr-2"></i> Dark Mode';
                 }
-            })
-            .catch(error => {
-                console.error("Failed to fetch Firebase config:", error);
-            });
+            }
 
-        // Theme handling
-        if (localStorage.getItem('theme') === 'dark' || 
-            (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-            document.body.classList.add('dark');
-            updateThemeIcon(true);
-        } else {
-            document.body.classList.remove('dark');
-            updateThemeIcon(false);
-        }
+            // Sidebar toggle
+            const sidebarToggle = document.getElementById('sidebar-toggle');
+            const sidebarClose = document.getElementById('sidebar-close');
+            const sidebar = document.getElementById('sidebar');
+            if (sidebarToggle) {
+                sidebarToggle.addEventListener('click', () => {
+                    sidebar.classList.toggle('-translate-x-full');
+                });
+            }
+            if (sidebarClose) {
+                sidebarClose.addEventListener('click', () => {
+                    sidebar.classList.add('-translate-x-full');
+                });
+            }
 
-        function updateThemeIcon(isDark) {
+            // Theme toggle
             const themeToggle = document.getElementById('theme-toggle');
             if (themeToggle) {
-                themeToggle.innerHTML = isDark 
-                    ? '<i class="fas fa-sun mr-2"></i> Light Mode'
-                    : '<i class="fas fa-moon mr-2"></i> Dark Mode';
-            }
-        }
-
-        // Sidebar toggle
-        const sidebarToggle = document.getElementById('sidebar-toggle');
-        const sidebarClose = document.getElementById('sidebar-close');
-        const sidebar = document.getElementById('sidebar');
-        if (sidebarToggle) {
-            sidebarToggle.addEventListener('click', () => {
-                sidebar.classList.toggle('-translate-x-full');
-            });
-        }
-        if (sidebarClose) {
-            sidebarClose.addEventListener('click', () => {
-                sidebar.classList.add('-translate-x-full');
-            });
-        }
-
-        // Theme toggle
-        const themeToggle = document.getElementById('theme-toggle');
-        if (themeToggle) {
-            themeToggle.addEventListener('click', () => {
-                const isDark = document.body.classList.toggle('dark');
-                localStorage.setItem('theme', isDark ? 'dark' : 'light');
-                updateThemeIcon(isDark);
-            });
-        }
-
-        // Logout handling
-        function handleLogout(event) {
-            event.preventDefault();
-            firebase.auth().signOut()
-                .then(() => {
-                    console.log("User signed out from Firebase Auth");
-                    window.location.href = "{{ url_for('logout') }}";
-                })
-                .catch((error) => {
-                    console.error("Error signing out from Firebase Auth:", error);
-                    window.location.href = "{{ url_for('logout') }}";
+                themeToggle.addEventListener('click', () => {
+                    const isDark = document.body.classList.toggle('dark');
+                    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+                    updateThemeIcon(isDark);
                 });
-        }
-    })
+            }
+
+            // Logout handling
+            function handleLogout(event) {
+                event.preventDefault();
+                firebase.auth().signOut()
+                    .then(() => {
+                        console.log("User signed out from Firebase Auth");
+                        window.location.href = "{{ url_for('logout') }}";
+                    })
+                    .catch((error) => {
+                        console.error("Error signing out from Firebase Auth:", error);
+                        window.location.href = "{{ url_for('logout') }}";
+                    });
+            }
+        });
 
         // Custom styles
         const style = document.createElement('style');
