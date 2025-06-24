@@ -17,11 +17,10 @@
             // Import Firebase modules (will be completed with VAPID key later)
             const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
             const { getAuth, onAuthStateChanged } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js');
-            const { getMessaging, getToken, onMessage } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js');
+            // Messaging imports removed until VAPID key is added
 
             // Fetch and initialize Firebase (placeholder)
-  
-	        fetch('/firebase-config')
+            fetch('/firebase-config')
                 .then(response => response.json())
                 .then(config => {
                     console.log("Raw firebaseConfig from /firebase-config:", config);
@@ -29,42 +28,9 @@
                         console.error("Firebase config is empty or not loaded");
                     } else {
                         try {
-                            // Initialize Firebase App
                             const app = initializeApp(config);
                             console.log("Firebase initialized successfully in base.html");
-
-                            // Initialize Authentication
                             const auth = getAuth(app);
-
-                            // Initialize Messaging
-                            const messaging = getMessaging(app);
-                            const vapidKey = "BGFTJX3UU265YoQbXrZSTgorWZUOo7hyvMhOlUzMLAill4DsLr_AVL2qFq_9M6KYUczF7MfBntVGCT2nxGx-H24"; // Replace with your VAPID key
-
-                            // Request permission and get token
-                            Notification.requestPermission().then((permission) => {
-                                if (permission === 'granted') {
-                                    console.log("Notification permission granted.");
-                                    return getToken(messaging, { vapidKey: vapidKey });
-                                }
-                            }).then((token) => {
-                                if (token) {
-                                    console.log("FCM Token:", token);
-                                    // Placeholder for sending token to backend
-                                    console.log("Token ready to send to /save-fcm-token");
-                                } else {
-                                    console.log('No registration token available. Request permission to generate one.');
-                                }
-                            }).catch((err) => {
-                                console.error("FCM setup failed:", err);
-                            });
-
-                            // Handle incoming messages
-                            onMessage(messaging, (payload) => {
-                                console.log('Message received. ', payload);
-                                // Optionally show a notification here
-                            });
-
-                            // Auth state listener
                             onAuthStateChanged(auth, (user) => {
                                 if (!user) {
                                     window.location.href = "{{ url_for('auth_route') }}";
@@ -78,6 +44,7 @@
                 .catch(error => {
                     console.error("Failed to fetch Firebase config:", error);
                 });
+
             // Theme toggle logic
             const isDark = localStorage.getItem('theme') === 'dark' || 
                 (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -103,16 +70,15 @@
             // Sidebar toggle
             const sidebarToggle = document.getElementById('sidebar-toggle');
             const sidebarClose = document.getElementById('sidebar-close');
-            if (sidebarToggle) {
+            const sidebar = document.getElementById('sidebar');
+            if (sidebarToggle && sidebar) {
                 sidebarToggle.addEventListener('click', () => {
-                    const sidebar = document.getElementById('sidebar');
-                    if (sidebar) sidebar.classList.toggle('-translate-x-full');
+                    sidebar.classList.toggle('active');
                 });
             }
-            if (sidebarClose) {
+            if (sidebarClose && sidebar) {
                 sidebarClose.addEventListener('click', () => {
-                    const sidebar = document.getElementById('sidebar');
-                    if (sidebar) sidebar.classList.add('-translate-x-full');
+                    sidebar.classList.remove('active');
                 });
             }
 
@@ -182,6 +148,14 @@
                     .sales-card-value { font-size: 1.25rem; }
                     th, td { padding: 0.5rem; font-size: 0.875rem; }
                     .btn { padding: 0.375rem 0.75rem; min-width: 80px; font-size: 0.875rem; }
+                    #sidebar.active { transform: translate-x-0; }
+                }
+                #sidebar { 
+                    transition: transform 0.3s ease-in-out;
+                    transform: translate-x-0;
+                }
+                #sidebar.active { 
+                    transform: translate-x-(-100%);
                 }
             `;
             document.head.appendChild(style);
