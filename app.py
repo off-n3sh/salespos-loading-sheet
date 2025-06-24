@@ -1358,7 +1358,7 @@ def mark_paid(order_id):
             })
 
         return redirect(url_for('dashboard', time='day'))
-    except Exception as e):
+    except Exception as e:
         return f"Error updating order: {str(e)}", 500
        
 # Updated /stock route
