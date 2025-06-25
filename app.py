@@ -1260,6 +1260,14 @@ def orders():
 
 @app.route('/mark_paid/<receipt_id>', methods=['POST'])
 def mark_paid(receipt_id):
+    from datetime import datetime
+    from google.cloud import firestore
+    from flask import request, redirect, url_for
+
+    # Assuming NAIROBI_TZ is defined, e.g., from zoneinfo import ZoneInfo
+    NAIROBI_TZ = ZoneInfo("Africa/Nairobi")
+    db = firestore.Client()
+
     # Query order by receipt_id field
     orders_ref = db.collection('orders').where('receipt_id', '==', receipt_id).limit(1).stream()
     order_doc = next(orders_ref, None)
@@ -1289,7 +1297,7 @@ def mark_paid(receipt_id):
             'balance': new_balance
         }
         if new_balance == 0:
-            update_data['closed_date'] = now  # Optional: set closed_date when fully paid
+            update_data['closed_date'] = now
 
         # Update order
         order_ref.update(update_data)
@@ -1306,17 +1314,25 @@ def mark_paid(receipt_id):
         # Create notification
         user_id = order_dict.get('user_id')
         if user_id:
-            notification_message = (
+            notification_title = "Payment Update"
+            notification_body = (
                 f"Order #{receipt_id} fully paid on {now.strftime('%d/%m/%Y %H:%M')}"
                 if new_balance == 0 else
                 f"Order #{receipt_id} partially paid. New balance: KSh {new_balance} on {now.strftime('%d/%m/%Y %H:%M')}"
             )
             db.collection('users').document(user_id).collection('notifications').add({
-                'message': notification_message,
+                'user_id': user_id,
+                'type': 'payment_closed' if new_balance == 0 else 'payment_partial',
+                'title': notification_title,
+                'body': notification_body,
                 'timestamp': now,
-                'order_id': receipt_id,
                 'read': False,
-                'type': 'payment_closed' if new_balance == 0 else 'payment_partial'
+                'visible': True,
+                'data': {
+                    'orderId': order_doc.id,
+                    'receipt_id': receipt_id,
+                },
+                'recipient': user_id,
             })
 
         return redirect(url_for('dashboard'))
