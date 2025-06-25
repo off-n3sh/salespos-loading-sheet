@@ -15,7 +15,7 @@
             </button>
             {% if session['user']['role'] == 'manager' %}
             <button type="button" id="open-expense-modal" class="btn bg-purple-500 text-white hover:bg-purple-600 px-4 py-2 rounded-lg">
-                Add Expense
+            Add Expense
             </button>
             {% endif %}
         </div>
@@ -33,65 +33,64 @@
         </div>
     </div>
 
-    <!-- Orders Table -->
-    <div class="overflow-x-auto">
-        <table id="orders-table" class="min-w-full bg-white dark:bg-gray-800 rounded-lg shadow-md">
-            <thead>
-                <tr class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 uppercase text-sm leading-normal">
-                    <th class="py-3 px-6 text-left">Order #</th>
-                    <th class="py-3 px-6 text-left">Client</th>
-                    <th class="py-3 px-6 text-center">Total Items</th>
-                    <th class="py-3 px-6 text-center">Date</th>
-                    <th class="py-3 px-6 text-center">Payment (KSh)</th>
-                    <th class="py-3 px-6 text-center">Balance (KSh)</th>
-                    <th class="py-3 px-6 text-center">Actions</th>
-                </tr>
-            </thead>
-            <tbody id="orders-tbody" class="text-gray-600 dark:text-gray-300 text-sm font-light">
-                {% for order in orders %}
-                <tr class="order-row border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 
-                    {{ 'border-l-4 border-yellow-500' if order.balance > 0 else 'border-l-4 border-green-500' }}"
-                    data-order-type="{{ order.order_type }}"
-                    data-receipt-id="{{ order.receipt_id }}"
-                    data-balance="{{ order.balance }}"
-                    data-date="{{ order.date.strftime('%Y-%m-%d') }}"
-                    data-search="{{ order.receipt_id ~ ' ' ~ (order.shop_name or 'Retail Sale') ~ ' ' ~ order.order_type }}">
-                    <td class="py-3 px-6 text-left whitespace-nowrap">{{ order.receipt_id }}</td>
-                    <td class="py-3 px-6 text-left">
-                        {{ order.shop_name or 'Retail Sale' }}
-                        <br>
-                        <span class="text-xs font-medium {{ 'text-blue-500' if order.order_type == 'retail' else 'text-green-500' }}">
-                            {{ order.order_type|capitalize }}
-                        </span>
-                    </td>
-                    <td class="py-3 px-6 text-center">{{ order.total_items }}</td>
-                    <td class="py-3 px-6 text-center">{{ order.date.strftime('%d/%m/%Y') }}</td>
-                    <td class="py-3 px-6 text-center">{{ order.payment | round(2) }}</td>
-                    <td class="py-3 px-6 text-center {{ 'text-red-600' if order.balance > 0 else 'text-green-600' }}">{{ order.balance | round(2) }}</td>
-                    <td class="py-3 px-6 text-center relative">
-                        <button class="order-actions-btn p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700" aria-label="Order actions">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600 dark:text-gray-300" viewBox="0 0 20 20" fill="currentColor">
-                                <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                            </svg>
-                        </button>
-                        <div class="order-actions-menu hidden absolute right-6 top-12 w-48 bg-white dark:bg-gray-700 rounded-lg shadow-lg z-20 py-1">
-                            <a href="{{ url_for('receipt', order_id=order.receipt_id) }}" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600">View Receipt</a>
-                            {% if session.get('user', {}).get('role') == 'manager' or session.get('user', {}).get('firstName', '') + ' ' + session.get('user', {}).get('lastName', '') == order.salesperson_name %}
-                            <button class="edit-order-btn w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600" data-receipt-id="{{ order.receipt_id }}" data-order-type="{{ order.order_type }}" data-shop-name="{{ order.shop_name }}" data-items='{{ order.items_list|tojson|safe }}'>Edit Order</button>
-                            <button class="delete-order-btn w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-600" data-receipt-id="{{ order.receipt_id }}">Delete Order</button>
-                            {% if order.balance > 0 %}
-                            <button class="mark-paid-btn w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-gray-100 dark:hover:bg-gray-600" data-receipt-id="{{ order.receipt_id }}" data-balance="{{ order.balance }}">Mark as Paid</button>
-                            <button class="return-stock-btn w-full text-left px-4 py-2 text-sm text-yellow-600 hover:bg-gray-100 dark:hover:bg-gray-600" data-receipt-id="{{ order.receipt_id }}" data-items='{{ order.items_list|tojson|safe }}'>Return Stock</button>
-                            {% endif %}
-                            {% endif %}
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-
+<!-- Orders Table -->
+<div class="overflow-x-auto">
+    <table id="orders-table" class="min-w-full bg-white dark:bg-gray-800 rounded-lg shadow-md">
+        <thead>
+            <tr class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 uppercase text-sm leading-normal">
+                <th class="py-3 px-6 text-left">Order #</th>
+                <th class="py-3 px-6 text-left">Client</th>
+                <th class="py-3 px-6 text-center">Total Items</th>
+                <th class="py-3 px-6 text-center">Date</th>
+                <th class="py-3 px-6 text-center">Payment (KSh)</th>
+                <th class="py-3 px-6 text-center">Balance (KSh)</th>
+                <th class="py-3 px-6 text-center">Actions</th>
+            </tr>
+        </thead>
+        <tbody id="orders-tbody" class="text-gray-600 dark:text-gray-300 text-sm font-light">
+            {% for order in orders %}
+            <tr class="order-row border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 
+                {{ 'border-l-4 border-yellow-500' if order.balance > 0 else 'border-l-4 border-green-500' }}"
+                data-order-type="{{ order.order_type }}"
+                data-receipt-id="{{ order.receipt_id }}"
+                data-balance="{{ order.balance }}"
+                data-date="{{ order.date.strftime('%Y-%m-%d') }}"
+                data-search="{{ order.receipt_id ~ ' ' ~ (order.shop_name or 'Retail Sale') ~ ' ' ~ order.order_type }}">
+                <td class="py-3 px-6 text-left whitespace-nowrap">{{ order.receipt_id }}</td>
+                <td class="py-3 px-6 text-left">
+                    {{ order.shop_name or 'Retail Sale' }}
+                    <br>
+                    <span class="text-xs font-medium {{ 'text-blue-500' if order.order_type == 'retail' else 'text-green-500' }}">
+                        {{ order.order_type|capitalize }}
+                    </span>
+                </td>
+                <td class="py-3 px-6 text-center">{{ order.total_items }}</td>
+                <td class="py-3 px-6 text-center">{{ order.date.strftime('%d/%m/%Y') }}</td>
+                <td class="py-3 px-6 text-center">{{ order.payment | round(2) }}</td>
+                <td class="py-3 px-6 text-center {{ 'text-red-600' if order.balance > 0 else 'text-green-600' }}">{{ order.balance | round(2) }}</td>
+                <td class="py-3 px-6 text-center relative">
+                    <button class="order-actions-btn p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700" aria-label="Order actions">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600 dark:text-gray-300" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                        </svg>
+                    </button>
+                    <div class="order-actions-menu hidden absolute right-6 top-12 w-48 bg-white dark:bg-gray-700 rounded-lg shadow-lg z-20 py-1">
+                        <a href="{{ url_for('receipt', order_id=order.receipt_id) }}" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600">View Receipt</a>
+                        {% if session.get('user', {}).get('role') == 'manager' or session.get('user', {}).get('firstName', '') + ' ' + session.get('user', {}).get('lastName', '') == order.salesperson_name %}
+                        <button class="edit-order-btn w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600" data-receipt-id="{{ order.receipt_id }}" data-order-type="{{ order.order_type }}" data-shop-name="{{ order.shop_name }}" data-items='{{ order.items_list|tojson|safe }}'>Edit Order</button>
+                        <button class="delete-order-btn w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-600" data-receipt-id="{{ order.receipt_id }}">Delete Order</button>
+                        {% if order.balance > 0 %}
+                        <button class="mark-paid-btn w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-gray-100 dark:hover:bg-gray-600" data-receipt-id="{{ order.receipt_id }}" data-balance="{{ order.balance }}">Mark as Paid</button>
+                        <button class="return-stock-btn w-full text-left px-4 py-2 text-sm text-yellow-600 hover:bg-gray-100 dark:hover:bg-gray-600" data-receipt-id="{{ order.receipt_id }}" data-items='{{ order.items_list|tojson|safe }}'>Return Stock</button>
+                        {% endif %}
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
     <!-- Pagination -->
     <div class="mt-4 flex justify-between items-center">
         <button id="prev-page" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50" disabled>Previous</button>
@@ -183,7 +182,7 @@
 </div>
 
 <!-- Add Expense Modal -->
-<div id="expense-modal" class="modal fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="expense-modal-title">
+<div id="expenseModal" class="modal fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="expense-modal-title">
     <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg w-96">
         <h2 id="expense-modal-title" class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Add Expense</h2>
         <div id="expense-error" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded mb-4"></div>
@@ -232,11 +231,6 @@
             <input type="hidden" name="order_type" id="edit-order-type">
             <input type="hidden" name="salesperson_name" value="{{ session['user']['firstName'] }} {{ session['user']['lastName'] }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div class="relative">
-                <label for="edit-client-input" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Client Name</label>
-                <select id="edit-client-input" name="shop_name" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" required></select>
-                <div id="edit-client-debt" class="mt-1 text-sm text-gray-600 dark:text-gray-400 hidden"></div>
-            </div>
             <div id="edit-items-container" class="space-y-4">
                 <div class="grid grid-cols-6 gap-2 items-center text-sm font-semibold item-row-header">
                     <span>Item</span>
@@ -263,7 +257,6 @@
         </form>
     </div>
 </div>
-
 <!-- Mark as Paid Modal -->
 <div id="mark-paid-modal" class="modal hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="mark-paid-modal-title">
     <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-lg w-96 max-h-[80vh] overflow-y-auto">
@@ -308,58 +301,48 @@
 
 <script>
 // Modal Management
-const modals = {
-    retail: document.getElementById('retail-modal'),
-    wholesale: document.getElementById('wholesale-modal'),
-    edit: document.getElementById('edit-order-modal'),
-    manual: document.getElementById('manual-item-modal'),
-    paid: document.getElementById('mark-paid-modal'),
-    return: document.getElementById('return-stock-modal'),
-    expense: document.getElementById('expense-modal')
-};
-const buttons = {
-    openRetail: document.getElementById('open-retail-modal'),
-    openWholesale: document.getElementById('open-wholesale-modal'),
-    openExpense: document.getElementById('open-expense-modal'),
-    closeRetail: document.getElementById('close-retail-modal'),
-    closeWholesale: document.getElementById('close-wholesale-modal'),
-    closeEdit: document.getElementById('close-edit-modal'),
-    closeManual: document.getElementById('close-manual-modal'),
-    closePaid: document.getElementById('close-paid-modal'),
-    closeReturn: document.getElementById('close-return-modal'),
-    closeExpense: document.getElementById('close-expense-modal'),
-    addRetailManual: document.getElementById('add-retail-manual'),
-    addWholesaleManual: document.getElementById('add-wholesale-manual'),
-    addEditManual: document.getElementById('add-edit-manual'),
-    addManualToOrder: document.getElementById('add-manual-to-order')
-};
-const containers = {
-    retail: document.getElementById('retail-items-container'),
-    wholesale: document.getElementById('wholesale-items-container'),
-    edit: document.getElementById('edit-items-container')
-};
-const inputs = {
-    manualQty: document.getElementById('manual-item-qty'),
-    manualPrice: document.getElementById('manual-item-price'),
-    retailAmountPaid: document.getElementById('retail-amount-paid'),
-    wholesaleAmountPaid: document.getElementById('wholesale-amount-paid')
-};
-const displays = {
-    manualTotal: document.getElementById('manual-total'),
-    retailOrderChange: document.getElementById('retail-order-change'),
-    wholesaleOrderChange: document.getElementById('wholesale-order-change')
-};
-const expenseElements = {
-    category: document.getElementById('expense-category'),
-    reason: document.getElementById('expense-reason'),
-    form: document.getElementById('expense-form')
-};
+const retailModal = document.getElementById('retail-modal');
+const wholesaleModal = document.getElementById('wholesale-modal');
+const editModal = document.getElementById('edit-order-modal');
+const manualModal = document.getElementById('manual-item-modal');
+const paidModal = document.getElementById('mark-paid-modal');
+const returnModal = document.getElementById('return-stock-modal');
+const openRetail = document.getElementById('open-retail-modal');
+const openWholesale = document.getElementById('open-wholesale-modal');
+const closeRetail = document.getElementById('close-retail-modal');
+const closeWholesale = document.getElementById('close-wholesale-modal');
+const closeEdit = document.getElementById('close-edit-modal');
+const closeManual = document.getElementById('close-manual-modal');
+const closePaid = document.getElementById('close-paid-modal');
+const closeReturn = document.getElementById('close-return-modal');
+const addRetailManual = document.getElementById('add-retail-manual');
+const addWholesaleManual = document.getElementById('add-wholesale-manual');
+const addEditManual = document.getElementById('add-edit-manual');
+const addManualToOrder = document.getElementById('add-manual-to-order');
+const retailContainer = document.getElementById('retail-items-container');
+const wholesaleContainer = document.getElementById('wholesale-items-container');
+const editContainer = document.getElementById('edit-items-container');
+const manualQty = document.getElementById('manual-item-qty');
+const manualPrice = document.getElementById('manual-item-price');
+const manualTotal = document.getElementById('manual-total');
+const retailAmountPaid = document.getElementById('retail-amount-paid');
+const wholesaleAmountPaid = document.getElementById('wholesale-amount-paid');
+const retailOrderChange = document.getElementById('retail-order-change');
+const wholesaleOrderChange = document.getElementById('wholesale-order-change');
+// Expense Modal Management
+const expenseModal = document.getElementById('expenseModal');
+const openExpenseModal = document.getElementById('open-expense-modal');
+const closeExpenseModal = document.getElementById('close-expense-modal');
+const expenseCategory = document.getElementById('expense-category');
+const expenseReason = document.getElementById('expense-reason');
+const expenseForm = document.getElementById('expense-form');
 
-let currentContainer = null;
+
+let currentContainer;
 let stockDataCache = null;
 
 function closeAllModals() {
-    Object.values(modals).forEach(modal => modal.classList.add('hidden'));
+    document.querySelectorAll('.modal').forEach(modal => modal.classList.add('hidden'));
 }
 
 function showModalError(modalId, message) {
@@ -385,54 +368,54 @@ function resetModal(container) {
         debtElement.classList.add('hidden');
     }
 }
-
-// Expense Modal Handlers
-if (buttons.openExpense) {
-    buttons.openExpense.addEventListener('click', () => {
+if (openExpenseModal) {
+    openExpenseModal.addEventListener('click', () => {
         closeAllModals();
-        modals.expense.classList.remove('hidden');
-        expenseElements.form.reset();
-        expenseElements.reason.classList.add('hidden');
-        expenseElements.reason.removeAttribute('required');
+        expenseModal.classList.remove('hidden');
+        expenseForm.reset();
+        expenseReason.classList.add('hidden');
+        expenseReason.removeAttribute('required');
         document.getElementById('expense-error').classList.add('hidden');
     });
 }
 
-if (buttons.closeExpense) {
-    buttons.closeExpense.addEventListener('click', () => {
-        modals.expense.classList.add('hidden');
-        expenseElements.form.reset();
-        expenseElements.reason.classList.add('hidden');
-        expenseElements.reason.removeAttribute('required');
+if (closeExpenseModal) {
+    closeExpenseModal.addEventListener('click', () => {
+        expenseModal.classList.add('hidden');
+        expenseForm.reset();
+        expenseReason.classList.add('hidden');
+        expenseReason.removeAttribute('required');
     });
 }
 
-expenseElements.category.addEventListener('change', () => {
-    const isOther = expenseElements.category.value === 'Other';
-    expenseElements.reason.classList.toggle('hidden', !isOther);
+// Show/hide reason input for "Other" category
+expenseCategory.addEventListener('change', () => {
+    const isOther = expenseCategory.value === 'Other';
+    expenseReason.classList.toggle('hidden', !isOther);
     if (isOther) {
-        expenseElements.reason.setAttribute('required', 'required');
+        expenseReason.setAttribute('required', 'required');
     } else {
-        expenseElements.reason.removeAttribute('required');
+        expenseReason.removeAttribute('required');
     }
 });
 
-expenseElements.form.addEventListener('submit', async (e) => {
+// Form submission with error handling
+expenseForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const submitBtn = expenseElements.form.querySelector('.submit-btn');
+    const submitBtn = expenseForm.querySelector('.submit-btn');
     submitBtn.classList.add('processing');
     submitBtn.disabled = true;
 
     try {
-        const response = await fetch(expenseElements.form.action, {
+        const response = await fetch(expenseForm.action, {
             method: 'POST',
-            body: new FormData(expenseElements.form),
+            body: new FormData(expenseForm),
             headers: {
-                'X-CSRFToken': expenseElements.form.querySelector('[name=csrf_token]').value
+                'X-CSRFToken': expenseForm.querySelector('[name=csrf_token]').value
             }
         });
         if (response.ok) {
-            modals.expense.classList.add('hidden');
+            expenseModal.classList.add('hidden');
             window.location.href = '/dashboard';
         } else {
             const errorText = await response.text();
@@ -447,61 +430,61 @@ expenseElements.form.addEventListener('submit', async (e) => {
 });
 
 // Modal Event Listeners
-buttons.openRetail.addEventListener('click', () => {
+openRetail.addEventListener('click', () => {
     closeAllModals();
-    resetModal(containers.retail);
-    modals.retail.classList.remove('hidden');
-    currentContainer = containers.retail;
-    attachAddItemListeners(containers.retail);
-    modals.retail.dispatchEvent(new Event('modal:open'));
+    resetModal(retailContainer);
+    retailModal.classList.remove('hidden');
+    currentContainer = retailContainer;
+    attachAddItemListeners(retailContainer);
+    retailModal.dispatchEvent(new Event('modal:open'));
 });
 
-buttons.openWholesale.addEventListener('click', () => {
+openWholesale.addEventListener('click', () => {
     closeAllModals();
-    resetModal(containers.wholesale);
-    modals.wholesale.classList.remove('hidden');
-    currentContainer = containers.wholesale;
-    attachAddItemListeners(containers.wholesale);
-    modals.wholesale.dispatchEvent(new Event('modal:open'));
+    resetModal(wholesaleContainer);
+    wholesaleModal.classList.remove('hidden');
+    currentContainer = wholesaleContainer;
+    attachAddItemListeners(wholesaleContainer);
+    wholesaleModal.dispatchEvent(new Event('modal:open'));
 });
 
-buttons.closeRetail.addEventListener('click', () => {
-    resetModal(containers.retail);
-    modals.retail.classList.add('hidden');
+closeRetail.addEventListener('click', () => {
+    resetModal(retailContainer);
+    retailModal.classList.add('hidden');
 });
 
-buttons.closeWholesale.addEventListener('click', () => {
-    resetModal(containers.wholesale);
-    modals.wholesale.classList.add('hidden');
+closeWholesale.addEventListener('click', () => {
+    resetModal(wholesaleContainer);
+    wholesaleModal.classList.add('hidden');
 });
 
-buttons.closeEdit.addEventListener('click', () => {
-    resetModal(containers.edit);
-    modals.edit.classList.add('hidden');
+closeEdit.addEventListener('click', () => {
+    resetModal(editContainer);
+    editModal.classList.add('hidden');
 });
 
-buttons.closeManual.addEventListener('click', () => {
-    modals.manual.classList.add('hidden');
+closeManual.addEventListener('click', () => {
+    manualModal.classList.add('hidden');
     document.getElementById('manual-item-form').reset();
-    displays.manualTotal.textContent = 'Total: 0.00';
+    manualTotal.textContent = 'Total: 0.00';
 });
 
-buttons.closePaid.addEventListener('click', () => modals.paid.classList.add('hidden'));
-buttons.closeReturn.addEventListener('click', () => modals.return.classList.add('hidden'));
+closePaid.addEventListener('click', () => paidModal.classList.add('hidden'));
+closeReturn.addEventListener('click', () => returnModal.classList.add('hidden'));
 
-buttons.addRetailManual.addEventListener('click', () => {
-    modals.manual.classList.remove('hidden');
-    currentContainer = containers.retail;
+addRetailManual.addEventListener('click', () => {
+    manualModal.classList.remove('hidden');
+    currentContainer = retailContainer;
 });
 
-buttons.addWholesaleManual.addEventListener('click', () => {
-    modals.manual.classList.remove('hidden');
-    currentContainer = containers.wholesale;
+addWholesaleManual.addEventListener('click', () => {
+    manualModal.classList.remove('hidden');
+    currentContainer = wholesaleContainer;
 });
 
-buttons.addEditManual.addEventListener('click', () => {
-    modals.manual.classList.remove('hidden');
-    currentContainer = containers.edit;
+addEditManual.addEventListener('click', () => {
+    manualModal.classList.remove('hidden');
+    currentContainer = editContainer;
 });
 
 // Populate Clients with Choices.js
@@ -580,15 +563,22 @@ async function populateClients(inputElement, debtElement) {
 populateClients(document.getElementById('retail-client-input'), document.getElementById('retail-client-debt'));
 populateClients(document.getElementById('wholesale-client-input'), document.getElementById('wholesale-client-debt'));
 populateClients(document.getElementById('edit-client-input'), document.getElementById('edit-client-debt'));
-
-// Fetch Stock Data
+</script>
+<script>
+// Fetch Stock Data from Firestore
 async function fetchStockData() {
     if (stockDataCache) return stockDataCache;
     try {
-        const response = await fetch('/stock_data', { credentials: 'include' });
-        if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+        const response = await fetch('/stock_data', {
+            credentials: 'include' // Ensure session cookies are sent for @login_required
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP error: ${response.status}`);
+        }
         const data = await response.json();
-        if (!Array.isArray(data)) throw new Error('Invalid response format: Expected an array');
+        if (!Array.isArray(data)) {
+            throw new Error('Invalid response format: Expected an array');
+        }
         stockDataCache = data.map(item => ({
             stock_name: item.stock_name,
             selling_price: parseFloat(item.selling_price) || 0,
@@ -596,10 +586,12 @@ async function fetchStockData() {
             stock_quantity: parseFloat(item.stock_quantity) || 0,
             uom: item.uom || 'Unit'
         }));
-        if (!stockDataCache.length) console.warn('No stock items returned from /stock_data');
+        if (!stockDataCache.length) {
+            console.warn('No stock items returned from /stock_data');
+        }
         return stockDataCache;
     } catch (error) {
-        console.error('Error fetching stock data:', error);
+        console.error('Error fetching stock data from /stock_data:', error);
         return [];
     }
 }
@@ -613,15 +605,30 @@ function attachActionButtonListeners() {
         newBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             const menu = newBtn.nextElementSibling;
-            document.querySelectorAll('.order-actions-menu').forEach(m => m !== menu && m.classList.add('hidden'));
+            const isOpen = !menu.classList.contains('hidden');
+            
+            document.querySelectorAll('.order-actions-menu').forEach(m => {
+                if (m !== menu) m.classList.add('hidden');
+            });
+            
             menu.classList.toggle('hidden');
 
             const menuRect = menu.getBoundingClientRect();
             const tableRect = document.getElementById('orders-table').getBoundingClientRect();
-            menu.style.top = menuRect.bottom > tableRect.bottom ? 'auto' : '12px';
-            menu.style.bottom = menuRect.bottom > tableRect.bottom ? '40px' : 'auto';
-            menu.style.right = menuRect.right > tableRect.right ? '0' : '6px';
-            menu.style.left = menuRect.right > tableRect.right ? 'auto' : 'auto';
+            if (menuRect.bottom > tableRect.bottom) {
+                menu.style.top = 'auto';
+                menu.style.bottom = '40px';
+            } else {
+                menu.style.top = '12px';
+                menu.style.bottom = 'auto';
+            }
+            if (menuRect.right > tableRect.right) {
+                menu.style.right = '0';
+                menu.style.left = 'auto';
+            } else {
+                menu.style.right = '6px';
+                menu.style.left = 'auto';
+            }
         });
     });
 
@@ -646,7 +653,7 @@ function attachActionButtonListeners() {
             const orderRow = btn.closest('.order-row');
             const receiptId = orderRow.getAttribute('data-receipt-id');
             const orderType = orderRow.getAttribute('data-order-type');
-            const shopName = btn.getAttribute('data-shop-name');
+            const shopName = orderRow.querySelector('td:nth-child(2)').textContent.split('\n')[0].trim();
             const itemsJson = btn.getAttribute('data-items');
             editOrder(receiptId, orderType, shopName, itemsJson);
         });
@@ -679,7 +686,8 @@ function updateOrdersDisplay() {
         const matchesFilter = currentFilter === 'all' || 
                              (currentFilter === 'pending' && balance > 0) || 
                              (currentFilter === 'paid' && balance === 0);
-        return matchesFilter && (searchTerm === '' || searchText.includes(searchTerm));
+        const matchesSearch = searchTerm === '' || searchText.includes(searchTerm);
+        return matchesFilter && matchesSearch;
     });
 
     filteredRows.sort((a, b) => new Date(b.getAttribute('data-date')) - new Date(a.getAttribute('data-date')));
@@ -754,24 +762,22 @@ function handleAddItemClick(event) {
 }
 
 async function addItem(container) {
-    const isRetail = container.id.includes('retail');
-    const isWholesale = container.id.includes('wholesale');
-    const isEdit = container.id.includes('edit');
-    const priceField = isRetail ? 'selling_price' : isWholesale ? 'wholesale' : (document.getElementById('edit-order-type').value === 'retail' ? 'selling_price' : 'wholesale');
-    
+    const isRetail = container.id === 'retail-items-container';
+    const isWholesale = container.id === 'wholesale-items-container';
+    const isEdit = container.id === 'edit-items-container';
+    const priceField = isRetail ? 'selling_price' : isWholesale ? 'wholesale' : (isEdit && container.closest('#edit-order-modal').querySelector('#edit-order-type').value === 'retail' ? 'selling_price' : 'wholesale');
     const div = document.createElement('div');
     div.className = 'grid grid-cols-6 gap-2 item-row';
     div.innerHTML = `
-        <select name="items[]" class="col-span-2 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-select w-full">
+        <select name="items[]" class="col-span-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-select w-full">
             <option value="">Search or select a product</option>
         </select>
-        <input name="items[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:text-gray-300 qty-input text-center w-full" min="0" step="0.01">
-        <input type="number" class="price-display p-2 border rounded-lg dark:bg-gray-700 dark:text-gray-300 text-center w-full" readonly>
-        <input type="number" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:text-gray-300 text-center w-full" readonly>
-        <input type="number" class="total-display p-2 border rounded-lg dark:bg-gray-700 text-center w-full" readonly>
-        <button type="button" class="remove-item bg-red-600 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
+        <input name="items[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="0.01">
+        <input type="number" class="price-display p-2 border rounded-lg text-center w-full" readonly>
+        <input type="number" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+        <input type="number" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+        <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
     `;
-    
     const addBtn = container.querySelector('.add-item-btn');
     container.insertBefore(div, addBtn);
 
@@ -793,9 +799,8 @@ async function addItem(container) {
             label: `${item.stock_name} (${item.uom})`
         }));
         choices.setChoices(choicesData, 'value', 'label', true);
-    }]);
     } catch (error) {
-        showModalError(container.id.split('-')[0], 'Error loading stock items.');
+        showModalError(container.id.split('-')[0], 'Failed to load stock items.');
     }
 
     div.querySelector('.remove-item').addEventListener('click', () => {
@@ -807,10 +812,10 @@ async function addItem(container) {
     updateSubtotal(container);
 }
 
-buttons.addManualToOrder.addEventListener('click', () => {
+addManualToOrder.addEventListener('click', () => {
     const name = document.getElementById('manual-item-name').value.trim();
-    const qty = parseFloat(inputs.manualQty.value) || 0;
-    const price = parseFloat(inputs.manualPrice.value) || 0;
+    const qty = parseFloat(manualQty.value) || 0;
+    const price = parseFloat(manualPrice.value) || 0;
     if (!name) {
         showModalError('manual-item', 'Item name is required.');
         return;
@@ -820,83 +825,82 @@ buttons.addManualToOrder.addEventListener('click', () => {
         return;
     }
     if (price <= 0) {
-        showModalError('manual-item', 'Price must be positive.');
+        showModalError('manual-item', 'Price must be greater than 0.');
         return;
     }
-
     const div = document.createElement('div');
     div.className = 'grid grid-cols-6 gap-2 item-row';
     div.innerHTML = `
-        <input name="items[]" type="hidden" value="product|${name}|quantity|${qty}|price|${price}|stock|0|uom|Unit">
-        <span class="col-span-2 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center">${name}</span>
-        <input name="items[]" type="number" value="${qty}" class="p-2 border rounded-lg dark:bg-gray-700 dark:text-gray-300 qty-input text-center w-full" min="0" step="0.01">
-        <input type="number" value="${price}" class="price-display p-2 border rounded-lg dark:bg-gray-700 dark:text-gray-300 text-center w-full" readonly>
-        <input type="number" value="0" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:text-gray-300 text-center w-full" readonly>
-        <input type="number" value="${price * qty}" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:text-gray-300 text-center w-full" readonly>
-        <button type="button" class="remove-item bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700">Remove</button>
+        <input name="items[]" type="hidden" value="product|${name}|quantity|0|price|${price}|stock|0|uom|Unit">
+        <span class="col-span-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center">${name}</span>
+        <input name="items[]" type="number" value="${qty}" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="0.01">
+        <input type="number" value="${price}" class="price-display p-2 border rounded-lg text-center w-full" readonly>
+        <input type="number" value="0" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+        <input type="number" value="${price * qty}" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+        <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
     `;
-    
     const addBtn = currentContainer.querySelector('.add-item-btn');
     currentContainer.insertBefore(div, addBtn);
-    
     div.querySelector('.remove-item').addEventListener('click', () => {
         div.remove();
         updateSubtotal(currentContainer);
     });
-    
-    div.querySelector('.qty-input').addEventListener('input', () => updateTotalDisplay(div));
-    modals.manual.classList.add('hidden');
+    div.querySelector('.qty-input').addEventListener('input', () => updatePriceAndTotal(div));
+    manualModal.classList.add('hidden');
     document.getElementById('manual-item-form').reset();
-    displays.manualTotal.textContent = 'Total: 0.00';
+    manualTotal.textContent = 'Total: 0.00';
     updateSubtotal(currentContainer);
 });
 
 function markPaid(receiptId, balance) {
     closeAllModals();
-    modals.paid.classList.remove('hidden');
+    paidModal.classList.remove('hidden');
     document.getElementById('paid-order-id').textContent = receiptId;
-    document.getElementById('full-amount-text').textContent = `Remaining Balance: ${balance.toFixed(2)}`;
-    const form = document.forms.getElementById('mark-paid-form-id');
+    document.getElementById('full-amount-text').textContent = `Remaining Balance: ${parseFloat(balance).toFixed(2)}`;
+    const form = document.getElementById('mark-paid-form');
     form.action = `/mark_paid/${receiptId}`;
+    document.getElementById('paid-amount').max = balance;
     document.getElementById('paid-amount').value = '';
-    
-    form.onsubmit = async (e) => {
+
+    form.onsubmit = function(e) {
         e.preventDefault();
         const submitBtn = form.querySelector('.submit-btn');
         submitBtn.classList.add('processing');
         submitBtn.disabled = true;
-        
         const amountPaid = parseFloat(document.getElementById('paid-amount').value) || 0;
-        if (amountPaid <= 0 || amountPaid > balance) {
-            showModalError('paid', 'Invalid amount.');
+        if (amountPaid <= 0 || amountPaid > parseFloat(balance)) {
+            showModalError('mark-paid', 'Please enter a valid amount (greater than 0, up to the balance).');
             submitBtn.classList.remove('processing');
             submitBtn.disabled = false;
             return;
         }
-        
-        try {
-            const response = await fetch(form.action, {
-                method: 'POST',
-                body: new FormData(form)
-            });
+
+        const formData = new FormData(this);
+        fetch(this.action, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
             if (response.ok) {
-                modals.paid.classList.add('hidden');
-                window.location.reload();
+                paidModal.classList.add('hidden');
+                window.location.href = '/orders';
             } else {
-                showModalError('paid', await response.text());
+                response.text().then(text => showModalError('mark-paid', 'Error processing payment: ' + text));
+                submitBtn.classList.remove('processing');
+                submitBtn.disabled = false;
             }
-        } catch (error) {
-            showModalError('paid', 'Error processing payment.');
-        } finally {
+        })
+        .catch(error => {
+            showModalError('mark-paid', 'An error occurred while processing the payment.');
             submitBtn.classList.remove('processing');
             submitBtn.disabled = false;
-        }
+        });
     };
 }
 
 function returnStock(receiptId, itemsJson) {
     closeAllModals();
-    modals.return.classList.remove('hidden');
+    returnModal.classList.remove('hidden');
     document.getElementById('return-order-id').textContent = receiptId;
     const form = document.getElementById('return-stock-form');
     const returnItemsContainer = document.getElementById('return-stock-items-container');
@@ -930,13 +934,17 @@ function returnStock(receiptId, itemsJson) {
         returnItemsContainer.innerHTML = '<p class="text-gray-700 dark:text-gray-300">No items available for return.</p>';
     }
 
-    form.onsubmit = async (e) => {
+    let isSubmitting = false;
+    form.onsubmit = function(e) {
         e.preventDefault();
+        if (isSubmitting) return;
+
         const submitBtn = form.querySelector('.submit-btn');
         submitBtn.classList.add('processing');
         submitBtn.disabled = true;
+        isSubmitting = true;
 
-        const formData = new FormData(form);
+        const formData = new FormData(this);
         let hasReturns = false;
         items.forEach(item => {
             const qty = parseInt(formData.get(`return_qty_${item.name}`)) || 0;
@@ -946,6 +954,7 @@ function returnStock(receiptId, itemsJson) {
                     showModalError('return-stock', `Cannot return more than ${item.quantity} units of ${item.name}.`);
                     submitBtn.classList.remove('processing');
                     submitBtn.disabled = false;
+                    isSubmitting = false;
                     return;
                 }
             }
@@ -955,93 +964,122 @@ function returnStock(receiptId, itemsJson) {
             showModalError('return-stock', 'Please specify at least one item to return.');
             submitBtn.classList.remove('processing');
             submitBtn.disabled = false;
+            isSubmitting = false;
             return;
         }
 
-        try {
-            const response = await fetch(form.action, {
-                method: 'POST',
-                body: formData
-            });
+        fetch(this.action, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
             if (response.ok) {
-                modals.return.classList.add('hidden');
+                returnModal.classList.add('hidden');
                 alert('Stock returns logged successfully. Please update the stock manually.');
-                window.location.reload();
+                window.location.href = '/orders';
             } else {
-                showModalError('return-stock', await response.text());
+                response.text().then(text => showModalError('return-stock', 'Error logging stock returns: ' + text));
+                submitBtn.classList.remove('processing');
+                submitBtn.disabled = false;
+                isSubmitting = false;
             }
-        } catch (error) {
-            showModalError('return-stock', 'Error logging stock returns.');
-        } finally {
+        })
+        .catch(error => {
+            showModalError('return-stock', 'An error occurred while logging the stock returns: ' + error);
             submitBtn.classList.remove('processing');
             submitBtn.disabled = false;
-        }
+            isSubmitting = false;
+        });
     };
 }
 
-function editOrder(receiptId, orderType, shopName, itemsJson) {
+function editOrder(orderId, orderType, itemsJson, subtotal, amountPaid) {
     closeAllModals();
-    modals.edit.classList.remove('hidden');
-    document.getElementById('edit-order-id').textContent = receiptId;
+    editModal.classList.remove('hidden');
+    document.getElementById('edit-order-id').textContent = orderId;
     document.getElementById('edit-order-type').value = orderType;
-    const form = document.forms.getElementById('edit-order-form-id');
-    form.action = `/edit_order/${receiptId}`;
-    resetModal(containers.edit);
+    const form = document.getElementById('edit-order-form');
+    form.action = `/edit_order/${orderId}`;
+    resetModal(editContainer);
 
-    const clientInput = document.getElementById('edit-client-input');
-    const choices = new Choices(clientInput);
-    choices.setChoiceByValue(shopName);
+    // Load existing items
+    let items = typeof itemsJson === 'string' ? JSON.parse(itemsJson) : itemsJson;
+    if (Array.isArray(items)) {
+        items.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'grid grid-cols-6 gap-2 item-row';
+            const price = parseFloat(item.price) || 0;
+            const quantity = parseInt(item.quantity) || 0;
+            div.innerHTML = `
+                <input name="items[]" type="text" value="${item.name}" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-input w-full">
+                <input name="items[]" type="number" value="${quantity}" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="1">
+                <input name="items[]" type="number" value="${price}" class="price-display p-2 border rounded-lg text-center w-full">
+                <input type="number" value="0" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+                <input type="number" value="${price * quantity}" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+                <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
+            `;
+            const addBtn = editContainer.querySelector('.add-item-btn');
+            editContainer.insertBefore(div, addBtn);
+            attachPriceListener(div);
+            div.querySelector('.remove-item').addEventListener('click', () => {
+                div.remove();
+                updateSubtotal(editContainer);
+            });
+        });
+    }
 
-    let items = JSON.parse(itemsJson);
-    items.forEach(item => {
+    // Set initial subtotal and amount paid
+    const initialSubtotal = parseFloat(subtotal) || 0;
+    document.getElementById('edit-order-total').textContent = initialSubtotal.toFixed(2);
+    document.getElementById('edit-amount-paid').value = parseFloat(amountPaid || 0).toFixed(2);
+    updateSubtotal(editContainer);
+
+    // Add item button (mimics manual item)
+    const addItemBtn = editContainer.querySelector('.add-item-btn');
+    addItemBtn.addEventListener('click', () => {
         const div = document.createElement('div');
         div.className = 'grid grid-cols-6 gap-2 item-row';
-        const price = parseFloat(item.price) || 0;
-        const quantity = parseInt(item.quantity) || 0;
         div.innerHTML = `
-            <input name="items[]" type="text" value="${item.name}" class="col-span-2 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-input w-full">
-            <input name="items[]" type="number" value="${quantity}" class="p-2 border rounded-lg dark:bg-gray-700 dark:text-gray-300 qty-input text-center w-full" min="0" step="1">
-            <input name="items[]" type="number" value="${price}" class="price-display p-2 border rounded-lg dark:bg-gray-700 dark:text-gray-300 text-center w-full">
-            <input type="number" value="0" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:text-gray-300 text-center w-full" readonly>
-            <input type="number" value="${price * quantity}" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:text-gray-300 text-center w-full" readonly>
-            <button type="button" class="remove-item bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700">Remove</button>
+            <input name="items[]" type="text" placeholder="Item name" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-input w-full">
+            <input name="items[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="1">
+            <input name="items[]" type="number" placeholder="Price" class="price-display p-2 border rounded-lg text-center w-full">
+            <input type="number" value="0" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+            <input type="number" value="0" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+            <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
         `;
-        const addBtn = containers.edit.querySelector('.add-item-btn');
-        containers.edit.insertBefore(div, addBtn);
+        const addBtn = editContainer.querySelector('.add-item-btn');
+        editContainer.insertBefore(div, addBtn);
         attachPriceListener(div);
         div.querySelector('.remove-item').addEventListener('click', () => {
             div.remove();
-            updateSubtotal(containers.edit);
+            updateSubtotal(editContainer);
         });
+        updateSubtotal(editContainer);
     });
 
-    updateSubtotal(containers.edit);
-
-    const addItemBtn = containers.edit.querySelector('.add-item-btn');
-    addItemBtn.onclick = () => addItem(containers.edit);
-
-    form.onsubmit = async (e) => {
+    // Form submission
+    form.onsubmit = async function(e) {
         e.preventDefault();
         const submitBtn = form.querySelector('.submit-btn');
         submitBtn.classList.add('processing');
         submitBtn.disabled = true;
 
         try {
-            const response = await fetch(form.action, {
+            const response = await fetch(this.action, {
                 method: 'POST',
-                body: new FormData(form),
-                headers: { 'X-CSRFToken': form.querySelector('[name=submitBtn]').value]').value }
+                body: new FormData(this),
+                headers: { 'X-CSRFToken': form.querySelector('[name=csrf_token]').value }
             });
             const result = await response.json();
             if (response.ok && result.status === 'success') {
-                modals.edit.classList.add('hidden');
+                editModal.classList.add('hidden');
                 showSuccessMessage(result.message);
                 setTimeout(() => window.location.reload(), 2000);
             } else {
-                showModalError('edit-order', result.error || 'Error updating order.');
+                showModalError('edit-order', `Error updating order: ${result.error || 'Unknown error'}`);
             }
         } catch (error) {
-            showModalError('edit-order', 'Error occurred during update.');
+            showModalError('edit-order', `An error occurred: ${error.message}`);
         } finally {
             submitBtn.classList.remove('processing');
             submitBtn.disabled = false;
@@ -1049,22 +1087,160 @@ function editOrder(receiptId, orderType, shopName, itemsJson) {
     };
 }
 
+// Success message
 function showSuccessMessage(message) {
     const div = document.createElement('div');
-    div.className = 'fixed top-4 right-4 bg-green-600 text-white p-4 rounded-lg shadow-lg z-50';
+    div.className = 'fixed top-4 right-4 bg-green-500 text-white p-4 rounded-lg shadow-lg z-50';
     div.textContent = message;
     document.body.appendChild(div);
     setTimeout(() => div.remove(), 3000);
 }
 
+// Update subtotal (aligned with add-edit-manual)
 function updateSubtotal(container) {
     let subtotal = 0;
     container.querySelectorAll('.item-row').forEach(row => {
-        const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
-        const price = parseFloat(row.querySelector('.price-display').value || row.querySelector('.price-display').value) || 0;
+        const qty = parseInt(row.querySelector('.qty-input').value) || 0;
+        const price = parseFloat(row.querySelector('.price-display').value) || 0;
         const total = qty * price;
         row.querySelector('.total-display').value = total.toFixed(2);
         subtotal += total;
+    });
+    const totalSpan = container.parentElement.querySelector('#edit-order-total');
+    totalSpan.textContent = subtotal.toFixed(2);
+
+    const amountPaidInput = container.parentElement.querySelector('#edit-amount-paid');
+    const changeSpan = container.parentElement.querySelector('#edit-order-change');
+    const amountPaid = parseFloat(amountPaidInput.value) || 0;
+    changeSpan.textContent = (amountPaid - subtotal).toFixed(2);
+}
+
+// Price listener for manual items
+function attachPriceListener(row) {
+    const qtyInput = row.querySelector('.qty-input');
+    const priceInput = row.querySelector('.price-display');
+    const updateTotal = () => {
+        const qty = parseInt(qtyInput.value) || 0;
+        const price = parseFloat(priceInput.value) || 0;
+        const total = qty * price;
+        row.querySelector('.total-display').value = total.toFixed(2);
+        updateSubtotal(row.closest('#edit-items-container'));
+    };
+    qtyInput.addEventListener('input', updateTotal);
+    priceInput.addEventListener('input', updateTotal);
+}
+
+// Reset modal
+function resetModal(container) {
+    container.querySelectorAll('.item-row').forEach(row => row.remove());
+}
+
+// Update edit button listeners
+document.querySelectorAll('.edit-order-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const orderRow = btn.closest('.order-row');
+        const orderId = btn.getAttribute('data-order-id') || orderRow.getAttribute('data-receipt-id'); // Fallback to receipt_id
+        const orderType = orderRow.getAttribute('data-order-type');
+        const itemsJson = btn.getAttribute('data-items');
+        const subtotal = orderRow.getAttribute('data-subtotal') || orderRow.querySelector('td:nth-child(6)').textContent.trim(); // Balance column
+        const amountPaid = orderRow.getAttribute('data-payment') || orderRow.querySelector('td:nth-child(5)').textContent.trim(); // Payment column
+        editOrder(orderId, orderType, itemsJson, subtotal, amountPaid);
+    });
+});
+
+function deleteOrder(receiptId) {
+    if (!confirm(`Are you sure you want to delete order #${receiptId}?`)) return;
+
+    fetch(`/delete_order/${receiptId}`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token() }}'
+        }
+    })
+    .then(response => {
+        if (response.ok) {
+            alert('Order deleted successfully.');
+            window.location.href = '/orders';
+        } else {
+            response.text().then(text => alert('Error deleting order: ' + text));
+        }
+    })
+    .catch(error => {
+        alert('An error occurred while deleting the order: ' + error);
+    });
+}
+
+manualQty.addEventListener('input', updateManualTotal);
+manualPrice.addEventListener('input', updateManualTotal);
+function updateManualTotal() {
+    const qty = parseFloat(manualQty.value) || 0;
+    const price = parseFloat(manualPrice.value) || 0;
+    manualTotal.textContent = `Total: ${(qty * price).toFixed(2)}`;
+}
+
+function attachPriceListener(row) {
+    const select = row.querySelector('.product-select');
+    const priceDisplay = row.querySelector('.price-display');
+    const stockDisplay = row.querySelector('.stock-display');
+    const totalDisplay = row.querySelector('.total-display');
+    const qtyInput = row.querySelector('.qty-input');
+    let basePrice = 0;
+    let maxStock = 0;
+
+    select.addEventListener('change', () => {
+        const selectedOption = select.options[select.selectedIndex];
+        if (selectedOption.value) {
+            const values = selectedOption.value.split('|');
+            basePrice = parseFloat(values[5]) || 0;
+            maxStock = parseFloat(values[7]) || 0;
+            priceDisplay.value = basePrice.toFixed(2);
+            stockDisplay.value = maxStock.toFixed(2);
+            qtyInput.max = maxStock;
+            const qty = parseFloat(qtyInput.value) || 0;
+            if (qty > maxStock) {
+                qtyInput.value = maxStock;
+                showModalError(row.closest('.modal').id.split('-')[0], `Cannot order more than ${maxStock} units of ${values[1]}.`);
+            }
+            totalDisplay.value = (basePrice * (parseFloat(qtyInput.value) || 0)).toFixed(2);
+            updateSubtotal(row.closest('.space-y-4'));
+        } else {
+            basePrice = 0;
+            maxStock = 0;
+            priceDisplay.value = '';
+            stockDisplay.value = '';
+            totalDisplay.value = '';
+            qtyInput.max = '';
+            updateSubtotal(row.closest('.space-y-4'));
+        }
+    });
+
+    qtyInput.addEventListener('input', () => {
+        const qty = parseFloat(qtyInput.value) || 0;
+        if (qty > maxStock) {
+            qtyInput.value = maxStock;
+            showModalError(row.closest('.modal').id.split('-')[0], `Cannot order more than ${maxStock} units.`);
+        }
+        totalDisplay.value = (basePrice * (parseFloat(qtyInput.value) || 0)).toFixed(2);
+        updateSubtotal(row.closest('.space-y-4'));
+    });
+}
+
+function updatePriceAndTotal(row) {
+    const qtyInput = row.querySelector('.qty-input');
+    const priceDisplay = row.querySelector('.price-display');
+    const totalDisplay = row.querySelector('.total-display');
+    const basePrice = parseFloat(row.querySelector('input[type="hidden"]')?.value.split('|')[5]) || parseFloat(priceDisplay.value) || 0;
+    const qty = parseFloat(qtyInput.value) || 0;
+    totalDisplay.value = (basePrice * qty).toFixed(2);
+    updateSubtotal(row.closest('.space-y-4'));
+}
+
+function updateSubtotal(container) {
+    let subtotal = 0;
+    const rows = container.querySelectorAll('.item-row');
+    rows.forEach(row => {
+        const totalDisplay = row.querySelector('.total-display');
+        if (totalDisplay && totalDisplay.value) subtotal += parseFloat(totalDisplay.value) || 0;
     });
     const totalSpan = container.parentElement.querySelector('[id$="-order-total"]');
     if (totalSpan) totalSpan.textContent = subtotal.toFixed(2);
@@ -1084,116 +1260,69 @@ function updateChange(container) {
     changeSpan.parentElement.classList.toggle('text-red-600', change < 0);
 }
 
-function attachPriceListener(row) {
-    const select = row.querySelector('.product-select');
-    const priceDisplay = row.querySelector('.price-display');
-    const stockDisplay = row.querySelector('.stock-display');
-    const totalDisplay = row.querySelector('.total-display');
-    const qtyInput = row.querySelector('.qty-input');
-    let basePrice = 0;
-    let maxStock = 0;
+retailAmountPaid.addEventListener('input', () => updateChange(retailContainer));
+wholesaleAmountPaid.addEventListener('input', () => updateChange(wholesaleContainer));
 
-    if (select) {
-        select.addEventListener('change', () => {
-            const values = select.value.split('|');
-            if (values.length > 5) {
-                basePrice = parseFloat(values[5]) || 0;
-                maxStock = parseFloat(values[7]) || 0;
-                priceDisplay.value = basePrice.toFixed(2);
-                stockDisplay.value = maxStock.toFixed(2);
-                qtyInput.max = maxStock;
-                updateTotalDisplay(row);
-            }
-        });
-    }
-
-    qtyInput.addEventListener('input', () => {
-        const qty = parseFloat(qtyInput.value) || 0;
-        if (qty > maxStock) {
-            qtyInput.value = maxStock;
-            showModalError(row.closest('.modal').id.split('-')[0], `Cannot order more than ${maxStock} units.`);
-        }
-        updateTotalDisplay(row);
-    });
-
-    if (priceInput) {
-        priceInput.addEventListener('input', () => updateTotalDisplay(row));
-    }
-}
-
-function updateTotalDisplay(row) {
-    const qtyInput = row.querySelector('.qty-input');
-    const priceDisplay = row.querySelector('.price-display');
-    const totalDisplay = row.querySelector('.total-display');
-    const qty = parseFloat(qtyInput.value) || 0;
-    const price = parseFloat(priceDisplay.value) || 0;
-    totalDisplay.value = (qty * price).toFixed(2);
-    updateSubtotal(row.closest('.space-y-4'));
-}
-
-function deleteOrder(receiptId) {
-    if (!confirm(`Are you sure you want to delete order #${receiptId}?`)) return;
-
-    fetch(`/delete_order/${receiptId}`, {
+document.getElementById('retail-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const submitBtn = this.querySelector('.submit-btn');
+    submitBtn.classList.add('processing');
+    submitBtn.disabled = true;
+    const formData = new FormData(this);
+    fetch(this.action, {
         method: 'POST',
-        headers: {
-            'X-CSRF-Token': '{{ csrf_token() }}'
-        } })
+        body: formData
+    })
     .then(response => {
         if (response.ok) {
-            alert('Order deleted successfully.');
+            retailModal.classList.add('hidden');
             window.location.reload();
         } else {
-            alert('Error deleting order: ' + response.text());
-        }
-    })
-    .catch(error => {
-        alert('Error occurred: ' + error);
-    });
-}
-
-inputs.manualQty.addEventListener('input', updateManualTotal);
-inputs.manualPrice.addEventListener('input', updateManualTotal);
-function updateManualTotal() {
-    const qty = parseFloat(inputs.manualQty.value) || 0;
-    const price = parseFloat(inputs.manualPrice.value) || 0;
-    displays.manualTotal.textContent = `Total: ${(qty * price).toFixed(2)}`;
-}
-
-inputs.retailAmountPaid.addEventListener('input', () => updateChange(containers.retail));
-inputs.wholesaleAmountPaid.addEventListener('input', () => updateChange(containers.wholesale));
-
-['retail', 'wholesale'].forEach(type => {
-    document.getElementById(`${type}-form`).addEventListener('submit', async function(e) {
-        e.preventDefault();
-        const submitBtn = this.querySelector('.submit-btn');
-        submitBtn.classList.add('processing');
-        submitBtn.disabled = true;
-
-        try {
-            const response = await fetch(this.action, {
-                method: 'POST',
-                body: new FormData(this)
-            });
-            if (response.ok) {
-                modals[type].classList.add('hidden');
-                window.location.reload();
-            } else {
-                showModalError(type, await response.text());
-            }
-        } catch (error) {
-            showModalError(type, `Error submitting ${type} order.`);
-        } finally {
+            response.text().then(text => showModalError('retail', 'Error submitting retail order: ' + text));
             submitBtn.classList.remove('processing');
             submitBtn.disabled = false;
         }
+    })
+    .catch(error => {
+        showModalError('retail', 'An error occurred while submitting the retail order.');
+        submitBtn.classList.remove('processing');
+        submitBtn.disabled = false;
+    });
+});
+
+document.getElementById('wholesale-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const submitBtn = this.querySelector('.submit-btn');
+    submitBtn.classList.add('processing');
+    submitBtn.disabled = true;
+    const formData = new FormData(this);
+    fetch(this.action, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (response.ok) {
+            wholesaleModal.classList.add('hidden');
+            window.location.reload();
+        } else {
+            response.text().then(text => showModalError('wholesale', 'Error submitting wholesale order: ' + text));
+            submitBtn.classList.remove('processing');
+            submitBtn.disabled = false;
+        }
+    })
+    .catch(error => {
+        showModalError('wholesale', 'An error occurred while submitting the wholesale order.');
+        submitBtn.classList.remove('processing');
+        submitBtn.disabled = false;
     });
 });
 
 // Close Menus on Outside Click
-document.addEventListener('mousedown', (e) => {
+document.addEventListener('click', (e) => {
     if (!e.target.closest('.order-actions-btn') && !e.target.closest('.order-actions-menu')) {
-        document.querySelectorAll('.order-actions-menu').forEach(menu => menu.classList.add('hidden'));
+        document.querySelectorAll('.order-actions-menu').forEach(menu => {
+            menu.classList.add('hidden');
+        });
     }
 });
 </script>
@@ -1211,55 +1340,58 @@ input[type="number"][readonly]::-webkit-outer-spin-button {
     margin: 0;
 }
 .choices__inner { 
-    background-color: #fff;
-    border-color: #d1d5db;
-    color: #374151;
-    min-height: 2.5rem;
-    padding: 0.5rem;
-    border-radius: 0.5rem;
+    background-color: #fff; 
+    border-color: #d1d5db; 
+    color: #374151; 
+    min-height: 2.5rem; 
+    padding: 0.5rem; 
+    border-radius: 0.5rem; 
+    width: 100%; 
 }
 .choices__list--single { padding: 0; }
 .choices__list--dropdown { 
-    background-color: #fff;
-    border-color: #d1d5db;
-    color: #374151;
-    border-radius: 0.5rem;
-    max-height: 200px;
+    background-color: #fff; 
+    border-color: #d1d5db; 
+    color: #374151; 
+    border-radius: 0.5rem; 
+    width: 100%; 
+    max-height: 200px; 
     overflow-y: auto;
 }
 .choices__item--selectable { color: #374151; }
 .choices__input { 
-    background-color: #fff;
-    color: #374151;
+    background-color: #fff; 
+    color: #374151; 
+    width: 100%; 
 }
 .dark .choices__inner { 
-    background-color: #374151;
-    border-color: #4b5563;
-    color: #d1d5db;
+    background-color: #374151; 
+    border-color: #4b5563; 
+    color: #d1d5db; 
 }
 .dark .choices__list--dropdown { 
-    background-color: #374151;
-    border-color: #4b5563;
-    color: #d1d5db;
-    border-radius: 0.5rem;
-    max-height: 200px;
+    background-color: #374151; 
+    border-color: #4b5563; 
+    color: #d1d5db; 
+    border-radius: 0.5rem; 
+    max-height: 200px; 
     overflow-y: auto;
 }
 .dark .choices__item--selectable { color: #d1d5db; }
 .dark .choices__input { 
-    background-color: #374151;
-    color: #d1d5db;
+    background-color: #374151; 
+    color: #d1d5db; 
 }
 .modal { 
-    overflow: hidden;
-    z-index: 50;
+    overflow-y: hidden; 
+    z-index: 50; 
 }
 #manual-item-modal { 
-    z-index: 60;
+    z-index: 60; 
 }
 .modal > div { 
-    max-height: 80vh;
-    overflow-y: auto;
+    max-height: 80vh; 
+    overflow-y: auto; 
 }
 .item-row-header, .item-row {
     display: grid;
@@ -1314,32 +1446,30 @@ input[type="number"][readonly]::-webkit-outer-spin-button {
     outline: none;
     box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.5);
 }
-.submit-btn {
- &.processing {
+.submit-btn.processing {
     position: relative;
     overflow: hidden;
     transition: all 0.3s ease;
 }
-    &.processing::after {
-        content: '';
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        width: 0;
-        height: 0;
-        background: rgba(255, 255,255, 0.3);
-        border-radius: 50%;
-        transform: translate(-50%, -50%);
-        animation: ripple 0.6s linear;
-    }
-    &.processing::before {
-        content: '\f1ce';
-        font-family: 'Font Awesome 6 Free';
-        font-weight: 900;
-        display: inline-block;
-        margin-right: 0.5rem;
-        animation: spin 1s linear infinite;
-    }
+.submit-btn.processing::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    animation: ripple 0.6s linear;
+}
+.submit-btn.processing::before {
+    content: '\f1ce';
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 900;
+    display: inline-block;
+    margin-right: 0.5rem;
+    animation: spin 1s linear infinite;
 }
 @keyframes ripple {
     to {
@@ -1352,6 +1482,7 @@ input[type="number"][readonly]::-webkit-outer-spin-button {
     to {
         transform: rotate(360deg);
     }
+}
 .submit-btn:disabled {
     opacity: 0.7;
     cursor: not-allowed;
@@ -1367,28 +1498,11 @@ th, td {
     border: 1px solid #e5e7eb;
 }
 .dark th, .dark td {
-    border-color: #4b5563;
+    border: 1px solid #4b5563;
 }
 .text-blue-500 { color: #3b82f6; }
 .text-green-500 { color: #10b981; }
 .dark .text-blue-500 { color: #3b82f6; }
 .dark .text-green-500 { color: #10b981; }
-.tr highlighted {
-    background-color: #dbeafe;
-    border-left: 4px solid #3b82f6;
-    animation: fadeHighlight 3s ease-out forwards;
-}
-.dark tr.highlighted {
-    background-color: #4b5563;
-    border-left-color: #60a5fa;
-}
-@keyframes fadeHighlight {
-    from { background-color: #dbeafe; }
-    to { background-color: transparent; }
-}
-.dark @keyframes fadeHighlight {
-    from { background-color: #4b5563; }
-    to { background-color: transparent; }
-}
 </style>
 {% endblock %}
