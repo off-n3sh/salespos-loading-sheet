@@ -21,7 +21,7 @@
                 .then(config => {
                     if (!config || Object.keys(config).length === 0) {
                         console.error("Firebase config is empty or not loaded");
-                        notificationList.innerHTML = '<li class="p-4 text-sm text-red-600 dark:text-red-400">Failed to load Firebase configuration</li>';
+                        document.getElementById('notification-list').innerHTML = '<li class="p-4 text-sm text-red-600 dark:text-red-400">Failed to load Firebase configuration</li>';
                         return;
                     }
                     try {
@@ -43,8 +43,8 @@
                             notificationDropdown.classList.toggle('hidden');
                         });
 
-                        // Track displayed orders to simulate "read" status
-                        const displayedOrders = new Set();
+                        // Track read notifications
+                        const readNotifications = new Set();
 
                         // Fetch and display orders as notifications in real-time
                         firebase.auth().onAuthStateChanged(user => {
@@ -55,31 +55,33 @@
                             const salespersonName = user.displayName ? user.displayName.toLowerCase() : 'anonymous';
                             db.collection('orders')
                                 .where('salesperson_name_lower', '==', salespersonName)
+                                .orderBy('date', 'desc') // Sort by date, newest first
                                 .onSnapshot(snapshot => {
                                     let unreadCount = 0;
                                     notificationList.innerHTML = '';
                                     if (snapshot.empty) {
-                                        notificationList.innerHTML = '<li class="p-4 text-sm text-gray-600 dark:text-gray-400">No new orders found</li>';
+                                        notificationList.innerHTML = '<li class="p-4 text-sm text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 rounded-md">No new orders found</li>';
                                         notificationCount.textContent = 0;
                                         notificationCount.classList.add('hidden');
                                         return;
                                     }
+                                    const notifications = [];
                                     snapshot.forEach(doc => {
-                                        const order = doc.data();
-                                        const orderId = doc.id;
-
-                                        // Skip if already displayed
-                                        if (displayedOrders.has(orderId)) return;
+                                        notifications.push({ id: doc.id, data: doc.data() });
+                                    });
+                                    notifications.forEach(({ id, data }) => {
+                                        const order = data;
+                                        const orderId = id;
 
                                         // Handle different order structures
-                                        let message = `New ${order.order_type || 'unknown'} order #${order.receipt_id || 'N/A'}`;
+                                        let message = `<span class="font-semibold text-blue-600 dark:text-blue-400">New ${order.order_type || 'unknown'} order</span> <span class="font-bold">#${order.receipt_id || 'N/A'}</span>`;
                                         const balance = order.balance !== undefined ? order.balance : order.pending_payment || 0;
                                         if (balance > 0) {
-                                            message += ` with pending balance of ${balance}`;
+                                            message += ` with <span class="text-red-500 dark:text-red-400 font-semibold">pending balance of $${balance}</span>`;
                                         } else {
-                                            message += ` (fully paid)`;
+                                            message += ` (<span class="text-green-500 dark:text-green-400">fully paid</span>)`;
                                         }
-                                        message += ` at ${order.shop_name || 'unknown shop'}.`;
+                                        message += ` at <span class="font-medium">${order.shop_name || 'unknown shop'}</span>.`;
 
                                         // Extract items for additional context
                                         let itemsText = '';
@@ -96,26 +98,41 @@
                                             }
                                         }
                                         if (itemsText) {
-                                            message += ` Items: ${itemsText}.`;
+                                            message += `<br><span class="text-sm text-gray-600 dark:text-gray-400">Items: ${itemsText}</span>`;
                                         }
 
                                         // Create notification list item
                                         const li = document.createElement('li');
-                                        li.className = 'p-4 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer';
+                                        li.className = `p-4 rounded-md mb-2 transition-all duration-200 ${readNotifications.has(orderId) ? 'bg-gray-100 dark:bg-gray-700' : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-600'}`;
                                         li.innerHTML = `
-                                            <div class="flex justify-between">
-                                                <p class="text-sm text-gray-800 dark:text-gray-200">${message}</p>
-                                                <span class="text-xs text-gray-500 dark:text-gray-400">${new Date(order.date?.toDate()).toLocaleString()}</span>
+                                            <div class="flex justify-between items-start">
+                                                <div class="flex-1">
+                                                    <p class="text-sm text-gray-800 dark:text-gray-200">${message}</p>
+                                                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">${new Date(order.date?.toDate()).toLocaleString()}</p>
+                                                </div>
+                                                <button class="mark-read text-xs text-blue-600 dark:text-blue-400 hover:underline ${readNotifications.has(orderId) ? 'hidden' : ''}" data-id="${orderId}">Mark as read</button>
                                             </div>
                                         `;
-                                        li.addEventListener('click', () => {
-                                            displayedOrders.add(orderId);
+                                        li.addEventListener('click', (e) => {
+                                            if (e.target.classList.contains('mark-read')) return;
+                                            readNotifications.add(orderId);
                                             notificationCount.textContent = Math.max(0, notificationCount.textContent - 1);
                                             notificationCount.classList.toggle('hidden', notificationCount.textContent == 0);
                                             window.location.href = "{{ url_for('orders') }}";
                                         });
                                         notificationList.appendChild(li);
-                                        unreadCount++;
+                                        if (!readNotifications.has(orderId)) unreadCount++;
+                                    });
+                                    // Add event listeners for mark as read buttons
+                                    document.querySelectorAll('.mark-read').forEach(button => {
+                                        button.addEventListener('click', (e) => {
+                                            const orderId = e.target.getAttribute('data-id');
+                                            readNotifications.add(orderId);
+                                            e.target.closest('li').classList.add('bg-gray-100', 'dark:bg-gray-700');
+                                            e.target.classList.add('hidden');
+                                            notificationCount.textContent = Math.max(0, notificationCount.textContent - 1);
+                                            notificationCount.classList.toggle('hidden', notificationCount.textContent == 0);
+                                        });
                                     });
                                     notificationCount.textContent = unreadCount;
                                     notificationCount.classList.toggle('hidden', unreadCount == 0);
@@ -127,7 +144,7 @@
                                     } else if (err.code === 'unavailable') {
                                         errorMessage = 'Firestore unavailable: Check your connection';
                                     }
-                                    notificationList.innerHTML = `<li class="p-4 text-sm text-red-600 dark:text-red-400">${errorMessage}</li>`;
+                                    notificationList.innerHTML = `<li class="p-4 text-sm text-red-600 dark:text-red-400 bg-white dark:bg-gray-800 rounded-md">${errorMessage}</li>`;
                                     notificationCount.textContent = 0;
                                     notificationCount.classList.add('hidden');
                                 });
@@ -139,7 +156,7 @@
                                 .where('salesperson_name_lower', '==', firebase.auth().currentUser?.displayName?.toLowerCase() || 'anonymous')
                                 .get();
                             snapshot.forEach(doc => {
-                                displayedOrders.add(doc.id);
+                                readNotifications.add(doc.id);
                             });
                             notificationList.innerHTML = '';
                             notificationCount.textContent = 0;
@@ -163,12 +180,12 @@
                             });
                     } catch (error) {
                         console.error("Firebase initialization failed in base.html:", error);
-                        notificationList.innerHTML = '<li class="p-4 text-sm text-red-600 dark:text-red-400">Failed to initialize Firebase</li>';
+                        notificationList.innerHTML = '<li class="p-4 text-sm text-red-600 dark:text-red-400 bg-white dark:bg-gray-800 rounded-md">Failed to initialize Firebase</li>';
                     }
                 })
                 .catch(error => {
                     console.error("Failed to fetch Firebase config:", error);
-                    notificationList.innerHTML = '<li class="p-4 text-sm text-red-600 dark:text-red-400">Failed to fetch Firebase configuration</li>';
+                    notificationList.innerHTML = '<li class="p-4 text-sm text-red-600 dark:text-red-400 bg-white dark:bg-gray-800 rounded-md">Failed to fetch Firebase configuration</li>';
                 });
 
             // Theme handling
@@ -264,10 +281,9 @@
             .card-header { font-weight: 600; font-size: 1.25rem; margin-bottom: 1rem; color: #1a202c; }
             .dark .card-header { color: #f7fafc; }
             .sales-cards-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
-            .notification-dropdown { max-height: 24rem; overflow-y: auto; border: 1px solid #e2e8f0; }
-            .dark .notification-dropdown { border-color: #4a5568; }
-            .notification-dropdown li { transition: background-color 0.2s; }
-            .notification-icon { font-size: 1.5rem; } /* Larger bell icon */
+            .notification-dropdown { max-height: 24rem; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 0.5rem; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+            .dark .notification-dropdown { border-color: #4a5568; background-color: #2d3748; }
+            .notification-icon { font-size: 1.75rem; } /* Larger bell icon */
         `;
         document.head.appendChild(style);
     </script>
@@ -338,19 +354,17 @@
                 <div class="flex space-x-4">
                     <button id="notifications" class="text-white hover:text-blue-200 focus:outline-none relative">
                         <i class="fas fa-bell notification-icon"></i>
-                        <span id="notification-count" class="absolute top-0 right-0 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center hidden">0</span>
+                        <span id="notification-count" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center hidden">0</span>
                     </button>
                     <!-- Notification Dropdown -->
                     <div id="notification-dropdown" class="hidden absolute right-4 top-14 w-96 bg-white dark:bg-gray-800 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
-                        <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+                        <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                             <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Notifications</h3>
+                            <button id="clear-notifications" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">Clear All</button>
                         </div>
                         <ul id="notification-list" class="divide-y divide-gray-200 dark:divide-gray-700">
                             <!-- Notifications populated here -->
                         </ul>
-                        <div class="p-4 text-center">
-                            <button id="clear-notifications" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">Clear All</button>
-                        </div>
                     </div>
                 </div>
             </header>
