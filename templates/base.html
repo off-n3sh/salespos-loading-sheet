@@ -21,7 +21,7 @@
                 .then(config => {
                     if (!config || Object.keys(config).length === 0) {
                         console.error("Firebase config is empty or not loaded");
-                        showErrorNotification("Failed to load Firebase configuration");
+                        notificationList.innerHTML = '<li class="p-4 text-sm text-red-600 dark:text-red-400">Failed to load Firebase configuration</li>';
                         return;
                     }
                     try {
@@ -33,28 +33,18 @@
 
                         // Notification elements
                         const notificationButton = document.getElementById('notifications');
-                        const notificationPopup = document.getElementById('notification-popup');
+                        const notificationDropdown = document.getElementById('notification-dropdown');
                         const notificationList = document.getElementById('notification-list');
                         const notificationCount = document.getElementById('notification-count');
                         const clearNotificationsButton = document.getElementById('clear-notifications');
 
-                        // Toggle popup visibility
+                        // Toggle dropdown visibility
                         notificationButton.addEventListener('click', () => {
-                            notificationPopup.classList.toggle('hidden');
+                            notificationDropdown.classList.toggle('hidden');
                         });
 
-                        // Close popup when clicking outside
-                        document.addEventListener('click', (e) => {
-                            if (!notificationButton.contains(e.target) && !notificationPopup.contains(e.target)) {
-                                notificationPopup.classList.add('hidden');
-                            }
-                        });
-
-                        // Show error in popup
-                        function showErrorNotification(message) {
-                            notificationList.innerHTML = `<li class="p-4 text-sm text-red-600 dark:text-red-400">${message}</li>`;
-                            notificationCount.textContent = 0;
-                            notificationCount.class忽然
+                        // Track displayed orders to simulate "read" status
+                        const displayedOrders = new Set();
 
                         // Fetch and display orders as notifications in real-time
                         firebase.auth().onAuthStateChanged(user => {
@@ -65,8 +55,6 @@
                             const salespersonName = user.displayName ? user.displayName.toLowerCase() : 'anonymous';
                             db.collection('orders')
                                 .where('salesperson_name_lower', '==', salespersonName)
-                                .where('read', '==', false)
-                                .orderBy('date', 'desc') // Newest first
                                 .onSnapshot(snapshot => {
                                     let unreadCount = 0;
                                     notificationList.innerHTML = '';
@@ -80,18 +68,20 @@
                                         const order = doc.data();
                                         const orderId = doc.id;
 
+                                        // Skip if already displayed
+                                        if (displayedOrders.has(orderId)) return;
+
                                         // Handle different order structures
-                                        let message = `
-                                            <div class="flex flex-col">
-                                                <div class="flex justify-between items-center">
-                                                    <span class="font-bold text-blue-600 dark:text-blue-400">New ${order.order_type || 'unknown'} Order #${order.receipt_id || 'N/A'}</span>
-                                                    <span class="text-xs text-gray-500 dark:text-gray-400">${new Date(order.date?.toDate()).toLocaleString()}</span>
-                                                </div>
-                                                <p class="text-sm text-gray-800 dark:text-gray-200 mt-1">
-                                                    <span class="font-semibold">Shop:</span> ${order.shop_name || 'Unknown Shop'}<br>
-                                                    <span class="font-semibold">Balance:</span> ${order.balance !== undefined ? order.balance : order.pending_payment || 0} ${order.balance > 0 || order.pending_payment > 0 ? '(Pending)' : '(Fully Paid)'}
-                                                </p>
-                                        `;
+                                        let message = `New ${order.order_type || 'unknown'} order #${order.receipt_id || 'N/A'}`;
+                                        const balance = order.balance !== undefined ? order.balance : order.pending_payment || 0;
+                                        if (balance > 0) {
+                                            message += ` with pending balance of ${balance}`;
+                                        } else {
+                                            message += ` (fully paid)`;
+                                        }
+                                        message += ` at ${order.shop_name || 'unknown shop'}.`;
+
+                                        // Extract items for additional context
                                         let itemsText = '';
                                         if (order.order_type === 'app' && Array.isArray(order.items)) {
                                             itemsText = order.items.map(item => `${item.quantity} x ${item.product}`).join(', ');
@@ -106,25 +96,25 @@
                                             }
                                         }
                                         if (itemsText) {
-                                            message += `<p class="text-sm text-gray-800 dark:text-gray-200 mt-1"><span class="font-semibold">Items:</span> ${itemsText}</p>`;
+                                            message += ` Items: ${itemsText}.`;
                                         }
-                                        message += '</div>';
 
                                         // Create notification list item
                                         const li = document.createElement('li');
-                                        li.className = 'p-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition-all duration-200';
-                                        li.innerHTML = message;
-                                        li.addEventListener('click', async () => {
-                                            try {
-                                                await db.collection('orders').doc(orderId).update({ read: true });
-                                                notificationCount.textContent = Math.max(0, notificationCount.textContent - 1);
-                                                notificationCount.classList.toggle('hidden', notificationCount.textContent == 0);
-                                                window.location.href = "{{ url_for('orders') }}?highlight_order=" + orderId;
-                                            } catch (error) {
-                                                console.error("Error marking order as read:", error);
-                                            }
+                                        li.className = 'p-4 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer';
+                                        li.innerHTML = `
+                                            <div class="flex justify-between">
+                                                <p class="text-sm text-gray-800 dark:text-gray-200">${message}</p>
+                                                <span class="text-xs text-gray-500 dark:text-gray-400">${new Date(order.date?.toDate()).toLocaleString()}</span>
+                                            </div>
+                                        `;
+                                        li.addEventListener('click', () => {
+                                            displayedOrders.add(orderId);
+                                            notificationCount.textContent = Math.max(0, notificationCount.textContent - 1);
+                                            notificationCount.classList.toggle('hidden', notificationCount.textContent == 0);
+                                            window.location.href = "{{ url_for('orders') }}";
                                         });
-                                        notificationList.prepend(li); // Prepend for newest-first
+                                        notificationList.appendChild(li);
                                         unreadCount++;
                                     });
                                     notificationCount.textContent = unreadCount;
@@ -137,30 +127,24 @@
                                     } else if (err.code === 'unavailable') {
                                         errorMessage = 'Firestore unavailable: Check your connection';
                                     }
-                                    showErrorNotification(errorMessage);
+                                    notificationList.innerHTML = `<li class="p-4 text-sm text-red-600 dark:text-red-400">${errorMessage}</li>`;
+                                    notificationCount.textContent = 0;
+                                    notificationCount.classList.add('hidden');
                                 });
                         });
 
                         // Clear all notifications
                         clearNotificationsButton.addEventListener('click', async () => {
-                            try {
-                                const snapshot = await db.collection('orders')
-                                    .where('salesperson_name_lower', '==', firebase.auth().currentUser?.displayName?.toLowerCase() || 'anonymous')
-                                    .where('read', '==', false)
-                                    .get();
-                                const batch = db.batch();
-                                snapshot.forEach(doc => {
-                                    batch.update(db.collection('orders').doc(doc.id), { read: true });
-                                });
-                                await batch.commit();
-                                notificationList.innerHTML = '';
-                                notificationCount.textContent = 0;
-                                notificationCount.classList.add('hidden');
-                                notificationPopup.classList.add('hidden');
-                            } catch (error) {
-                                console.error("Error clearing notifications:", error);
-                                showErrorNotification("Failed to clear notifications");
-                            }
+                            const snapshot = await db.collection('orders')
+                                .where('salesperson_name_lower', '==', firebase.auth().currentUser?.displayName?.toLowerCase() || 'anonymous')
+                                .get();
+                            snapshot.forEach(doc => {
+                                displayedOrders.add(doc.id);
+                            });
+                            notificationList.innerHTML = '';
+                            notificationCount.textContent = 0;
+                            notificationCount.classList.add('hidden');
+                            notificationDropdown.classList.add('hidden');
                         });
 
                         // Initialize Firebase Messaging
@@ -179,12 +163,12 @@
                             });
                     } catch (error) {
                         console.error("Firebase initialization failed in base.html:", error);
-                        showErrorNotification("Failed to initialize Firebase");
+                        notificationList.innerHTML = '<li class="p-4 text-sm text-red-600 dark:text-red-400">Failed to initialize Firebase</li>';
                     }
                 })
                 .catch(error => {
                     console.error("Failed to fetch Firebase config:", error);
-                    showErrorNotification("Failed to fetch Firebase configuration");
+                    notificationList.innerHTML = '<li class="p-4 text-sm text-red-600 dark:text-red-400">Failed to fetch Firebase configuration</li>';
                 });
 
             // Theme handling
@@ -204,12 +188,6 @@
                         ? '<i class="fas fa-sun mr-2"></i> Light Mode'
                         : '<i class="fas fa-moon mr-2"></i> Dark Mode';
                 }
-            }
-
-            function showErrorNotification(message) {
-                notificationList.innerHTML = `<li class="p-4 text-sm text-red-600 dark:text-red-400">${message}</li>`;
-                notificationCount.textContent = 0;
-                notificationCount.classList.add('hidden');
             }
 
             // Sidebar toggle
@@ -286,36 +264,10 @@
             .card-header { font-weight: 600; font-size: 1.25rem; margin-bottom: 1rem; color: #1a202c; }
             .dark .card-header { color: #f7fafc; }
             .sales-cards-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+            .notification-dropdown { max-height: 24rem; overflow-y: auto; border: 1px solid #e2e8f0; }
+            .dark .notification-dropdown { border-color: #4a5568; }
+            .notification-dropdown li { transition: background-color 0.2s; }
             .notification-icon { font-size: 1.5rem; } /* Larger bell icon */
-            .notification-popup {
-                width: 400px;
-                max-height: 500px;
-                background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
-                border: 1px solid #e2e8f0;
-                border-radius: 0.75rem;
-                box-shadow: 0 10px 15px rgba(0, 0, 0, 0.2);
-                animation: slideIn 0.3s ease-out;
-                z-index: 1000;
-            }
-            .dark .notification-popup {
-                background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
-                border-color: #4b5563;
-            }
-            @keyframes slideIn {
-                from { transform: translateY(-20px); opacity: 0; }
-                to { transform: translateY(0); opacity: 1; }
-            }
-            .notification-popup-header {
-                background: #3b82f6;
-                color: white;
-                padding: 1rem;
-                border-top-left-radius: 0.75rem;
-                border-top-right-radius: 0.75rem;
-                font-weight: 600;
-            }
-            .dark .notification-popup-header {
-                background: #2563eb;
-            }
         `;
         document.head.appendChild(style);
     </script>
@@ -388,14 +340,16 @@
                         <i class="fas fa-bell notification-icon"></i>
                         <span id="notification-count" class="absolute top-0 right-0 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center hidden">0</span>
                     </button>
-                    <!-- Notification Popup -->
-                    <div id="notification-popup" class="hidden absolute right-4 top-14 notification-popup z-50">
-                        <div class="notification-popup-header">
-                            <h3 class="text-lg font-semibold">New Orders</h3>
+                    <!-- Notification Dropdown -->
+                    <div id="notification-dropdown" class="hidden absolute right-4 top-14 w-96 bg-white dark:bg-gray-800 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
+                        <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+                            <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Notifications</h3>
                         </div>
-                        <ul id="notification-list" class="divide-y divide-gray-200 dark:divide-gray-700"></ul>
+                        <ul id="notification-list" class="divide-y divide-gray-200 dark:divide-gray-700">
+                            <!-- Notifications populated here -->
+                        </ul>
                         <div class="p-4 text-center">
-                            <button id="clear-notifications" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">Clear All Notifications</button>
+                            <button id="clear-notifications" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">Clear All</button>
                         </div>
                     </div>
                 </div>
