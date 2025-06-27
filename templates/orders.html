@@ -2,339 +2,297 @@
 {% block title %}Orders{% endblock %}
 {% block header %}Orders{% endblock %}
 {% block content %}
-<div class="container mx-auto p-4">
-    <!-- Search and Filter Section -->
-    <div class="flex justify-between mb-4">
-        <input type="text" id="order-search" placeholder="Search orders..." 
-               class="p-2 border rounded-lg w-full max-w-md dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-        <div class="flex space-x-2">
-            <button id="open-retail-modal" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">New Retail Order</button>
-            <button id="open-wholesale-modal" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">New Wholesale Order</button>
+<div class="container mx-auto px-4 py-6">
+    <!-- Order Creation Section -->
+    <div class="mb-6 flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">Orders Management</h1>
+        <div class="space-x-2">
+            <button type="button" id="open-retail-modal" class="btn bg-blue-500 text-white hover:bg-blue-600 px-4 py-2 rounded-lg">
+                New Retail Order
+            </button>
+            <button type="button" id="open-wholesale-modal" class="btn bg-green-500 text-white hover:bg-green-600 px-4 py-2 rounded-lg">
+                New Wholesale Order
+            </button>
             {% if session['user']['role'] == 'manager' %}
-            <button id="open-expense-modal" class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600">Add Expense</button>
+            <button type="button" id="open-expense-modal" class="btn bg-purple-500 text-white hover:bg-purple-600 px-4 py-2 rounded-lg">
+            Add Expense
+            </button>
             {% endif %}
         </div>
     </div>
 
-    <!-- Filter Buttons -->
-    <div class="flex space-x-2 mb-4">
-        <button class="filter-btn text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 px-4 py-2 rounded" data-filter="all">All</button>
-        <button class="filter-btn text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 px-4 py-2 rounded" data-filter="pending">Pending</button>
-        <button class="filter-btn text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 px-4 py-2 rounded" data-filter="paid">Paid</button>
+    <!-- Order Filters and Search -->
+    <div class="mb-4 flex flex-col sm:flex-row sm:items-center sm:space-x-4">
+        <div class="flex space-x-2 mb-2 sm:mb-0">
+            <button data-filter="all" class="filter-btn px-4 py-2 rounded-lg bg-blue-500 text-white">All Orders</button>
+            <button data-filter="pending" class="filter-btn px-4 py-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Pending</button>
+            <button data-filter="paid" class="filter-btn px-4 py-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Paid</button>
+        </div>
+        <div class="relative w-full sm:w-64">
+            <input type="text" id="order-search" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Search orders...">
+        </div>
     </div>
 
-    <!-- Orders Table -->
-    <div class="overflow-x-auto">
-        <table id="orders-table" class="min-w-full border rounded-lg">
-            <thead class="bg-gray-100 dark:bg-gray-700">
-                <tr>
-                    <th class="p-2 text-left">Receipt ID</th>
-                    <th class="p-2 text-left">Client</th>
-                    <th class="p-2 text-left">Items</th>
-                    <th class="p-2 text-center">Type</th>
-                    <th class="p-2 text-center">Date</th>
-                    <th class="p-2 text-center">Total</th>
-                    <th class="p-2 text-center">Balance</th>
-                    <th class="p-2 text-center">Actions</th>
-                </tr>
-            </thead>
-            <tbody id="orders-tbody">
-                {% for order in orders %}
-                <tr class="order-row" 
-                    data-receipt-id="{{ order.receipt_id }}" 
-                    data-order-type="{{ order.order_type }}" 
-                    data-balance="{{ order.balance }}" 
-                    data-date="{{ order.date_ordered }}" 
-                    data-search="{{ order.receipt_id }} {{ order.shop_name }} {{ order.order_type }} {{ order.items_list | map(attribute='name') | join(' ') }}">
-                    <td class="p-2">{{ order.receipt_id }}</td>
-                    <td class="p-2">{{ order.shop_name }}<br><span class="text-sm text-gray-500 dark:text-gray-400">Debt: KSh {{ order.debt | format_currency }}</span></td>
-                    <td class="p-2">
-                        {% for item in order.items_list %}
-                        {{ item.name }} ({{ item.quantity }} {{ item.uom }})<br>
-                        {% endfor %}
-                    </td>
-                    <td class="p-2 text-center">{{ order.order_type | capitalize }}</td>
-                    <td class="p-2 text-center">{{ order.date_ordered | format_datetime }}</td>
-                    <td class="p-2 text-center">KSh {{ order.total | format_currency }}</td>
-                    <td class="p-2 text-center {% if order.balance > 0 %}text-red-600{% else %}text-green-600{% endif %}">
-                        KSh {{ order.balance | format_currency }}
-                    </td>
-                    <td class="p-2 text-center relative">
-                        <button class="order-actions-btn text-blue-500 hover:text-blue-700">⚙️</button>
-                        <div class="order-actions-menu hidden absolute z-10 bg-white dark:bg-gray-800 border rounded-lg shadow-lg right-6 top-12">
-                            {% if order.balance > 0 %}
-                            <button class="mark-paid-btn block w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700" 
-                                    data-receipt-id="{{ order.receipt_id }}" 
-                                    data-balance="{{ order.balance }}">Mark as Paid</button>
-                            {% endif %}
-                            {% if session['user']['role'] == 'manager' %}
-                            <button class="return-stock-btn block w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700" 
-                                    data-receipt-id="{{ order.receipt_id }}" 
-                                    data-items="{{ order.items_list | tojson | safe }}">Return Stock</button>
-                            <button class="edit-order-btn block w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700" 
-                                    data-receipt-id="{{ order.receipt_id }}" 
-                                    data-items="{{ order.items_list | tojson | safe }}">Edit Order</button>
-                            <button class="delete-order-btn block w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700" 
-                                    data-receipt-id="{{ order.receipt_id }}">Delete Order</button>
-                            {% endif %}
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-
+<!-- Orders Table -->
+<div class="overflow-x-auto">
+    <table id="orders-table" class="min-w-full bg-white dark:bg-gray-800 rounded-lg shadow-md">
+        <thead>
+            <tr class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 uppercase text-sm leading-normal">
+                <th class="py-3 px-6 text-left">Order #</th>
+                <th class="py-3 px-6 text-left">Client</th>
+                <th class="py-3 px-6 text-center">Total Items</th>
+                <th class="py-3 px-6 text-center">Date</th>
+                <th class="py-3 px-6 text-center">Payment (KSh)</th>
+                <th class="py-3 px-6 text-center">Balance (KSh)</th>
+                <th class="py-3 px-6 text-center">Actions</th>
+            </tr>
+        </thead>
+        <tbody id="orders-tbody" class="text-gray-600 dark:text-gray-300 text-sm font-light">
+            {% for order in orders %}
+            <tr class="order-row border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 
+                {{ 'border-l-4 border-yellow-500' if order.balance > 0 else 'border-l-4 border-green-500' }}"
+                data-order-type="{{ order.order_type }}"
+                data-receipt-id="{{ order.receipt_id }}"
+                data-balance="{{ order.balance }}"
+                data-date="{{ order.date.strftime('%Y-%m-%d') }}"
+                data-search="{{ order.receipt_id ~ ' ' ~ (order.shop_name or 'Retail Sale') ~ ' ' ~ order.order_type }}">
+                <td class="py-3 px-6 text-left whitespace-nowrap">{{ order.receipt_id }}</td>
+                <td class="py-3 px-6 text-left">
+                    {{ order.shop_name or 'Retail Sale' }}
+                    <br>
+                    <span class="text-xs font-medium {{ 'text-blue-500' if order.order_type == 'retail' else 'text-green-500' }}">
+                        {{ order.order_type|capitalize }}
+                    </span>
+                </td>
+                <td class="py-3 px-6 text-center">{{ order.total_items }}</td>
+                <td class="py-3 px-6 text-center">{{ order.date.strftime('%d/%m/%Y') }}</td>
+                <td class="py-3 px-6 text-center">{{ order.payment | round(2) }}</td>
+                <td class="py-3 px-6 text-center {{ 'text-red-600' if order.balance > 0 else 'text-green-600' }}">{{ order.balance | round(2) }}</td>
+                <td class="py-3 px-6 text-center relative">
+                    <button class="order-actions-btn p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700" aria-label="Order actions">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600 dark:text-gray-300" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                        </svg>
+                    </button>
+                    <div class="order-actions-menu hidden absolute right-6 top-12 w-48 bg-white dark:bg-gray-700 rounded-lg shadow-lg z-20 py-1">
+                        <a href="{{ url_for('receipt', order_id=order.receipt_id) }}" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600">View Receipt</a>
+                        {% if session.get('user', {}).get('role') == 'manager' or session.get('user', {}).get('firstName', '') + ' ' + session.get('user', {}).get('lastName', '') == order.salesperson_name %}
+                        <button class="edit-order-btn w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600" data-receipt-id="{{ order.receipt_id }}" data-order-type="{{ order.order_type }}" data-shop-name="{{ order.shop_name }}" data-items='{{ order.items_list|tojson|safe }}'>Edit Order</button>
+                        <button class="delete-order-btn w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-600" data-receipt-id="{{ order.receipt_id }}">Delete Order</button>
+                        {% if order.balance > 0 %}
+                        <button class="mark-paid-btn w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-gray-100 dark:hover:bg-gray-600" data-receipt-id="{{ order.receipt_id }}" data-balance="{{ order.balance }}">Mark as Paid</button>
+                        <button class="return-stock-btn w-full text-left px-4 py-2 text-sm text-yellow-600 hover:bg-gray-100 dark:hover:bg-gray-600" data-receipt-id="{{ order.receipt_id }}" data-items='{{ order.items_list|tojson|safe }}'>Return Stock</button>
+                        {% endif %}
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
     <!-- Pagination -->
-    <div class="flex justify-between items-center mt-4">
-        <button id="prev-page" class="bg-gray-200 dark:bg-gray-700 px-4 py-2 rounded hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50">Previous</button>
-        <span id="page-info" class="text-gray-700 dark:text-gray-300">Page 1 of 1</span>
-        <button id="next-page" class="bg-gray-200 dark:bg-gray-700 px-4 py-2 rounded hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50">Next</button>
+    <div class="mt-4 flex justify-between items-center">
+        <button id="prev-page" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50" disabled>Previous</button>
+        <span id="page-info" class="text-gray-600 dark:text-gray-300">Page 1</span>
+        <button id="next-page" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600">Next</button>
     </div>
+</div>
 
-    <!-- Retail Order Modal -->
-    <div id="retail-modal" class="modal fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden">
-        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-3xl">
-            <h2 class="text-xl font-bold mb-4 dark:text-white">New Retail Order</h2>
-            <div id="retail-error" class="text-red-600 dark:text-red-400 hidden mb-4"></div>
-            <form id="retail-form" action="/add_retail_order" method="POST">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="hidden" name="salesperson_name" value="{{ session['user']['firstName'] }} {{ session['user']['lastName'] }}">
-                <input type="hidden" name="order_type" value="retail">
-                <div class="mb-4">
-                    <label class="block text-gray-700 dark:text-gray-300 mb-2">Client</label>
-                    <select id="retail-client-input" name="shop_name" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"></select>
-                    <span id="retail-client-debt" class="text-sm text-gray-500 dark:text-gray-400 hidden mt-1"></span>
+<!-- Retail Order Modal -->
+<div id="retail-modal" class="modal fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="retail-modal-title">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
+        <h2 id="retail-modal-title" class="text-xl font-bold mb-4 text-gray-900 dark:text-white">New Retail Order</h2>
+        <div id="retail-error" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded mb-4"></div>
+        <form id="retail-form" method="POST" action="{{ url_for('orders') }}" class="space-y-4">
+            <input type="hidden" name="order_type" value="retail">
+            <input type="hidden" name="salesperson_name" value="{{ session['user']['firstName'] }} {{ session['user']['lastName'] }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="relative">
+                <label for="retail-client-input" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Client Name</label>
+                <select id="retail-client-input" name="shop_name" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" required></select>
+                <div id="retail-client-debt" class="mt-1 text-sm text-gray-600 dark:text-gray-400 hidden"></div>
+            </div>
+            <div id="retail-items-container" class="space-y-4">
+                <div class="grid grid-cols-6 gap-2 items-center text-sm font-semibold item-row-header">
+                    <span>Item</span>
+                    <span class="text-center">Qty</span>
+                    <span class="text-center">Price</span>
+                    <span class="text-center">Stock</span>
+                    <span class="text-center">Total</span>
+                    <span class="text-center">Action</span>
                 </div>
-                <div id="retail-items-container" class="space-y-4">
-                    <div class="item-row-header">
-                        <span class="font-bold">Item</span>
-                        <span class="font-bold">Qty</span>
-                        <span class="font-bold">Price</span>
-                        <span class="font-bold">Stock</span>
-                        <span class="font-bold">Total</span>
-                        <span></span>
-                    </div>
-                    <button type="button" class="add-item-btn bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Add Item</button>
-                </div>
-                <div class="mt-4">
-                    <button type="button" id="add-retail-manual" class="text-blue-500 hover:text-blue-700">Add Manual Item</button>
-                </div>
-                <div class="mt-4 flex justify-between">
-                    <div>
-                        <label class="block text-gray-700 dark:text-gray-300">Amount Paid</label>
-                        <input type="number" id="retail-amount-paid" name="amount_paid" step="0.01" min="0" 
-                               class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white w-32">
-                    </div>
-                    <div class="text-right">
-                        <p class="text-gray-700 dark:text-gray-300">Total: <span id="retail-order-total">0.00</span></p>
-                        <p class="text-gray-700 dark:text-gray-300">Change: <span id="retail-order-change">0.00</span></p>
-                    </div>
-                </div>
-                <div class="mt-4 flex justify-end space-x-2">
-                    <button type="button" id="close-retail-modal" class="bg-gray-300 dark:bg-gray-600 px-4 py-2 rounded hover:bg-gray-400 dark:hover:bg-gray-500">Cancel</button>
-                    <button type="submit" class="submit-btn bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Submit</button>
-                </div>
-            </form>
-        </div>
+                <button type="button" class="add-item-btn w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600">Add Item</button>
+            </div>
+            <div class="flex justify-between items-center mt-4">
+                <button type="button" id="add-retail-manual" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">Add Manual Item</button>
+                <div class="text-right"><span class="font-semibold">Subtotal:</span> <span id="retail-order-total" class="ml-2">0.00</span></div>
+            </div>
+            <div>
+                <input type="number" name="amount_paid" id="retail-amount-paid" placeholder="Amount Paid (optional)" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" min="0" step="0.01">
+                <div class="text-right mt-2"><span class="font-semibold">Change:</span> <span id="retail-order-change" class="ml-2">0.00</span></div>
+            </div>
+            <div class="flex space-x-2 mt-4">
+                <button type="submit" class="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600 submit-btn">Submit Order</button>
+                <button type="button" id="close-retail-modal" class="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600">Cancel</button>
+            </div>
+        </form>
     </div>
+</div>
 
-    <!-- Wholesale Order Modal -->
-    <div id="wholesale-modal" class="modal fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden">
-        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-3xl">
-            <h2 class="text-xl font-bold mb-4 dark:text-white">New Wholesale Order</h2>
-            <div id="wholesale-error" class="text-red-600 dark:text-red-400 hidden mb-4"></div>
-            <form id="wholesale-form" action="/add_wholesale_order" method="POST">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="hidden" name="salesperson_name" value="{{ session['user']['firstName'] }} {{ session['user']['lastName'] }}">
-                <input type="hidden" name="order_type" value="wholesale">
-                <div class="mb-4">
-                    <label class="block text-gray-700 dark:text-gray-300 mb-2">Client</label>
-                    <select id="wholesale-client-input" name="shop_name" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"></select>
-                    <span id="wholesale-client-debt" class="text-sm text-gray-500 dark:text-gray-400 hidden mt-1"></span>
+<!-- Wholesale Order Modal -->
+<div id="wholesale-modal" class="modal fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="wholesale-modal-title">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
+        <h2 id="wholesale-modal-title" class="text-xl font-bold mb-4 text-gray-900 dark:text-white">New Wholesale Order</h2>
+        <div id="wholesale-error" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded mb-4"></div>
+        <form id="wholesale-form" method="POST" action="{{ url_for('orders') }}" class="space-y-4">
+            <input type="hidden" name="order_type" value="wholesale">
+            <input type="hidden" name="salesperson_name" value="{{ session['user']['firstName'] }} {{ session['user']['lastName'] }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="relative">
+                <label for="wholesale-client-input" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Shop Name</label>
+                <select id="wholesale-client-input" name="shop_name" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" required></select>
+                <div id="wholesale-client-debt" class="mt-1 text-sm text-gray-600 dark:text-gray-400 hidden"></div>
+            </div>
+            <div id="wholesale-items-container" class="space-y-4">
+                <div class="grid grid-cols-6 gap-2 items-center text-sm font-semibold item-row-header">
+                    <span>Item</span>
+                    <span class="text-center">Qty</span>
+                    <span class="text-center">Price</span>
+                    <span class="text-center">Stock</span>
+                    <span class="text-center">Total</span>
+                    <span class="text-center">Action</span>
                 </div>
-                <div id="wholesale-items-container" class="space-y-4">
-                    <div class="item-row-header">
-                        <span class="font-bold">Item</span>
-                        <span class="font-bold">Qty</span>
-                        <span class="font-bold">Price</span>
-                        <span class="font-bold">Stock</span>
-                        <span class="font-bold">Total</span>
-                        <span></span>
-                    </div>
-                    <button type="button" class="add-item-btn bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Add Item</button>
-                </div>
-                <div class="mt-4">
-                    <button type="button" id="add-wholesale-manual" class="text-blue-500 hover:text-blue-700">Add Manual Item</button>
-                </div>
-                <div class="mt-4 flex justify-between">
-                    <div>
-                        <label class="block text-gray-700 dark:text-gray-300">Amount Paid</label>
-                        <input type="number" id="wholesale-amount-paid" name="amount_paid" step="0.01" min="0" 
-                               class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white w-32">
-                    </div>
-                    <div class="text-right">
-                        <p class="text-gray-700 dark:text-gray-300">Total: <span id="wholesale-order-total">0.00</span></p>
-                        <p class="text-gray-700 dark:text-gray-300">Change: <span id="wholesale-order-change">0.00</span></p>
-                    </div>
-                </div>
-                <div class="mt-4 flex justify-end space-x-2">
-                    <button type="button" id="close-wholesale-modal" class="bg-gray-300 dark:bg-gray-600 px-4 py-2 rounded hover:bg-gray-400 dark:hover:bg-gray-500">Cancel</button>
-                    <button type="submit" class="submit-btn bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Submit</button>
-                </div>
-            </form>
-        </div>
+                <button type="button" class="add-item-btn w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600">Add Item</button>
+            </div>
+            <div class="flex justify-between items-center mt-4">
+                <button type="button" id="add-wholesale-manual" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">Add Manual Item</button>
+                <div class="text-right"><span class="font-semibold">Subtotal:</span> <span id="wholesale-order-total" class="ml-2">0.00</span></div>
+            </div>
+            <div>
+                <input type="number" name="amount_paid" id="wholesale-amount-paid" placeholder="Amount Paid (optional)" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" min="0" step="0.01">
+                <div class="text-right mt-2"><span class="font-semibold">Change:</span> <span id="wholesale-order-change" class="ml-2">0.00</span></div>
+            </div>
+            <div class="flex space-x-2 mt-4">
+                <button type="submit" class="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600 submit-btn">Submit Order</button>
+                <button type="button" id="close-wholesale-modal" class="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600">Cancel</button>
+            </div>
+        </form>
     </div>
+</div>
 
-    <!-- Expense Modal -->
-    <div id="expenseModal" class="modal fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden">
-        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
-            <h2 class="text-xl font-bold mb-4 dark:text-white">Add Expense</h2>
-            <div id="expense-error" class="text-red-600 dark:text-red-400 hidden mb-4"></div>
-            <form id="expense-form" action="/add_expense" method="POST">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <div class="mb-4">
-                    <label class="block text-gray-700 dark:text-gray-300 mb-2">Category</label>
-                    <select id="expense-category" name="category" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-                        <option value="Fuel">Fuel</option>
-                        <option value="Maintenance">Maintenance</option>
-                        <option value="Salary">Salary</option>
-                        <option value="Rent">Rent</option>
-                        <option value="Utilities">Utilities</option>
-                        <option value="Other">Other</option>
-                    </select>
-                </div>
-                <div id="expense-reason" class="mb-4 hidden">
-                    <label class="block text-gray-700 dark:text-gray-300 mb-2">Reason</label>
-                    <input type="text" name="reason" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-                </div>
-                <div class="mb-4">
-                    <label class="block text-gray-700 dark:text-gray-300 mb-2">Amount</label>
-                    <input type="number" name="amount" step="0.01" min="0" required 
-                           class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-                </div>
-                <div class="flex justify-end space-x-2">
-                    <button type="button" id="close-expense-modal" class="bg-gray-300 dark:bg-gray-600 px-4 py-2 rounded hover:bg-gray-400 dark:hover:bg-gray-500">Cancel</button>
-                    <button type="submit" class="submit-btn bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Submit</button>
-                </div>
-            </form>
-        </div>
+<!-- Add Expense Modal -->
+<div id="expenseModal" class="modal fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="expense-modal-title">
+    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg w-96">
+        <h2 id="expense-modal-title" class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Add Expense</h2>
+        <div id="expense-error" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded mb-4"></div>
+        <form id="expense-form" method="POST" action="{{ url_for('expenses') }}" class="flex flex-col space-y-4">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <select name="category" id="expense-category" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" required>
+                <option value="Stock">Stock</option>
+                <option value="Fuel">Fuel</option>
+                <option value="Other">Other</option>
+            </select>
+            <input id="expense-reason" name="reason" placeholder="Reason (e.g., What are you buying?)" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 hidden" required>
+            <input name="description" placeholder="Description (e.g., Fuel for Delivery)" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" required>
+            <input name="amount" type="number" step="0.01" placeholder="Amount (e.g., 500)" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" min="0" required>
+            <div class="flex space-x-2">
+                <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 submit-btn">Submit</button>
+                <button type="button" id="close-expense-modal" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">Cancel</button>
+            </div>
+        </form>
     </div>
+</div>
 
-    <!-- Manual Item Modal -->
-    <div id="manual-item-modal" class="modal fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden">
-        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
-            <h2 class="text-xl font-bold mb-4 dark:text-white">Add Manual Item</h2>
-            <div id="manual-item-error" class="text-red-600 dark:text-red-400 hidden mb-4"></div>
-            <form id="manual-item-form">
-                <div class="mb-4">
-                    <label class="block text-gray-700 dark:text-gray-300 mb-2">Item Name</label>
-                    <input type="text" id="manual-item-name" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-                </div>
-                <div class="mb-4">
-                    <label class="block text-gray-700 dark:text-gray-300 mb-2">Quantity</label>
-                    <input type="number" id="manual-item-qty" step="0.01" min="0" 
-                           class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-                </div>
-                <div class="mb-4">
-                    <label class="block text-gray-700 dark:text-gray-300 mb-2">Price per Unit</label>
-                    <input type="number" id="manual-item-price" step="0.01" min="0" 
-                           class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-                </div>
-                <div class="mb-4">
-                    <p class="text-gray-700 dark:text-gray-300">Total: <span id="manual-total">0.00</span></p>
-                </div>
-                <div class="flex justify-end space-x-2">
-                    <button type="button" id="close-manual-modal" class="bg-gray-300 dark:bg-gray-600 px-4 py-2 rounded hover:bg-gray-400 dark:hover:bg-gray-500">Cancel</button>
-                    <button type="button" id="add-manual-to-order" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Add to Order</button>
-                </div>
-            </form>
-        </div>
+<!-- Manual Item Modal -->
+<div id="manual-item-modal" class="modal fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="manual-item-modal-title">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-96 p-6">
+        <h2 id="manual-item-modal-title" class="text-xl font-bold mb-4 text-gray-900 dark:text-white">Add Manual Item</h2>
+        <div id="manual-error" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded mb-4"></div>
+        <form id="manual-item-form" class="space-y-4">
+            <input id="manual-item-name" placeholder="Item Name" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" required>
+            <input id="manual-item-qty" type="number" placeholder="Quantity" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" min="0" step="0.01" required>
+            <input id="manual-item-price" type="number" placeholder="Price per Unit" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" min="0" step="0.01" required>
+            <p id="manual-total" class="text-sm text-gray-600 dark:text-gray-300">Total: 0.00</p>
+            <div class="flex space-x-2">
+                <button type="button" id="add-manual-to-order" class="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600">Add Item</button>
+                <button type="button" id="close-manual-modal" class="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600">Cancel</button>
+            </div>
+        </form>
     </div>
+</div>
 
-    <!-- Edit Order Modal -->
-    <div id="edit-order-modal" class="modal fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden">
-        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-3xl">
-            <h2 class="text-xl font-bold mb-4 dark:text-white">Edit Order #<span id="edit-order-id"></span></h2>
-            <div id="edit-order-error" class="text-red-600 dark:text-red-400 hidden mb-4"></div>
-            <form id="edit-order-form" method="POST">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="hidden" id="edit-order-type" name="order_type">
-                <input type="hidden" name="salesperson_name" value="{{ session['user']['firstName'] }} {{ session['user']['lastName'] }}">
-                <div class="mb-4">
-                    <label class="block text-gray-700 dark:text-gray-300 mb-2">Client</label>
-                    <input type="text" id="edit-client-input" name="shop_name" 
-                           class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-                    <span id="edit-client-debt" class="text-sm text-gray-500 dark:text-gray-400 hidden mt-1"></span>
+<!-- Edit Order Modal -->
+<div id="edit-order-modal" class="modal fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="edit-order-modal-title">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
+        <h2 id="edit-order-modal-title" class="text-xl font-bold mb-4 text-gray-900 dark:text-white">Edit Order #<span id="edit-order-id"></span></h2>
+        <div id="edit-error" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded mb-4"></div>
+        <form id="edit-order-form" method="POST" action="" class="space-y-4">
+            <input type="hidden" name="order_type" id="edit-order-type">
+            <input type="hidden" name="salesperson_name" value="{{ session['user']['firstName'] }} {{ session['user']['lastName'] }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div id="edit-items-container" class="space-y-4">
+                <div class="grid grid-cols-6 gap-2 items-center text-sm font-semibold item-row-header">
+                    <span>Item</span>
+                    <span class="text-center">Qty</span>
+                    <span class="text-center">Price</span>
+                    <span class="text-center">Stock</span>
+                    <span class="text-center">Total</span>
+                    <span class="text-center">Action</span>
                 </div>
-                <div id="edit-items-container" class="space-y-4">
-                    <div class="item-row-header">
-                        <span class="font-bold">Item</span>
-                        <span class="font-bold">Qty</span>
-                        <span class="font-bold">Price</span>
-                        <span class="font-bold">Stock</span>
-                        <span class="font-bold">Total</span>
-                        <span></span>
-                    </div>
-                    <button type="button" class="add-item-btn bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Add Item</button>
-                </div>
-                <div class="mt-4">
-                    <button type="button" id="add-edit-manual" class="text-blue-500 hover:text-blue-700">Add Manual Item</button>
-                </div>
-                <div class="mt-4 flex justify-between">
-                    <div>
-                        <label class="block text-gray-700 dark:text-gray-300">Amount Paid</label>
-                        <input type="number" id="edit-amount-paid" name="amount_paid" step="0.01" min="0" 
-                               class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white w-32">
-                    </div>
-                    <div class="text-right">
-                        <p class="text-gray-700 dark:text-gray-300">Total: <span id="edit-order-total">0.00</span></p>
-                        <p class="text-gray-700 dark:text-gray-300">Change: <span id="edit-order-change">0.00</span></p>
-                    </div>
-                </div>
-                <div class="mt-4 flex justify-end space-x-2">
-                    <button type="button" id="close-edit-modal" class="bg-gray-300 dark:bg-gray-600 px-4 py-2 rounded hover:bg-gray-400 dark:hover:bg-gray-500">Cancel</button>
-                    <button type="submit" class="submit-btn bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Submit</button>
-                </div>
-            </form>
-        </div>
+                <button type="button" class="add-item-btn w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600" data-container="edit-items-container">Add Item</button>
+            </div>
+            <div class="flex justify-between items-center mt-4">
+                <button type="button" id="add-edit-manual" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">Add Manual Item</button>
+                <div class="text-right"><span class="font-semibold">Subtotal:</span> <span id="edit-order-total" class="ml-2">0.00</span></div>
+            </div>
+            <div>
+                <input type="number" name="amount_paid" id="edit-amount-paid" placeholder="Amount Paid (optional)" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" min="0" step="0.01">
+                <div class="text-right mt-2"><span class="font-semibold">Change:</span> <span id="edit-order-change" class="ml-2">0.00</span></div>
+            </div>
+            <div class="flex space-x-2 mt-4">
+                <button type="submit" class="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600 submit-btn">Update Order</button>
+                <button type="button" id="close-edit-modal" class="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600">Cancel</button>
+            </div>
+        </form>
     </div>
-
-    <!-- Return Stock Modal -->
-    <div id="return-stock-modal" class="modal fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden">
-        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
-            <h2 class="text-xl font-bold mb-4 dark:text-white">Return Stock for Order #<span id="return-order-id"></span></h2>
-            <div id="return-stock-error" class="text-red-600 dark:text-red-400 hidden mb-4"></div>
-            <form id="return-stock-form" method="POST">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <div id="return-stock-items-container" class="space-y-2 mb-4"></div>
-                <div class="flex justify-end space-x-2">
-                    <button type="button" id="close-return-modal" class="bg-gray-300 dark:bg-gray-600 px-4 py-2 rounded hover:bg-gray-400 dark:hover:bg-gray-500">Cancel</button>
-                    <button type="submit" class="submit-btn bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Submit</button>
-                </div>
-            </form>
-        </div>
+</div>
+<!-- Mark as Paid Modal -->
+<div id="mark-paid-modal" class="modal hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="mark-paid-modal-title">
+    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-lg w-96 max-h-[80vh] overflow-y-auto">
+        <h3 id="mark-paid-modal-title" class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Mark as Paid for Order #<span id="paid-order-id"></span></h3>
+        <div id="paid-error" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded mb-4"></div>
+        <form id="mark-paid-form" method="POST" action="" class="space-y-4">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div>
+                <label class="font-semibold text-gray-900 dark:text-white">Amount Paid</label>
+                <input id="paid-amount" name="amount_paid" type="number" placeholder="Amount Paid" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 w-full" min="0" step="0.01" required>
+                <p id="full-amount-text" class="text-sm text-gray-700 dark:text-gray-300"></p>
+            </div>
+            <div class="flex space-x-2">
+                <button type="submit" class="btn btn-primary bg-green-500 hover:bg-green-600 flex-1 submit-btn">Confirm</button>
+                <button type="button" id="close-paid-modal" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 flex-1">Cancel</button>
+            </div>
+        </form>
     </div>
+</div>
 
-    <!-- Mark as Paid Modal -->
-    <div id="mark-paid-modal" class="modal fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden">
-        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
-            <h2 class="text-xl font-bold mb-4 dark:text-white">Mark Order #<span id="paid-order-id"></span> as Paid</h2>
-            <div id="mark-paid-error" class="text-red-600 dark:text-red-400 hidden mb-4"></div>
-            <form id="mark-paid-form" method="POST">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <div class="mb-4">
-                    <p id="full-amount-text" class="text-gray-700 dark:text-gray-300 mb-2"></p>
-                    <label class="block text-gray-700 dark:text-gray-300 mb-2">Amount Paid</label>
-                    <input type="number" id="paid-amount" name="amount_paid" step="0.01" min="0" 
-                           class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-                </div>
-                <div class="flex justify-end space-x-2">
-                    <button type="button" id="close-paid-modal" class="bg-gray-300 dark:bg-gray-600 px-4 py-2 rounded hover:bg-gray-400 dark:hover:bg-gray-500">Cancel</button>
-                    <button type="submit" class="submit-btn bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Submit</button>
-                </div>
-            </form>
-        </div>
+<!-- Return Stock Modal -->
+<div id="return-stock-modal" class="modal hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="return-stock-modal-title">
+    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-lg w-96 max-h-[80vh] overflow-y-auto">
+        <h3 id="return-stock-modal-title" class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Return Stock for Order #<span id="return-order-id"></span></h3>
+        <div id="return-error" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded mb-4"></div>
+        <form id="return-stock-form" method="POST" action="" class="space-y-4">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div>
+                <label class="font-semibold text-gray-900 dark:text-white">Select Items to Return</label>
+                <div id="return-stock-items-container" class="space-y-3 mt-2"></div>
+            </div>
+            <div class="flex space-x-2">
+                <button type="submit" class="btn btn-primary bg-yellow-500 hover:bg-yellow-600 flex-1 submit-btn">Submit</button>
+                <button type="button" id="close-return-modal" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 flex-1">Cancel</button>
+            </div>
+        </form>
     </div>
 </div>
 
