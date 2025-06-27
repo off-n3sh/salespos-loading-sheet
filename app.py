@@ -1323,10 +1323,9 @@ def mark_paid(receipt_id):
         if user_id and order_dict.get('order_type') == 'app':
             notification_title = "Payment Update"
             notification_body = (
-0
-                f"Your order #{receipt_id} has been fully paid on {now.strftime('%d/%m/%Y %H:%M')}."
+                f"Your order \#{receipt_id} has been fully paid on {now.strftime('%d/%m/%Y %H:%M')}."
                 if new_balance == 0 else
-                f"Your order #{receipt_id} has been partially paid. New balance: KSh {new_balance:.2f} on {now.strftime('%d/%m/%Y %H:%M')}."
+                f"Your order \#{receipt_id} has been partially paid. New balance: KSh {new_balance:.2f} on {now.strftime('%d/%m/%Y %H:%M')}."
             )
             batch.set(db.collection('users').document(user_id).collection('notifications').document(), {
                 'user_id': user_id,
