@@ -1275,8 +1275,8 @@ def orders():
         return render_template('error.html', message=f"Failed to load orders: {str(e)}"), 500
 
 
-@app.route('/mark_paid_v2/<receipt_id>', methods=['POST'])
-def mark_paid_v2(receipt_id):
+@app.route('/mark_paid/<receipt_id>', methods=['POST'])
+def mark_paid(receipt_id):
     NAIROBI_TZ = ZoneInfo("Africa/Nairobi")
     
     try:
