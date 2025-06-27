@@ -3,7 +3,7 @@
 import { showModalError } from './utils.js';
 
 const expenseModal = document.getElementById('expenseModal');
-const openExpenseModal = document.getElementById('open-expense-modal');
+const openExpenseModalBtn = document.getElementById('open-expense-modal'); // Renamed to avoid conflict
 const closeExpenseModal = document.getElementById('close-expense-modal');
 const expenseCategory = document.getElementById('expense-category');
 const expenseReason = document.getElementById('expense-reason');
@@ -18,8 +18,8 @@ function openExpenseModal() {
     document.getElementById('expense-error').classList.add('hidden');
 }
 
-if (openExpenseModal) {
-    openExpenseModal.addEventListener('click', openExpenseModal);
+if (openExpenseModalBtn) {
+    openExpenseModalBtn.addEventListener('click', openExpenseModal);
 }
 
 if (closeExpenseModal) {
