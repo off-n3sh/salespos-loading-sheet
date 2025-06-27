@@ -1268,6 +1268,7 @@ def mark_paid(receipt_id):
         orders_ref = db.collection('orders').where('receipt_id', '==', receipt_id).limit(1).stream()
         order_doc = next(orders_ref, None)
         if not order_doc:
+            print(f"Error: Order with receipt_id {receipt_id} not found")
             return jsonify({"error": f"Order with receipt_id {receipt_id} not found"}), 404
 
         order_ref = db.collection('orders').document(order_doc.id)
@@ -1279,10 +1280,13 @@ def mark_paid(receipt_id):
 
         # Validation
         if amount_paid <= 0:
+            print(f"Error: Invalid amount_paid {amount_paid} for receipt_id {receipt_id}")
             return jsonify({"error": "Payment amount must be greater than 0"}), 400
         if current_balance <= 0:
+            print(f"Error: Order {receipt_id} already fully paid, balance: {current_balance}")
             return jsonify({"error": "Order is already fully paid"}), 400
         if amount_paid > current_balance:
+            print(f"Error: Payment amount {amount_paid} exceeds balance {current_balance} for receipt_id {receipt_id}")
             return jsonify({"error": f"Payment amount ({amount_paid}) exceeds remaining balance ({current_balance})"}), 400
 
         # Update payment and balance
@@ -1323,9 +1327,9 @@ def mark_paid(receipt_id):
         if user_id and order_dict.get('order_type') == 'app':
             notification_title = "Payment Update"
             notification_body = (
-                f"Your order \#{receipt_id} has been fully paid on {now.strftime('%d/%m/%Y %H:%M')}."
+                f"Your order #{receipt_id} has been fully paid on {now.strftime('%d/%m/%Y %H:%M')}."
                 if new_balance == 0 else
-                f"Your order \#{receipt_id} has been partially paid. New balance: KSh {new_balance:.2f} on {now.strftime('%d/%m/%Y %H:%M')}."
+                f"Your order #{receipt_id} has been partially paid. New balance: KSh {new_balance:.2f} on {now.strftime('%d/%m/%Y %H:%M')}."
             )
             batch.set(db.collection('users').document(user_id).collection('notifications').document(), {
                 'user_id': user_id,
@@ -1340,18 +1344,21 @@ def mark_paid(receipt_id):
                     'receipt_id': receipt_id
                 }
             })
+        else:
+            print(f"Warning: No user_id or order_type not 'app' for receipt_id {receipt_id}, user_id: {user_id}, order_type: {order_dict.get('order_type')}")
 
         # Commit all updates
         batch.commit()
+        print(f"Success: Payment processed for receipt_id {receipt_id}, amount: {amount_paid}, new_balance: {new_balance}")
 
         return jsonify({"status": "success", "message": "Payment processed successfully"}), 200
 
     except ValueError as ve:
+        print(f"ValueError in mark_paid for receipt_id {receipt_id}: {str(ve)}")
         return jsonify({"error": f"Invalid data format: {str(ve)}"}), 400
     except Exception as e:
-        print(f"Error in mark_paid: {str(e)}")
+        print(f"Exception in mark_paid for receipt_id {receipt_id}: {str(e)}")
         return jsonify({"error": f"Error processing payment: {str(e)}"}), 500
-
     
 # Updated /stock route
 @app.route('/stock', methods=['GET', 'POST'])
