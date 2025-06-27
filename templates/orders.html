@@ -675,189 +675,48 @@ function attachActionButtonListeners() {
     });
 }
 function markPaid(receiptId, balance) {
-    console.log('markPaid called:', { receiptId, balance });
-    const paidModal = document.getElementById('mark-paid-modal');
-    const form = document.getElementById('mark-paid-form');
-    const orderIdElement = document.getElementById('paid-order-id');
-    const amountTextElement = document.getElementById('full-amount-text');
-    const amountInput = document.getElementById('paid-amount');
-    const submitBtn = form.querySelector('.submit-btn');
-    const cancelBtn = document.getElementById('close-paid-modal');
-
-    if (!paidModal || !form || !orderIdElement || !amountTextElement || !amountInput || !submitBtn || !cancelBtn) {
-        console.error('Missing DOM elements');
-        showModalError('mark-paid', 'UI error: Missing elements.');
-        return;
-    }
-
-    // Reset button state on modal open
-    submitBtn.classList.remove('processing');
-    submitBtn.disabled = false;
-
-    // Open modal and set values
     closeAllModals();
     paidModal.classList.remove('hidden');
-    orderIdElement.textContent = receiptId;
-    amountTextElement.textContent = `Remaining Balance: ${parseFloat(balance).toFixed(2)}`;
+    document.getElementById('paid-order-id').textContent = receiptId;
+    document.getElementById('full-amount-text').textContent = `Remaining Balance: ${parseFloat(balance).toFixed(2)}`;
+    const form = document.getElementById('mark-paid-form');
     form.action = `/mark_paid/${receiptId}`;
-    amountInput.max = balance;
-    amountInput.value = '';
-    document.getElementById('paid-error').classList.add('hidden');
+    document.getElementById('paid-amount').max = balance;
+    document.getElementById('paid-amount').value = '';
 
-    // Cancel button handler
-    cancelBtn.onclick = function() {
-        console.log('Cancel clicked, resetting submit button');
-        submitBtn.classList.remove('processing');
-        submitBtn.disabled = false;
-        paidModal.classList.add('hidden');
-    };
-
-    let isSubmitting = false;
-    form.onsubmit = async function(e) {
+    form.onsubmit = function(e) {
         e.preventDefault();
-        console.log('Form submit triggered');
-        
-        if (isSubmitting) {
-            console.log('Already submitting, ignoring');
-            return;
-        }
-        
-        isSubmitting = true;
+        const submitBtn = form.querySelector('.submit-btn');
         submitBtn.classList.add('processing');
         submitBtn.disabled = true;
-        console.log('Submit button state changed to processing');
-
-        const amountPaid = parseFloat(amountInput.value) || 0;
-        console.log('Amount validation:', { amountPaid, balance: parseFloat(balance) });
-        
+        const amountPaid = parseFloat(document.getElementById('paid-amount').value) || 0;
         if (amountPaid <= 0 || amountPaid > parseFloat(balance)) {
-            console.error('Invalid amount:', { amountPaid, balance });
-            showModalError('mark-paid', 'Enter a valid amount (0 < amount ≤ balance).');
+            showModalError('mark-paid', 'Please enter a valid amount (greater than 0, up to the balance).');
             submitBtn.classList.remove('processing');
             submitBtn.disabled = false;
-            isSubmitting = false;
             return;
         }
 
-        const formData = new FormData(form);
-        console.log('Form data prepared:', {
-            url: form.action,
-            amount_paid: formData.get('amount_paid'),
-            csrf_token: formData.get('csrf_token'),
-            csrf_token_length: formData.get('csrf_token')?.length
-        });
-
-        // ENHANCED ERROR HANDLING AND DEBUGGING
-        try {
-            const controller = new AbortController();
-            
-            // Reduce timeout to 15 seconds for faster feedback
-            const timeoutId = setTimeout(() => {
-                console.error('Request timeout after 15 seconds');
-                controller.abort();
-            }, 15000);
-
-            // Add failsafe timeout
-            const failsafeTimeout = setTimeout(() => {
-                console.error('Failsafe timeout triggered after 20 seconds');
+        const formData = new FormData(this);
+        fetch(this.action, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (response.ok) {
+                paidModal.classList.add('hidden');
+                window.location.href = '/orders';
+            } else {
+                response.text().then(text => showModalError('mark-paid', 'Error processing payment: ' + text));
                 submitBtn.classList.remove('processing');
                 submitBtn.disabled = false;
-                isSubmitting = false;
-                showModalError('mark-paid', 'Request timed out. Please try again.');
-            }, 20000);
-
-            console.log('Sending fetch request...');
-            const startTime = Date.now();
-            
-            const response = await fetch(form.action, {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-CSRFToken': formData.get('csrf_token'),
-                    'Accept': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest' // Add this header
-                },
-                signal: controller.signal,
-                credentials: 'include'
-            });
-
-            const endTime = Date.now();
-            console.log(`Request completed in ${endTime - startTime}ms`);
-            
-            clearTimeout(timeoutId);
-            clearTimeout(failsafeTimeout);
-            
-            console.log('Response received:', {
-                status: response.status,
-                statusText: response.statusText,
-                ok: response.ok,
-                headers: {
-                    contentType: response.headers.get('content-type'),
-                    contentLength: response.headers.get('content-length')
-                }
-            });
-
-            // Check if response is JSON
-            const contentType = response.headers.get('content-type');
-            if (!contentType || !contentType.includes('application/json')) {
-                console.error('Non-JSON response received');
-                const textResponse = await response.text();
-                console.log('Response body (text):', textResponse.substring(0, 500));
-                throw new Error(`Server returned ${contentType || 'unknown content type'}`);
             }
-
-            let data;
-            try {
-                data = await response.json();
-                console.log('JSON parsed successfully:', data);
-            } catch (jsonError) {
-                console.error('JSON parsing failed:', jsonError);
-                const textResponse = await response.text();
-                console.log('Raw response:', textResponse.substring(0, 500));
-                throw new Error('Invalid JSON response from server');
-            }
-
-            // Reset button state
+        })
+        .catch(error => {
+            showModalError('mark-paid', 'An error occurred while processing the payment.');
             submitBtn.classList.remove('processing');
             submitBtn.disabled = false;
-            isSubmitting = false;
-
-            if (response.ok && data.status === 'success') {
-                console.log('Success response:', data.message);
-                paidModal.classList.add('hidden');
-                showSuccessMessage('Payment processed successfully!');
-                setTimeout(() => {
-                    console.log('Reloading page...');
-                    window.location.reload();
-                }, 1000);
-            } else {
-                console.error('Server error response:', {
-                    status: response.status,
-                    data: data
-                });
-                showModalError('mark-paid', data.error || 'Server error. Try again.');
-            }
-
-        } catch (error) {
-            console.error('Fetch error details:', {
-                name: error.name,
-                message: error.message,
-                stack: error.stack
-            });
-            
-            // Always reset button state on error
-            submitBtn.classList.remove('processing');
-            submitBtn.disabled = false;
-            isSubmitting = false;
-            
-            if (error.name === 'AbortError') {
-                showModalError('mark-paid', 'Request timed out. Please check your connection and try again.');
-            } else if (error.message.includes('JSON')) {
-                showModalError('mark-paid', 'Server response error. Please try again.');
-            } else {
-                showModalError('mark-paid', `Request failed: ${error.message}`);
-            }
-        }
+        });
     };
 }
 // Pagination and Filtering
