@@ -1264,7 +1264,10 @@ def mark_paid(receipt_id):
     db = firestore.Client()
 
     try:
-        # Query order by receipt_id
+        # Log request
+        print(f"Processing mark_paid for receipt_id: {receipt_id}, amount_paid: {request.form.get('amount_paid')}")
+
+        # Query order
         orders_ref = db.collection('orders').where('receipt_id', '==', receipt_id).limit(1).stream()
         order_doc = next(orders_ref, None)
         if not order_doc:
@@ -1273,6 +1276,8 @@ def mark_paid(receipt_id):
 
         order_ref = db.collection('orders').document(order_doc.id)
         order_dict = order_doc.to_dict()
+        print(f"Order found: {order_dict}")
+
         current_payment = float(order_dict.get('payment', 0))
         current_balance = float(order_dict.get('balance', 0))
         amount_paid = float(request.form.get('amount_paid', 0))
@@ -1306,7 +1311,7 @@ def mark_paid(receipt_id):
             update_data['closed_date'] = now
             update_data['status'] = 'completed'
 
-        # Update order in batch
+        # Batch updates
         batch = db.batch()
         batch.update(order_ref, update_data)
 
@@ -1319,6 +1324,7 @@ def mark_paid(receipt_id):
                 client_data = client_doc.to_dict()
                 new_debt = max(float(client_data.get('debt', 0)) - amount_paid, 0)
                 batch.update(db.collection('clients').document(client_doc.id), {'debt': new_debt})
+                print(f"Updated client debt for shop_name {shop_name}: new_debt={new_debt}")
             else:
                 print(f"Warning: No client found for shop_name {shop_name}")
 
@@ -1344,10 +1350,11 @@ def mark_paid(receipt_id):
                     'receipt_id': receipt_id
                 }
             })
+            print(f"Notification created for user_id: {user_id}, type: {'payment_success' if new_balance == 0 else 'payment_partial'}")
         else:
-            print(f"Warning: No user_id or order_type not 'app' for receipt_id {receipt_id}, user_id: {user_id}, order_type: {order_dict.get('order_type')}")
+            print(f"Warning: No notification created for receipt_id {receipt_id}, user_id: {user_id}, order_type: {order_dict.get('order_type')}")
 
-        # Commit all updates
+        # Commit batch
         batch.commit()
         print(f"Success: Payment processed for receipt_id {receipt_id}, amount: {amount_paid}, new_balance: {new_balance}")
 
@@ -1358,8 +1365,7 @@ def mark_paid(receipt_id):
         return jsonify({"error": f"Invalid data format: {str(ve)}"}), 400
     except Exception as e:
         print(f"Exception in mark_paid for receipt_id {receipt_id}: {str(e)}")
-        return jsonify({"error": f"Error processing payment: {str(e)}"}), 500
-    
+        return jsonify({"error": f"Error processing payment: {str(e)}"}), 500  
 # Updated /stock route
 @app.route('/stock', methods=['GET', 'POST'])
 @no_cache

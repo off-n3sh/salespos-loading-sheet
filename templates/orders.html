@@ -884,9 +884,8 @@ function markPaid(receiptId, balance) {
         console.log('Sending request to:', form.action);
         console.log('Form data:', Object.fromEntries(formData));
 
-        // Add timeout to prevent endless loading
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10-second timeout
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15-second timeout
 
         fetch(form.action, {
             method: 'POST',
@@ -919,7 +918,7 @@ function markPaid(receiptId, balance) {
         .catch(error => {
             clearTimeout(timeoutId);
             console.error('Fetch Error:', error.name, error.message);
-            showModalError('mark-paid', `An error occurred: ${error.message}`);
+            showModalError('mark-paid', `Request failed: ${error.message}`);
             submitBtn.classList.remove('processing');
             submitBtn.disabled = false;
             isSubmitting = false;
