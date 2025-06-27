@@ -685,15 +685,7 @@ function markPaid(receiptId, balance) {
     const cancelBtn = document.getElementById('close-paid-modal');
 
     if (!paidModal || !form || !orderIdElement || !amountTextElement || !amountInput || !submitBtn || !cancelBtn) {
-        console.error('Missing DOM elements:', {
-            paidModal: !!paidModal,
-            form: !!form,
-            orderIdElement: !!orderIdElement,
-            amountTextElement: !!amountTextElement,
-            amountInput: !!amountInput,
-            submitBtn: !!submitBtn,
-            cancelBtn: !!cancelBtn
-        });
+        console.error('Missing DOM elements');
         showModalError('mark-paid', 'UI error: Missing elements.');
         return;
     }
@@ -712,7 +704,7 @@ function markPaid(receiptId, balance) {
     amountInput.value = '';
     document.getElementById('paid-error').classList.add('hidden');
 
-    // Cancel button resets submit button and closes modal
+    // Cancel button handler
     cancelBtn.onclick = function() {
         console.log('Cancel clicked, resetting submit button');
         submitBtn.classList.remove('processing');
@@ -723,12 +715,21 @@ function markPaid(receiptId, balance) {
     let isSubmitting = false;
     form.onsubmit = async function(e) {
         e.preventDefault();
-        if (isSubmitting) return;
+        console.log('Form submit triggered');
+        
+        if (isSubmitting) {
+            console.log('Already submitting, ignoring');
+            return;
+        }
+        
         isSubmitting = true;
         submitBtn.classList.add('processing');
         submitBtn.disabled = true;
+        console.log('Submit button state changed to processing');
 
         const amountPaid = parseFloat(amountInput.value) || 0;
+        console.log('Amount validation:', { amountPaid, balance: parseFloat(balance) });
+        
         if (amountPaid <= 0 || amountPaid > parseFloat(balance)) {
             console.error('Invalid amount:', { amountPaid, balance });
             showModalError('mark-paid', 'Enter a valid amount (0 < amount ≤ balance).');
@@ -739,52 +740,162 @@ function markPaid(receiptId, balance) {
         }
 
         const formData = new FormData(form);
-        console.log('Hitting endpoint:', { url: form.action, data: Object.fromEntries(formData) });
+        console.log('Form data prepared:', {
+            url: form.action,
+            amount_paid: formData.get('amount_paid'),
+            csrf_token: formData.get('csrf_token'),
+            csrf_token_length: formData.get('csrf_token')?.length
+        });
 
+        // ENHANCED ERROR HANDLING AND DEBUGGING
         try {
             const controller = new AbortController();
+            
+            // Reduce timeout to 15 seconds for faster feedback
             const timeoutId = setTimeout(() => {
+                console.error('Request timeout after 15 seconds');
                 controller.abort();
-                console.error('Request timed out');
-            }, 10000);
+            }, 15000);
 
+            // Add failsafe timeout
+            const failsafeTimeout = setTimeout(() => {
+                console.error('Failsafe timeout triggered after 20 seconds');
+                submitBtn.classList.remove('processing');
+                submitBtn.disabled = false;
+                isSubmitting = false;
+                showModalError('mark-paid', 'Request timed out. Please try again.');
+            }, 20000);
+
+            console.log('Sending fetch request...');
+            const startTime = Date.now();
+            
             const response = await fetch(form.action, {
                 method: 'POST',
                 body: formData,
                 headers: {
                     'X-CSRFToken': formData.get('csrf_token'),
-                    'Accept': 'application/json'
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest' // Add this header
                 },
                 signal: controller.signal,
                 credentials: 'include'
             });
 
+            const endTime = Date.now();
+            console.log(`Request completed in ${endTime - startTime}ms`);
+            
             clearTimeout(timeoutId);
-            const data = await response.json();
-            console.log('Response:', { status: response.status, ok: response.ok, data });
+            clearTimeout(failsafeTimeout);
+            
+            console.log('Response received:', {
+                status: response.status,
+                statusText: response.statusText,
+                ok: response.ok,
+                headers: {
+                    contentType: response.headers.get('content-type'),
+                    contentLength: response.headers.get('content-length')
+                }
+            });
 
+            // Check if response is JSON
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                console.error('Non-JSON response received');
+                const textResponse = await response.text();
+                console.log('Response body (text):', textResponse.substring(0, 500));
+                throw new Error(`Server returned ${contentType || 'unknown content type'}`);
+            }
+
+            let data;
+            try {
+                data = await response.json();
+                console.log('JSON parsed successfully:', data);
+            } catch (jsonError) {
+                console.error('JSON parsing failed:', jsonError);
+                const textResponse = await response.text();
+                console.log('Raw response:', textResponse.substring(0, 500));
+                throw new Error('Invalid JSON response from server');
+            }
+
+            // Reset button state
             submitBtn.classList.remove('processing');
             submitBtn.disabled = false;
             isSubmitting = false;
 
             if (response.ok && data.status === 'success') {
-                console.log('Success:', data.message);
+                console.log('Success response:', data.message);
                 paidModal.classList.add('hidden');
                 showSuccessMessage('Payment processed successfully!');
-                setTimeout(() => window.location.reload(), 1000);
+                setTimeout(() => {
+                    console.log('Reloading page...');
+                    window.location.reload();
+                }, 1000);
             } else {
-                console.error('Server error:', data.error || 'Unknown error');
+                console.error('Server error response:', {
+                    status: response.status,
+                    data: data
+                });
                 showModalError('mark-paid', data.error || 'Server error. Try again.');
             }
+
         } catch (error) {
-            console.error('Fetch error:', error.name, error.message);
-            showModalError('mark-paid', `Request failed: ${error.message}`);
+            console.error('Fetch error details:', {
+                name: error.name,
+                message: error.message,
+                stack: error.stack
+            });
+            
+            // Always reset button state on error
             submitBtn.classList.remove('processing');
             submitBtn.disabled = false;
             isSubmitting = false;
+            
+            if (error.name === 'AbortError') {
+                showModalError('mark-paid', 'Request timed out. Please check your connection and try again.');
+            } else if (error.message.includes('JSON')) {
+                showModalError('mark-paid', 'Server response error. Please try again.');
+            } else {
+                showModalError('mark-paid', `Request failed: ${error.message}`);
+            }
         }
     };
 }
+
+// SERVER-SIDE DEBUGGING ADDITIONS:
+// Add these to your Flask route for better debugging:
+
+
+@app.route('/mark_paid/<receipt_id>', methods=['POST'])
+def mark_paid(receipt_id):
+    import time
+    start_time = time.time()
+    
+    NAIROBI_TZ = ZoneInfo("Africa/Nairobi")
+    
+    try:
+        print(f"[DEBUG] Request started for receipt_id: {receipt_id}")
+        print(f"[DEBUG] Request headers: {dict(request.headers)}")
+        print(f"[DEBUG] Form data: {request.form.to_dict()}")
+        
+        # Add timeout for Firestore operations
+        db = firestore.Client()
+        
+        # Your existing code here...
+        
+        end_time = time.time()
+        print(f"[DEBUG] Request completed in {end_time - start_time:.2f} seconds")
+        
+        return jsonify({"status": "success", "message": "Payment processed successfully"}), 200
+
+    except Exception as e:
+        end_time = time.time()
+        print(f"[ERROR] Request failed after {end_time - start_time:.2f} seconds")
+        print(f"[ERROR] Exception: {str(e)}")
+        print(f"[ERROR] Stack trace: {traceback.format_exc()}")
+        
+        # Ensure we always return JSON
+        return jsonify({"error": f"Server error: {str(e)}"}), 500
+
 // Pagination and Filtering
 const ordersPerPage = 10;
 let currentPage = 1;
