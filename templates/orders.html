@@ -45,11 +45,11 @@
                     data-order-type="{{ order.order_type }}" 
                     data-balance="{{ order.balance }}" 
                     data-date="{{ order.date_ordered }}" 
-                    data-search="{{ order.receipt_id }} {{ order.shop_name }} {{ order.order_type }} {{ order.items | map(attribute='name') | join(' ') }}">
+                    data-search="{{ order.receipt_id }} {{ order.shop_name }} {{ order.order_type }} {{ order.items_list | map(attribute='name') | join(' ') }}">
                     <td class="p-2">{{ order.receipt_id }}</td>
                     <td class="p-2">{{ order.shop_name }}<br><span class="text-sm text-gray-500 dark:text-gray-400">Debt: KSh {{ order.debt | format_currency }}</span></td>
                     <td class="p-2">
-                        {% for item in order.items %}
+                        {% for item in order.items_list %}
                         {{ item.name }} ({{ item.quantity }} {{ item.uom }})<br>
                         {% endfor %}
                     </td>
@@ -70,10 +70,10 @@
                             {% if session['user']['role'] == 'manager' %}
                             <button class="return-stock-btn block w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700" 
                                     data-receipt-id="{{ order.receipt_id }}" 
-                                    data-items="{{ order.items | tojson | safe }}">Return Stock</button>
+                                    data-items="{{ order.items_list | tojson | safe }}">Return Stock</button>
                             <button class="edit-order-btn block w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700" 
                                     data-receipt-id="{{ order.receipt_id }}" 
-                                    data-items="{{ order.items | tojson | safe }}">Edit Order</button>
+                                    data-items="{{ order.items_list | tojson | safe }}">Edit Order</button>
                             <button class="delete-order-btn block w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700" 
                                     data-receipt-id="{{ order.receipt_id }}">Delete Order</button>
                             {% endif %}
