@@ -38,6 +38,12 @@ def format_datetime(value):
     if isinstance(value, datetime):
         return value.strftime('%Y-%m-%d %H:%M:%S')  # Customize the format as needed
     return value 
+
+def format_currency(value):
+    try:
+        return f"{float(value):,.2f}"  # Format as currency with 2 decimal places
+    except (ValueError, TypeError):
+        return value  # Return as-is if conversion fails
 app.jinja_env.filters['format_datetime'] = format_datetime
 app.jinja_env.filters['format_currency'] = format_currency   
     
