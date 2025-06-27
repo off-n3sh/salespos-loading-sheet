@@ -1238,31 +1238,30 @@ def orders():
             items_list = []
 
             if order_dict.get('order_type') == 'app' and isinstance(items_raw, list) and items_raw and isinstance(items_raw[0], dict):
-                # App order: items is a list of maps
                 for item in items_raw:
                     items_list.append({
                         'name': item.get('product', 'Unknown'),
-                        'quantity': int(item.get('quantity', '0')),  # Ensure integer conversion
-                        'price': float(item.get('price', '0.0')),   # Ensure float conversion
-                        'amount': int(item.get('quantity', '0')) * float(item.get('price', '0.0'))
+                        'quantity': int(item.get('quantity', '0')),
+                        'price': float(item.get('price', '0.0')),
+                        'amount': int(item.get('quantity', '0')) * float(item.get('price', '0.0')),
+                        'uom': item.get('uom', 'Unit')  # Added uom for template compatibility
                     })
             else:
-                # Web order: flat array
                 i = 0
                 while i < len(items_raw):
                     if items_raw[i] == 'product':
                         product_name = items_raw[i + 1]
-                        quantity_str = str(items_raw[i + 3]) if i + 2 < len(items_raw) and items_raw[i + 2] == 'quantity' else '0'
-                        price_str = str(items_raw[i + 5]) if i + 4 < len(items_raw) and items_raw[i + 4] == 'price' else '0'
-                        quantity = int(quantity_str) if quantity_str.isdigit() else 0
-                        price = float(price_str) if price_str.replace('.', '').isdigit() or price_str.replace('.', '').replace('-', '').isdigit() else 0.0
+                        quantity = int(items_raw[i + 3]) if i + 2 < len(items_raw) and items_raw[i + 2] == 'quantity' else 0
+                        price = float(items_raw[i + 5]) if i + 4 < len(items_raw) and items_raw[i + 4] == 'price' else 0.0
+                        uom = items_raw[i + 9] if i + 8 < len(items_raw) and items_raw[i + 8] == 'uom' else 'Unit'
                         items_list.append({
                             'name': product_name,
                             'quantity': quantity,
                             'price': price,
-                            'amount': quantity * price
+                            'amount': quantity * price,
+                            'uom': uom
                         })
-                        i += 6
+                        i += 10  # Adjusted for uom field
                     else:
                         i += 1
 
@@ -1271,18 +1270,20 @@ def orders():
                 'salesperson_name': order_dict.get('salesperson_name', 'N/A'),
                 'salesperson_id': order_dict.get('salesperson_id', ''),
                 'shop_name': order_dict.get('shop_name', 'Unknown Shop'),
-                'total_items': process_items(order_dict.get('items')),
-                'items_list': items_list,
+                'debt': order_dict.get('debt', 0),  # Added for template
+                'total_items': process_items(order_dict.get('items', [])),
+                'items': items_list,  # Renamed to match template
                 'payment': order_dict.get('payment', 0),
                 'balance': order_dict.get('balance', 0),
-                'date': process_date(order_dict.get('date')),
-                'closed_date': process_date(order_dict.get('closed_date', None)) if order_dict.get('closed_date') else None,
+                'total': sum(item['amount'] for item in items_list),  # Added for template
+                'date_ordered': process_date(order_dict.get('date')),  # Renamed to match template
+                'closed_date': process_date(order_dict.get('closed_date', None)),
                 'order_type': order_dict.get('order_type', 'wholesale')
             })
 
         recent_activity = orders[:3]
         stock_items = [doc.to_dict() for doc in db.collection('stock').order_by('stock_name').get()]
-        return render_template('orders.html', orders=orders, recent_activity=recent_activity, stock_items=stock_items)
+        return render_template('orders.html', orders=orders, recent_activity=recent_activity, stock_items=stock_items, current_user=current_user)
     except Exception as e:
         logger.error(f"Error fetching orders: {e}")
         return render_template('error.html', message=f"Failed to load orders: {str(e)}"), 500
