@@ -597,6 +597,7 @@ async function fetchStockData() {
 }
 
 // Attach Action Button Listeners
+// Ensure markPaid buttons are correctly bound
 function attachActionButtonListeners() {
     document.querySelectorAll('.order-actions-btn').forEach(btn => {
         const newBtn = btn.cloneNode(true);
@@ -632,14 +633,21 @@ function attachActionButtonListeners() {
         });
     });
 
+    // Attach Mark as Paid button listeners
     document.querySelectorAll('.mark-paid-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const receiptId = btn.getAttribute('data-receipt-id');
-            const balance = parseFloat(btn.getAttribute('data-balance'));
-            markPaid(receiptId, balance);
-        });
+        btn.removeEventListener('click', handleMarkPaid); // Prevent duplicate listeners
+        btn.addEventListener('click', handleMarkPaid);
     });
 
+    function handleMarkPaid(e) {
+        e.stopPropagation();
+        const receiptId = e.target.getAttribute('data-receipt-id');
+        const balance = parseFloat(e.target.getAttribute('data-balance'));
+        console.log('Mark Paid clicked:', { receiptId, balance });
+        markPaid(receiptId, balance);
+    }
+
+    // Other button listeners (edit, delete, return)
     document.querySelectorAll('.return-stock-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const receiptId = btn.getAttribute('data-receipt-id');
@@ -667,6 +675,111 @@ function attachActionButtonListeners() {
     });
 }
 
+function markPaid(receiptId, balance) {
+    console.log('markPaid called:', { receiptId, balance });
+    try {
+        const paidModal = document.getElementById('mark-paid-modal');
+        if (!paidModal) {
+            console.error('Modal not found: #mark-paid-modal');
+            return;
+        }
+        closeAllModals();
+        paidModal.classList.remove('hidden');
+        console.log('Modal opened, hidden class removed');
+
+        const orderIdElement = document.getElementById('paid-order-id');
+        const amountTextElement = document.getElementById('full-amount-text');
+        const form = document.getElementById('mark-paid-form');
+        const amountInput = document.getElementById('paid-amount');
+        if (!orderIdElement || !amountTextElement || !form || !amountInput) {
+            console.error('Missing elements:', {
+                orderIdElement: !!orderIdElement,
+                amountTextElement: !!amountTextElement,
+                form: !!form,
+                amountInput: !!amountInput
+            });
+            return;
+        }
+
+        orderIdElement.textContent = receiptId;
+        amountTextElement.textContent = `Remaining Balance: ${parseFloat(balance).toFixed(2)}`;
+        form.action = `/mark_paid/${receiptId}`;
+        amountInput.max = balance;
+        amountInput.value = '';
+        document.getElementById('paid-error').classList.add('hidden');
+
+        let isSubmitting = false;
+        form.onsubmit = function(e) {
+            e.preventDefault();
+            if (isSubmitting) return;
+            isSubmitting = true;
+            const submitBtn = form.querySelector('.submit-btn');
+            if (!submitBtn) {
+                console.error('Submit button not found: .submit-btn');
+                isSubmitting = false;
+                return;
+            }
+            submitBtn.classList.add('processing');
+            submitBtn.disabled = true;
+
+            const amountPaid = parseFloat(amountInput.value) || 0;
+            if (amountPaid <= 0 || amountPaid > parseFloat(balance)) {
+                console.error(`Invalid amount: ${amountPaid}, Balance: ${balance}`);
+                showModalError('mark-paid', 'Enter a valid amount (0 < amount ≤ balance).');
+                submitBtn.classList.remove('processing');
+                submitBtn.disabled = false;
+                isSubmitting = false;
+                return;
+            }
+
+            const formData = new FormData(form);
+            console.log('Sending request to:', form.action);
+            console.log('Form data:', Object.fromEntries(formData));
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+            fetch(form.action, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': formData.get('csrf_token'),
+                    'Accept': 'application/json'
+                },
+                signal: controller.signal
+            })
+            .then(response => {
+                clearTimeout(timeoutId);
+                console.log('Response Status:', response.status, 'OK:', response.ok);
+                return response.json().then(data => ({ status: response.status, data }));
+            })
+            .then(({ status, data }) => {
+                submitBtn.classList.remove('processing');
+                submitBtn.disabled = false;
+                isSubmitting = false;
+                if (status === 200) {
+                    console.log('Success:', data.message);
+                    paidModal.classList.add('hidden');
+                    showSuccessMessage('Payment processed successfully');
+                    setTimeout(() => window.location.reload(), 2000);
+                } else {
+                    console.error('Server Error:', data.error || 'Unknown error');
+                    showModalError('mark-paid', data.error || 'Error processing payment');
+                }
+            })
+            .catch(error => {
+                clearTimeout(timeoutId);
+                console.error('Fetch Error:', error.name, error.message);
+                showModalError('mark-paid', `Request failed: ${error.message}`);
+                submitBtn.classList.remove('processing');
+                submitBtn.disabled = false;
+                isSubmitting = false;
+            });
+        };
+    } catch (error) {
+        console.error('Error in markPaid:', error.message);
+    }
+}
 // Pagination and Filtering
 const ordersPerPage = 10;
 let currentPage = 1;
@@ -854,7 +967,6 @@ addManualToOrder.addEventListener('click', () => {
 
 function markPaid(receiptId, balance) {
     closeAllModals();
-    const paidModal = document.getElementById('paid-modal'); // Ensure this matches your modal's ID
     paidModal.classList.remove('hidden');
     document.getElementById('paid-order-id').textContent = receiptId;
     document.getElementById('full-amount-text').textContent = `Remaining Balance: ${parseFloat(balance).toFixed(2)}`;
@@ -871,23 +983,22 @@ function markPaid(receiptId, balance) {
         const submitBtn = form.querySelector('.submit-btn');
         submitBtn.classList.add('processing');
         submitBtn.disabled = true;
-
         const amountPaid = parseFloat(document.getElementById('paid-amount').value) || 0;
         if (amountPaid <= 0 || amountPaid > parseFloat(balance)) {
-            console.error(`Invalid amount: ${amountPaid}, Balance: ${balance}`);
-            showModalError('mark-paid', 'Enter a valid amount (0 < amount ≤ balance).');
+            console.error(`Invalid amount paid: ${amountPaid}, Balance: ${balance}`);
+            showModalError('mark-paid', 'Please enter a valid amount (greater than 0, up to the balance).');
             submitBtn.classList.remove('processing');
             submitBtn.disabled = false;
             isSubmitting = false;
             return;
         }
 
-        const formData = new FormData(form);
-        console.log('Request URL:', form.action);
+        const formData = new FormData(this);
+        console.log('Sending request to:', form.action);
         console.log('Form data:', Object.fromEntries(formData));
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15-second timeout
 
         fetch(form.action, {
             method: 'POST',
@@ -905,26 +1016,25 @@ function markPaid(receiptId, balance) {
             return response.json().then(data => ({ status: response.status, data }));
         })
         .then(({ status, data }) => {
-            console.log('Response Data:', data);
-            submitBtn.classList.remove('processing');
-            submitBtn.disabled = false;
-            isSubmitting = false;
             if (status === 200) {
-                console.log('Success:', data.message);
+                console.log('Payment successful:', data);
                 paidModal.classList.add('hidden');
                 window.location.href = '/orders';
             } else {
                 console.error('Server Error:', data.error || 'Unknown error');
-                showModalError('mark-paid', data.error || 'Failed to process payment');
+                showModalError('mark-paid', data.error || 'Error processing payment');
+                submitBtn.classList.remove('processing');
+                submitBtn.disabled = false;
+                isSubmitting = false;
             }
         })
         .catch(error => {
             clearTimeout(timeoutId);
             console.error('Fetch Error:', error.name, error.message);
+            showModalError('mark-paid', `Request failed: ${error.message}`);
             submitBtn.classList.remove('processing');
             submitBtn.disabled = false;
             isSubmitting = false;
-            showModalError('mark-paid', `Request failed: ${error.message}`);
         });
     };
 }
