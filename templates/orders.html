@@ -854,6 +854,7 @@ addManualToOrder.addEventListener('click', () => {
 
 function markPaid(receiptId, balance) {
     closeAllModals();
+    const paidModal = document.getElementById('paid-modal'); // Ensure this matches your modal's ID
     paidModal.classList.remove('hidden');
     document.getElementById('paid-order-id').textContent = receiptId;
     document.getElementById('full-amount-text').textContent = `Remaining Balance: ${parseFloat(balance).toFixed(2)}`;
@@ -870,22 +871,23 @@ function markPaid(receiptId, balance) {
         const submitBtn = form.querySelector('.submit-btn');
         submitBtn.classList.add('processing');
         submitBtn.disabled = true;
+
         const amountPaid = parseFloat(document.getElementById('paid-amount').value) || 0;
         if (amountPaid <= 0 || amountPaid > parseFloat(balance)) {
-            console.error(`Invalid amount paid: ${amountPaid}, Balance: ${balance}`);
-            showModalError('mark-paid', 'Please enter a valid amount (greater than 0, up to the balance).');
+            console.error(`Invalid amount: ${amountPaid}, Balance: ${balance}`);
+            showModalError('mark-paid', 'Enter a valid amount (0 < amount ≤ balance).');
             submitBtn.classList.remove('processing');
             submitBtn.disabled = false;
             isSubmitting = false;
             return;
         }
 
-        const formData = new FormData(this);
-        console.log('Sending request to:', form.action);
+        const formData = new FormData(form);
+        console.log('Request URL:', form.action);
         console.log('Form data:', Object.fromEntries(formData));
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15-second timeout
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
         fetch(form.action, {
             method: 'POST',
@@ -903,25 +905,26 @@ function markPaid(receiptId, balance) {
             return response.json().then(data => ({ status: response.status, data }));
         })
         .then(({ status, data }) => {
+            console.log('Response Data:', data);
+            submitBtn.classList.remove('processing');
+            submitBtn.disabled = false;
+            isSubmitting = false;
             if (status === 200) {
-                console.log('Payment successful:', data);
+                console.log('Success:', data.message);
                 paidModal.classList.add('hidden');
                 window.location.href = '/orders';
             } else {
                 console.error('Server Error:', data.error || 'Unknown error');
-                showModalError('mark-paid', data.error || 'Error processing payment');
-                submitBtn.classList.remove('processing');
-                submitBtn.disabled = false;
-                isSubmitting = false;
+                showModalError('mark-paid', data.error || 'Failed to process payment');
             }
         })
         .catch(error => {
             clearTimeout(timeoutId);
             console.error('Fetch Error:', error.name, error.message);
-            showModalError('mark-paid', `Request failed: ${error.message}`);
             submitBtn.classList.remove('processing');
             submitBtn.disabled = false;
             isSubmitting = false;
+            showModalError('mark-paid', `Request failed: ${error.message}`);
         });
     };
 }
