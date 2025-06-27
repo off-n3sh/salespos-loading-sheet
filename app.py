@@ -34,6 +34,12 @@ if not app.secret_key:
 csrf = CSRFProtect(app)
 app.jinja_env.globals['csrf_token'] = lambda: session.get('_csrf_token', '')
 
+def format_datetime(value):
+    if isinstance(value, datetime):
+        return value.strftime('%Y-%m-%d %H:%M:%S')  # Customize the format as needed
+    return value 
+    
+    
 def calculate_dashboard_stats(orders, retail_collection, today_start, today_end):
     """Calculate dashboard statistics for sales, debts, and order counts."""
     retail_sales_today = 0.0
