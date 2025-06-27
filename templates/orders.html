@@ -860,42 +860,6 @@ function markPaid(receiptId, balance) {
         }
     };
 }
-
-// SERVER-SIDE DEBUGGING ADDITIONS:
-// Add these to your Flask route for better debugging:
-
-
-@app.route('/mark_paid/<receipt_id>', methods=['POST'])
-def mark_paid(receipt_id):
-    import time
-    start_time = time.time()
-    
-    NAIROBI_TZ = ZoneInfo("Africa/Nairobi")
-    
-    try:
-        print(f"[DEBUG] Request started for receipt_id: {receipt_id}")
-        print(f"[DEBUG] Request headers: {dict(request.headers)}")
-        print(f"[DEBUG] Form data: {request.form.to_dict()}")
-        
-        # Add timeout for Firestore operations
-        db = firestore.Client()
-        
-        # Your existing code here...
-        
-        end_time = time.time()
-        print(f"[DEBUG] Request completed in {end_time - start_time:.2f} seconds")
-        
-        return jsonify({"status": "success", "message": "Payment processed successfully"}), 200
-
-    except Exception as e:
-        end_time = time.time()
-        print(f"[ERROR] Request failed after {end_time - start_time:.2f} seconds")
-        print(f"[ERROR] Exception: {str(e)}")
-        print(f"[ERROR] Stack trace: {traceback.format_exc()}")
-        
-        # Ensure we always return JSON
-        return jsonify({"error": f"Server error: {str(e)}"}), 500
-
 // Pagination and Filtering
 const ordersPerPage = 10;
 let currentPage = 1;
