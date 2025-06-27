@@ -10,7 +10,7 @@
         <div class="flex space-x-2">
             <button id="open-retail-modal" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">New Retail Order</button>
             <button id="open-wholesale-modal" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">New Wholesale Order</button>
-            {% if current_user.role == 'admin' %}
+            {% if session['user']['role'] == 'manager' %}
             <button id="open-expense-modal" class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600">Add Expense</button>
             {% endif %}
         </div>
@@ -40,7 +40,8 @@
             </thead>
             <tbody id="orders-tbody">
                 {% for order in orders %}
-                <tr class="order-row" data-receipt-id="{{ order.receipt_id }}" 
+                <tr class="order-row" 
+                    data-receipt-id="{{ order.receipt_id }}" 
                     data-order-type="{{ order.order_type }}" 
                     data-balance="{{ order.balance }}" 
                     data-date="{{ order.date_ordered }}" 
@@ -66,7 +67,7 @@
                                     data-receipt-id="{{ order.receipt_id }}" 
                                     data-balance="{{ order.balance }}">Mark as Paid</button>
                             {% endif %}
-                            {% if current_user.role == 'admin' %}
+                            {% if session['user']['role'] == 'manager' %}
                             <button class="return-stock-btn block w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700" 
                                     data-receipt-id="{{ order.receipt_id }}" 
                                     data-items="{{ order.items | tojson | safe }}">Return Stock</button>
@@ -98,6 +99,8 @@
             <div id="retail-error" class="text-red-600 dark:text-red-400 hidden mb-4"></div>
             <form id="retail-form" action="/add_retail_order" method="POST">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="salesperson_name" value="{{ session['user']['firstName'] }} {{ session['user']['lastName'] }}">
+                <input type="hidden" name="order_type" value="retail">
                 <div class="mb-4">
                     <label class="block text-gray-700 dark:text-gray-300 mb-2">Client</label>
                     <select id="retail-client-input" name="shop_name" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"></select>
@@ -143,6 +146,8 @@
             <div id="wholesale-error" class="text-red-600 dark:text-red-400 hidden mb-4"></div>
             <form id="wholesale-form" action="/add_wholesale_order" method="POST">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="salesperson_name" value="{{ session['user']['firstName'] }} {{ session['user']['lastName'] }}">
+                <input type="hidden" name="order_type" value="wholesale">
                 <div class="mb-4">
                     <label class="block text-gray-700 dark:text-gray-300 mb-2">Client</label>
                     <select id="wholesale-client-input" name="shop_name" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"></select>
@@ -255,6 +260,7 @@
             <form id="edit-order-form" method="POST">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" id="edit-order-type" name="order_type">
+                <input type="hidden" name="salesperson_name" value="{{ session['user']['firstName'] }} {{ session['user']['lastName'] }}">
                 <div class="mb-4">
                     <label class="block text-gray-700 dark:text-gray-300 mb-2">Client</label>
                     <input type="text" id="edit-client-input" name="shop_name" 
