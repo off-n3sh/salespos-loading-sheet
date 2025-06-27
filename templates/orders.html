@@ -682,19 +682,25 @@ function markPaid(receiptId, balance) {
     const amountTextElement = document.getElementById('full-amount-text');
     const amountInput = document.getElementById('paid-amount');
     const submitBtn = form.querySelector('.submit-btn');
+    const cancelBtn = document.getElementById('close-paid-modal');
 
-    // Validate DOM elements
-    if (!paidModal || !form || !orderIdElement || !amountTextElement || !amountInput || !submitBtn) {
+    if (!paidModal || !form || !orderIdElement || !amountTextElement || !amountInput || !submitBtn || !cancelBtn) {
         console.error('Missing DOM elements:', {
             paidModal: !!paidModal,
             form: !!form,
             orderIdElement: !!orderIdElement,
             amountTextElement: !!amountTextElement,
             amountInput: !!amountInput,
-            submitBtn: !!submitBtn
+            submitBtn: !!submitBtn,
+            cancelBtn: !!cancelBtn
         });
+        showModalError('mark-paid', 'UI error: Missing elements.');
         return;
     }
+
+    // Reset button state on modal open
+    submitBtn.classList.remove('processing');
+    submitBtn.disabled = false;
 
     // Open modal and set values
     closeAllModals();
@@ -705,6 +711,14 @@ function markPaid(receiptId, balance) {
     amountInput.max = balance;
     amountInput.value = '';
     document.getElementById('paid-error').classList.add('hidden');
+
+    // Cancel button resets submit button and closes modal
+    cancelBtn.onclick = function() {
+        console.log('Cancel clicked, resetting submit button');
+        submitBtn.classList.remove('processing');
+        submitBtn.disabled = false;
+        paidModal.classList.add('hidden');
+    };
 
     let isSubmitting = false;
     form.onsubmit = async function(e) {
@@ -725,11 +739,14 @@ function markPaid(receiptId, balance) {
         }
 
         const formData = new FormData(form);
-        console.log('Sending request:', { url: form.action, data: Object.fromEntries(formData) });
+        console.log('Hitting endpoint:', { url: form.action, data: Object.fromEntries(formData) });
 
         try {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+            const timeoutId = setTimeout(() => {
+                controller.abort();
+                console.error('Request timed out');
+            }, 10000);
 
             const response = await fetch(form.action, {
                 method: 'POST',
@@ -739,7 +756,7 @@ function markPaid(receiptId, balance) {
                     'Accept': 'application/json'
                 },
                 signal: controller.signal,
-                credentials: 'include' // Ensure session cookies are sent
+                credentials: 'include'
             });
 
             clearTimeout(timeoutId);
@@ -751,13 +768,13 @@ function markPaid(receiptId, balance) {
             isSubmitting = false;
 
             if (response.ok && data.status === 'success') {
-                console.log('Payment successful:', data.message);
+                console.log('Success:', data.message);
                 paidModal.classList.add('hidden');
-                showSuccessMessage('Payment processed successfully');
+                showSuccessMessage('Payment processed successfully!');
                 setTimeout(() => window.location.reload(), 1000);
             } else {
                 console.error('Server error:', data.error || 'Unknown error');
-                showModalError('mark-paid', data.error || 'Error processing payment');
+                showModalError('mark-paid', data.error || 'Server error. Try again.');
             }
         } catch (error) {
             console.error('Fetch error:', error.name, error.message);
