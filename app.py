@@ -1294,7 +1294,7 @@ def mark_paid(receipt_id):
     orders_ref = db.collection('orders').where('receipt_id', '==', receipt_id).limit(1).stream()
     order_doc = next(orders_ref, None)
     if not order_doc:
-        return f"Order with receipt_id {receipt_id} not found", 404
+        return jsonify({"error": f"Order with receipt_id {receipt_id} not found"}), 404
 
     try:
         order_ref = db.collection('orders').document(order_doc.id)
@@ -1306,9 +1306,9 @@ def mark_paid(receipt_id):
 
         # Validation
         if amount_paid <= 0:
-            return "Payment amount must be greater than 0", 400
+            return jsonify({"error": "Payment amount must be greater than 0"}), 400
         if current_balance <= 0:
-            return "Order is already fully paid", 400
+            return jsonify({"error": "Order is already fully paid"}), 400
 
         # Update payment and balance
         new_payment = current_payment + amount_paid
@@ -1349,9 +1349,9 @@ def mark_paid(receipt_id):
                 'type': 'payment_closed' if new_balance == 0 else 'payment_partial'
             })
 
-        return redirect(url_for('dashboard'))
+        return jsonify({"success": True, "message": "Payment processed successfully", "new_balance": new_balance}), 200
     except Exception as e:
-        return f"Error updating order: {str(e)}", 500
+        return jsonify({"error": f"Error updating order: {str(e)}"}), 500
 
  
 # Updated /stock route

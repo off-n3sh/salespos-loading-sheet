@@ -1,11 +1,11 @@
 // static/js/markPaidModal.js
-
 import { showModalError } from './utils.js';
 
 const paidModal = document.getElementById('mark-paid-modal');
 const closePaid = document.getElementById('close-paid-modal');
 
 function markPaid(receiptId, balance) {
+    console.log('markPaid called with:', { receiptId, balance });
     document.querySelectorAll('.modal').forEach(modal => modal.classList.add('hidden'));
     paidModal.classList.remove('hidden');
     document.getElementById('paid-order-id').textContent = receiptId;
@@ -33,7 +33,7 @@ function markPaid(receiptId, balance) {
             return;
         }
 
-        const formData = new FormData(this);
+        const formData = new FormData(form);
         console.log('Sending request to:', form.action);
         console.log('Form data:', Object.fromEntries(formData));
 
@@ -56,10 +56,10 @@ function markPaid(receiptId, balance) {
             return response.json().then(data => ({ status: response.status, data }));
         })
         .then(({ status, data }) => {
-            if (status === 200) {
+            if (status === 200 && data.success) {
                 console.log('Payment successful:', data);
                 paidModal.classList.add('hidden');
-                window.location.href = '/orders';
+                window.location.href = '/orders'; // Redirect to orders, not dashboard
             } else {
                 console.error('Server Error:', data.error || 'Unknown error');
                 showModalError('mark-paid', data.error || 'Error processing payment');
