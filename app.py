@@ -1260,21 +1260,16 @@ def orders():
 
 @app.route('/mark_paid/<receipt_id>', methods=['POST'])
 def mark_paid(receipt_id):
-    from datetime import datetime
-    from google.cloud import firestore
-    from flask import request, redirect, url_for
-
-    # Assuming NAIROBI_TZ is defined, e.g., from zoneinfo import ZoneInfo
     NAIROBI_TZ = ZoneInfo("Africa/Nairobi")
     db = firestore.Client()
 
-    # Query order by receipt_id field
-    orders_ref = db.collection('orders').where('receipt_id', '==', receipt_id).limit(1).stream()
-    order_doc = next(orders_ref, None)
-    if not order_doc:
-        return f"Order with receipt_id {receipt_id} not found", 404
-
     try:
+        # Query order by receipt_id
+        orders_ref = db.collection('orders').where('receipt_id', '==', receipt_id).limit(1).stream()
+        order_doc = next(orders_ref, None)
+        if not order_doc:
+            return jsonify({"error": f"Order with receipt_id {receipt_id} not found"}), 404
+
         order_ref = db.collection('orders').document(order_doc.id)
         order_dict = order_doc.to_dict()
         current_payment = float(order_dict.get('payment', 0))
@@ -1284,9 +1279,11 @@ def mark_paid(receipt_id):
 
         # Validation
         if amount_paid <= 0:
-            return "Payment amount must be greater than 0", 400
+            return jsonify({"error": "Payment amount must be greater than 0"}), 400
         if current_balance <= 0:
-            return "Order is already fully paid", 400
+            return jsonify({"error": "Order is already fully paid"}), 400
+        if amount_paid > current_balance:
+            return jsonify({"error": f"Payment amount ({amount_paid}) exceeds remaining balance ({current_balance})"}), 400
 
         # Update payment and balance
         new_payment = current_payment + amount_paid
@@ -1294,35 +1291,46 @@ def mark_paid(receipt_id):
 
         update_data = {
             'payment': new_payment,
-            'balance': new_balance
+            'balance': new_balance,
+            'payment_history': order_dict.get('payment_history', []) + [{
+                'amount': amount_paid,
+                'date': now,
+                'payment_method': order_dict.get('payment_method', 'Unknown')
+            }]
         }
         if new_balance == 0:
             update_data['closed_date'] = now
+            update_data['status'] = 'completed'
 
-        # Update order
-        order_ref.update(update_data)
+        # Update order in batch
+        batch = db.batch()
+        batch.update(order_ref, update_data)
 
         # Update client debt
         shop_name = order_dict.get('shop_name')
-        client_ref = db.collection('clients').where('shop_name', '==', shop_name).limit(1).get()
-        if client_ref:
-            client_doc = client_ref[0]
-            client_data = client_doc.to_dict()
-            new_debt = max(float(client_data.get('debt', 0)) - amount_paid, 0)
-            db.collection('clients').document(client_doc.id).update({'debt': new_debt})
+        if shop_name:
+            client_ref = db.collection('clients').where('shop_name', '==', shop_name).limit(1).get()
+            if client_ref:
+                client_doc = client_ref[0]
+                client_data = client_doc.to_dict()
+                new_debt = max(float(client_data.get('debt', 0)) - amount_paid, 0)
+                batch.update(db.collection('clients').document(client_doc.id), {'debt': new_debt})
+            else:
+                print(f"Warning: No client found for shop_name {shop_name}")
 
-        # Create notification
+        # Create notification for order_type: "app"
         user_id = order_dict.get('user_id')
-        if user_id:
+        if user_id and order_dict.get('order_type') == 'app':
             notification_title = "Payment Update"
             notification_body = (
-                f"Order #{receipt_id} fully paid on {now.strftime('%d/%m/%Y %H:%M')}"
+0
+                f"Your order #{receipt_id} has been fully paid on {now.strftime('%d/%m/%Y %H:%M')}."
                 if new_balance == 0 else
-                f"Order #{receipt_id} partially paid. New balance: KSh {new_balance} on {now.strftime('%d/%m/%Y %H:%M')}"
+                f"Your order #{receipt_id} has been partially paid. New balance: KSh {new_balance:.2f} on {now.strftime('%d/%m/%Y %H:%M')}."
             )
-            db.collection('users').document(user_id).collection('notifications').add({
+            batch.set(db.collection('users').document(user_id).collection('notifications').document(), {
                 'user_id': user_id,
-                'type': 'payment_closed' if new_balance == 0 else 'payment_partial',
+                'type': 'payment_success' if new_balance == 0 else 'payment_partial',
                 'title': notification_title,
                 'body': notification_body,
                 'timestamp': now,
@@ -1330,14 +1338,20 @@ def mark_paid(receipt_id):
                 'visible': True,
                 'data': {
                     'orderId': order_doc.id,
-                    'receipt_id': receipt_id,
-                },
-                'recipient': user_id,
+                    'receipt_id': receipt_id
+                }
             })
 
-        return redirect(url_for('dashboard'))
+        # Commit all updates
+        batch.commit()
+
+        return jsonify({"status": "success", "message": "Payment processed successfully"}), 200
+
+    except ValueError as ve:
+        return jsonify({"error": f"Invalid data format: {str(ve)}"}), 400
     except Exception as e:
-        return f"Error updating order: {str(e)}", 500
+        print(f"Error in mark_paid: {str(e)}")
+        return jsonify({"error": f"Error processing payment: {str(e)}"}), 500
 
     
 # Updated /stock route
