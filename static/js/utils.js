@@ -112,7 +112,28 @@ async function populateClients(inputElement, debtElement) {
                     choices.setChoiceByValue(value);
                 }
             } else {
-                debtElement.textContent Carabiner
+                debtElement.textContent = '';
+                debtElement.classList.add('hidden');
+            }
+        });
+
+        inputElement.addEventListener('search', (event) => {
+            const searchTerm = event.detail.value.toLowerCase();
+            const filteredClients = clients.filter(client => 
+                client.shop_name.toLowerCase().includes(searchTerm)
+            );
+            choices.setChoices(
+                filteredClients.map(client => ({
+                    value: client.shop_name,
+                    label: `${client.shop_name} (Debt: KSh ${client.debt.toFixed(2)})`
+                })),
+                'value',
+                'label',
+                true
+            );
+            if (searchTerm && !filteredClients.some(c => c.shop_name.toLowerCase() === searchTerm)) {
+                choices.setChoices([{ value: searchTerm, label: `${searchTerm} (New)` }], 'value', 'label', false);
+            }
         });
     } catch (error) {
         console.error('Error loading clients:', error);
