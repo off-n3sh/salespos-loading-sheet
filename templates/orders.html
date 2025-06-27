@@ -674,111 +674,99 @@ function attachActionButtonListeners() {
         });
     });
 }
-
 function markPaid(receiptId, balance) {
     console.log('markPaid called:', { receiptId, balance });
-    try {
-        const paidModal = document.getElementById('mark-paid-modal');
-        if (!paidModal) {
-            console.error('Modal not found: #mark-paid-modal');
+    const paidModal = document.getElementById('mark-paid-modal');
+    const form = document.getElementById('mark-paid-form');
+    const orderIdElement = document.getElementById('paid-order-id');
+    const amountTextElement = document.getElementById('full-amount-text');
+    const amountInput = document.getElementById('paid-amount');
+    const submitBtn = form.querySelector('.submit-btn');
+
+    // Validate DOM elements
+    if (!paidModal || !form || !orderIdElement || !amountTextElement || !amountInput || !submitBtn) {
+        console.error('Missing DOM elements:', {
+            paidModal: !!paidModal,
+            form: !!form,
+            orderIdElement: !!orderIdElement,
+            amountTextElement: !!amountTextElement,
+            amountInput: !!amountInput,
+            submitBtn: !!submitBtn
+        });
+        return;
+    }
+
+    // Open modal and set values
+    closeAllModals();
+    paidModal.classList.remove('hidden');
+    orderIdElement.textContent = receiptId;
+    amountTextElement.textContent = `Remaining Balance: ${parseFloat(balance).toFixed(2)}`;
+    form.action = `/mark_paid/${receiptId}`;
+    amountInput.max = balance;
+    amountInput.value = '';
+    document.getElementById('paid-error').classList.add('hidden');
+
+    let isSubmitting = false;
+    form.onsubmit = async function(e) {
+        e.preventDefault();
+        if (isSubmitting) return;
+        isSubmitting = true;
+        submitBtn.classList.add('processing');
+        submitBtn.disabled = true;
+
+        const amountPaid = parseFloat(amountInput.value) || 0;
+        if (amountPaid <= 0 || amountPaid > parseFloat(balance)) {
+            console.error('Invalid amount:', { amountPaid, balance });
+            showModalError('mark-paid', 'Enter a valid amount (0 < amount ≤ balance).');
+            submitBtn.classList.remove('processing');
+            submitBtn.disabled = false;
+            isSubmitting = false;
             return;
         }
-        closeAllModals();
-        paidModal.classList.remove('hidden');
-        console.log('Modal opened, hidden class removed');
 
-        const orderIdElement = document.getElementById('paid-order-id');
-        const amountTextElement = document.getElementById('full-amount-text');
-        const form = document.getElementById('mark-paid-form');
-        const amountInput = document.getElementById('paid-amount');
-        if (!orderIdElement || !amountTextElement || !form || !amountInput) {
-            console.error('Missing elements:', {
-                orderIdElement: !!orderIdElement,
-                amountTextElement: !!amountTextElement,
-                form: !!form,
-                amountInput: !!amountInput
-            });
-            return;
-        }
+        const formData = new FormData(form);
+        console.log('Sending request:', { url: form.action, data: Object.fromEntries(formData) });
 
-        orderIdElement.textContent = receiptId;
-        amountTextElement.textContent = `Remaining Balance: ${parseFloat(balance).toFixed(2)}`;
-        form.action = `/mark_paid/${receiptId}`;
-        amountInput.max = balance;
-        amountInput.value = '';
-        document.getElementById('paid-error').classList.add('hidden');
-
-        let isSubmitting = false;
-        form.onsubmit = function(e) {
-            e.preventDefault();
-            if (isSubmitting) return;
-            isSubmitting = true;
-            const submitBtn = form.querySelector('.submit-btn');
-            if (!submitBtn) {
-                console.error('Submit button not found: .submit-btn');
-                isSubmitting = false;
-                return;
-            }
-            submitBtn.classList.add('processing');
-            submitBtn.disabled = true;
-
-            const amountPaid = parseFloat(amountInput.value) || 0;
-            if (amountPaid <= 0 || amountPaid > parseFloat(balance)) {
-                console.error(`Invalid amount: ${amountPaid}, Balance: ${balance}`);
-                showModalError('mark-paid', 'Enter a valid amount (0 < amount ≤ balance).');
-                submitBtn.classList.remove('processing');
-                submitBtn.disabled = false;
-                isSubmitting = false;
-                return;
-            }
-
-            const formData = new FormData(form);
-            console.log('Sending request to:', form.action);
-            console.log('Form data:', Object.fromEntries(formData));
-
+        try {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000);
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
-            fetch(form.action, {
+            const response = await fetch(form.action, {
                 method: 'POST',
                 body: formData,
                 headers: {
                     'X-CSRFToken': formData.get('csrf_token'),
                     'Accept': 'application/json'
                 },
-                signal: controller.signal
-            })
-            .then(response => {
-                clearTimeout(timeoutId);
-                console.log('Response Status:', response.status, 'OK:', response.ok);
-                return response.json().then(data => ({ status: response.status, data }));
-            })
-            .then(({ status, data }) => {
-                submitBtn.classList.remove('processing');
-                submitBtn.disabled = false;
-                isSubmitting = false;
-                if (status === 200) {
-                    console.log('Success:', data.message);
-                    paidModal.classList.add('hidden');
-                    showSuccessMessage('Payment processed successfully');
-                    setTimeout(() => window.location.reload(), 2000);
-                } else {
-                    console.error('Server Error:', data.error || 'Unknown error');
-                    showModalError('mark-paid', data.error || 'Error processing payment');
-                }
-            })
-            .catch(error => {
-                clearTimeout(timeoutId);
-                console.error('Fetch Error:', error.name, error.message);
-                showModalError('mark-paid', `Request failed: ${error.message}`);
-                submitBtn.classList.remove('processing');
-                submitBtn.disabled = false;
-                isSubmitting = false;
+                signal: controller.signal,
+                credentials: 'include' // Ensure session cookies are sent
             });
-        };
-    } catch (error) {
-        console.error('Error in markPaid:', error.message);
-    }
+
+            clearTimeout(timeoutId);
+            const data = await response.json();
+            console.log('Response:', { status: response.status, ok: response.ok, data });
+
+            submitBtn.classList.remove('processing');
+            submitBtn.disabled = false;
+            isSubmitting = false;
+
+            if (response.ok && data.status === 'success') {
+                console.log('Payment successful:', data.message);
+                paidModal.classList.add('hidden');
+                showSuccessMessage('Payment processed successfully');
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                console.error('Server error:', data.error || 'Unknown error');
+                showModalError('mark-paid', data.error || 'Error processing payment');
+            }
+        } catch (error) {
+            console.error('Fetch error:', error.name, error.message);
+            showModalError('mark-paid', `Request failed: ${error.message}`);
+            submitBtn.classList.remove('processing');
+            submitBtn.disabled = false;
+            isSubmitting = false;
+        }
+    };
 }
 // Pagination and Filtering
 const ordersPerPage = 10;
