@@ -19,6 +19,10 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_cors import CORS
 from firebase_admin import auth as firebase_auth
+import signal
+from contextlib import contextmanager
+import traceback
+from google.api_core import exceptions
 
 
 app = Flask(__name__)
@@ -377,6 +381,19 @@ app.jinja_env.filters['expire_date_days_left'] = expire_date_days_left
 logger.info("Filters registered at startup: %s", list(app.jinja_env.filters.keys()))
 if 'expire_date_days_left' not in app.jinja_env.filters:
     raise RuntimeError("Failed to register 'expire_date_days_left' filter")
+
+@contextmanager
+def timeout(seconds):
+    def timeout_handler(signum, frame):
+        raise TimeoutError(f"Operation timed out after {seconds} seconds")
+    
+    old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(seconds)
+    try:
+        yield
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old_handler)
 
 @app.route('/stock_data', methods=['GET'])
 @no_cache
@@ -1258,165 +1275,69 @@ def orders():
         return render_template('error.html', message=f"Failed to load orders: {str(e)}"), 500
 
 
-@app.route('/mark_paid/<receipt_id>', methods=['POST'])
-def mark_paid(receipt_id):
+@app.route('/mark_paid_v2/<receipt_id>', methods=['POST'])
+def mark_paid_v2(receipt_id):
     NAIROBI_TZ = ZoneInfo("Africa/Nairobi")
     
     try:
-        print(f"[{datetime.now(NAIROBI_TZ)}] Starting mark_paid for receipt_id: {receipt_id}")
+        print(f"[{datetime.now(NAIROBI_TZ)}] Starting mark_paid_v2 for receipt_id: {receipt_id}")
         
-        # Add overall timeout for the entire operation
-        with timeout(25):  # 25 second timeout for entire operation
-            
-            # Validate amount_paid
-            amount_paid = request.form.get('amount_paid')
-            print(f"Processing amount_paid: {amount_paid}")
-            
-            try:
-                amount_paid = float(amount_paid)
-            except (ValueError, TypeError):
-                print(f"Error: Invalid amount_paid format: {amount_paid}")
-                return jsonify({"error": "Invalid amount format"}), 400
+        # Validate amount_paid
+        amount_paid = request.form.get('amount_paid')
+        try:
+            amount_paid = float(amount_paid)
+        except (ValueError, TypeError):
+            return jsonify({"error": "Invalid amount format"}), 400
 
-            # Initialize Firestore with timeout
-            print("Initializing Firestore client...")
-            db = firestore.Client()
-            
-            # Query order with timeout
-            print(f"Querying order for receipt_id: {receipt_id}")
-            try:
-                # Add timeout to Firestore query
-                orders_ref = db.collection('orders').where('receipt_id', '==', receipt_id).limit(1)
-                
-                # Use get() instead of stream() for better timeout handling
-                orders = orders_ref.get(timeout=10)  # 10 second timeout for query
-                
-                if not orders:
-                    print(f"Error: Order with receipt_id {receipt_id} not found")
-                    return jsonify({"error": f"Order with receipt_id {receipt_id} not found"}), 404
-                
-                order_doc = orders[0]
-                print(f"Order found: {order_doc.id}")
-                
-            except exceptions.DeadlineExceeded:
-                print(f"Error: Firestore query timeout for receipt_id {receipt_id}")
-                return jsonify({"error": "Database query timeout. Please try again."}), 408
-            except Exception as e:
-                print(f"Error: Firestore query failed: {str(e)}")
-                return jsonify({"error": "Database query failed. Please try again."}), 500
+        # Initialize Firestore
+        db = firestore.Client()
+        
+        # Query with explicit timeout
+        try:
+            orders = db.collection('orders').where('receipt_id', '==', receipt_id).limit(1).get(timeout=10)
+            if not orders:
+                return jsonify({"error": f"Order with receipt_id {receipt_id} not found"}), 404
+            order_doc = orders[0]
+        except Exception as e:
+            print(f"Query error: {str(e)}")
+            return jsonify({"error": "Database query failed"}), 500
 
-            order_ref = db.collection('orders').document(order_doc.id)
-            order_dict = order_doc.to_dict()
-            print(f"Order data retrieved: payment={order_dict.get('payment')}, balance={order_dict.get('balance')}")
+        order_dict = order_doc.to_dict()
+        current_payment = float(order_dict.get('payment', 0))
+        current_balance = float(order_dict.get('balance', 0))
+        
+        # Validation
+        if amount_paid <= 0 or amount_paid > current_balance:
+            return jsonify({"error": "Invalid payment amount"}), 400
 
-            # Validate order data
-            current_payment = float(order_dict.get('payment', 0))
-            current_balance = float(order_dict.get('balance', 0))
-            now = datetime.now(NAIROBI_TZ)
+        # Calculate new values
+        new_payment = current_payment + amount_paid
+        new_balance = max(current_balance - amount_paid, 0)
+        now = datetime.now(NAIROBI_TZ)
 
-            if amount_paid <= 0:
-                print(f"Error: Invalid amount_paid {amount_paid}")
-                return jsonify({"error": "Payment amount must be greater than 0"}), 400
-            if current_balance <= 0:
-                print(f"Error: Order already fully paid, balance: {current_balance}")
-                return jsonify({"error": "Order is already fully paid"}), 400
-            if amount_paid > current_balance:
-                print(f"Error: Payment amount {amount_paid} exceeds balance {current_balance}")
-                return jsonify({"error": f"Payment amount ({amount_paid}) exceeds remaining balance ({current_balance})"}), 400
+        # Update order only (simplify to reduce hanging risk)
+        update_data = {
+            'payment': new_payment,
+            'balance': new_balance,
+            'payment_history': order_dict.get('payment_history', []) + [{
+                'amount': amount_paid,
+                'date': now,
+                'payment_method': order_dict.get('payment_method', 'Unknown')
+            }]
+        }
+        if new_balance == 0:
+            update_data['closed_date'] = now
+            update_data['status'] = 'completed'
 
-            # Update payment and balance
-            new_payment = current_payment + amount_paid
-            new_balance = max(current_balance - amount_paid, 0)
-            print(f"Calculated new values: payment={new_payment}, balance={new_balance}")
+        # Single update operation with timeout
+        db.collection('orders').document(order_doc.id).update(update_data, timeout=10)
+        
+        print(f"Success: Payment processed for receipt_id {receipt_id}")
+        return jsonify({"status": "success", "message": "Payment processed successfully"}), 200
 
-            update_data = {
-                'payment': new_payment,
-                'balance': new_balance,
-                'payment_history': order_dict.get('payment_history', []) + [{
-                    'amount': amount_paid,
-                    'date': now,
-                    'payment_method': order_dict.get('payment_method', 'Unknown')
-                }]
-            }
-            if new_balance == 0:
-                update_data['closed_date'] = now
-                update_data['status'] = 'completed'
-
-            print("Starting batch operations...")
-            # Use individual operations instead of batch for better error handling
-            try:
-                # Update order first
-                print("Updating order document...")
-                order_ref.update(update_data, timeout=10)
-                print("Order updated successfully")
-
-                # Update client debt
-                shop_name = order_dict.get('shop_name')
-                if shop_name:
-                    print(f"Updating client debt for shop: {shop_name}")
-                    try:
-                        client_ref = db.collection('clients').where('shop_name', '==', shop_name).limit(1).get(timeout=5)
-                        if client_ref:
-                            client_doc = client_ref[0]
-                            client_data = client_doc.to_dict()
-                            new_debt = max(float(client_data.get('debt', 0)) - amount_paid, 0)
-                            db.collection('clients').document(client_doc.id).update({'debt': new_debt}, timeout=5)
-                            print(f"Client debt updated: new_debt={new_debt}")
-                        else:
-                            print(f"Warning: No client found for shop_name {shop_name}")
-                    except Exception as client_error:
-                        print(f"Warning: Client update failed: {str(client_error)}")
-                        # Don't fail the entire operation for client update errors
-
-                # Create notification
-                user_id = order_dict.get('user_id')
-                order_type = order_dict.get('order_type')
-                if user_id and order_type in ['app', 'web_user']:
-                    print(f"Creating notification for user: {user_id}")
-                    try:
-                        notification_title = "Payment Update"
-                        notification_body = (
-                            f"Your order #{receipt_id} has been fully paid on {now.strftime('%d/%m/%Y %H:%M')}."
-                            if new_balance == 0 else
-                            f"Your order #{receipt_id} has been partially paid. New balance: KSh {new_balance:.2f} on {now.strftime('%d/%m/%Y %H:%M')}."
-                        )
-                        
-                        notification_ref = db.collection('users').document(user_id).collection('notifications').document()
-                        notification_ref.set({
-                            'user_id': user_id,
-                            'type': 'payment_success' if new_balance == 0 else 'payment_partial',
-                            'title': notification_title,
-                            'body': notification_body,
-                            'timestamp': now,
-                            'read': False,
-                            'visible': True,
-                            'data': {
-                                'orderId': order_doc.id,
-                                'receipt_id': receipt_id
-                            }
-                        }, timeout=5)
-                        print("Notification created successfully")
-                    except Exception as notif_error:
-                        print(f"Warning: Notification creation failed: {str(notif_error)}")
-                        # Don't fail the entire operation for notification errors
-
-                print(f"Success: Payment processed for receipt_id {receipt_id}, amount: {amount_paid}, new_balance: {new_balance}")
-                return jsonify({"status": "success", "message": "Payment processed successfully"}), 200
-
-            except exceptions.DeadlineExceeded:
-                print(f"Error: Firestore update timeout for receipt_id {receipt_id}")
-                return jsonify({"error": "Database update timeout. Please try again."}), 408
-            except Exception as update_error:
-                print(f"Error: Firestore update failed: {str(update_error)}")
-                return jsonify({"error": f"Database update failed: {str(update_error)}"}), 500
-
-    except TimeoutError as te:
-        print(f"Error: Overall operation timeout for receipt_id {receipt_id}: {str(te)}")
-        return jsonify({"error": "Operation timed out. Please try again."}), 408
     except Exception as e:
-        print(f"Error in mark_paid for receipt_id {receipt_id}: {str(e)}")
-        print(f"Stack trace: {traceback.format_exc()}")
-        return jsonify({"error": f"Server error: {str(e)}"}), 500
+        print(f"Error: {str(e)}")
+        return jsonify({"error": "Server error occurred"}), 500
  
 # Updated /stock route
 @app.route('/stock', methods=['GET', 'POST'])
