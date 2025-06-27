@@ -38,7 +38,8 @@ def format_datetime(value):
     if isinstance(value, datetime):
         return value.strftime('%Y-%m-%d %H:%M:%S')  # Customize the format as needed
     return value 
-    
+app.jinja_env.filters['format_datetime'] = format_datetime
+app.jinja_env.filters['format_currency'] = format_currency   
     
 def calculate_dashboard_stats(orders, retail_collection, today_start, today_end):
     """Calculate dashboard statistics for sales, debts, and order counts."""
