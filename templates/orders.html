@@ -2,1587 +2,347 @@
 {% block title %}Orders{% endblock %}
 {% block header %}Orders{% endblock %}
 {% block content %}
-<div class="container mx-auto px-4 py-6">
-    <!-- Order Creation Section -->
-    <div class="mb-6 flex justify-between items-center">
-        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">Orders Management</h1>
-        <div class="space-x-2">
-            <button type="button" id="open-retail-modal" class="btn bg-blue-500 text-white hover:bg-blue-600 px-4 py-2 rounded-lg">
-                New Retail Order
-            </button>
-            <button type="button" id="open-wholesale-modal" class="btn bg-green-500 text-white hover:bg-green-600 px-4 py-2 rounded-lg">
-                New Wholesale Order
-            </button>
-            {% if session['user']['role'] == 'manager' %}
-            <button type="button" id="open-expense-modal" class="btn bg-purple-500 text-white hover:bg-purple-600 px-4 py-2 rounded-lg">
-            Add Expense
-            </button>
+<div class="container mx-auto p-4">
+    <!-- Search and Filter Section -->
+    <div class="flex justify-between mb-4">
+        <input type="text" id="order-search" placeholder="Search orders..." 
+               class="p-2 border rounded-lg w-full max-w-md dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+        <div class="flex space-x-2">
+            <button id="open-retail-modal" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">New Retail Order</button>
+            <button id="open-wholesale-modal" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">New Wholesale Order</button>
+            {% if current_user.role == 'admin' %}
+            <button id="open-expense-modal" class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600">Add Expense</button>
             {% endif %}
         </div>
     </div>
 
-    <!-- Order Filters and Search -->
-    <div class="mb-4 flex flex-col sm:flex-row sm:items-center sm:space-x-4">
-        <div class="flex space-x-2 mb-2 sm:mb-0">
-            <button data-filter="all" class="filter-btn px-4 py-2 rounded-lg bg-blue-500 text-white">All Orders</button>
-            <button data-filter="pending" class="filter-btn px-4 py-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Pending</button>
-            <button data-filter="paid" class="filter-btn px-4 py-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Paid</button>
-        </div>
-        <div class="relative w-full sm:w-64">
-            <input type="text" id="order-search" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Search orders...">
-        </div>
+    <!-- Filter Buttons -->
+    <div class="flex space-x-2 mb-4">
+        <button class="filter-btn text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 px-4 py-2 rounded" data-filter="all">All</button>
+        <button class="filter-btn text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 px-4 py-2 rounded" data-filter="pending">Pending</button>
+        <button class="filter-btn text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 px-4 py-2 rounded" data-filter="paid">Paid</button>
     </div>
 
-<!-- Orders Table -->
-<div class="overflow-x-auto">
-    <table id="orders-table" class="min-w-full bg-white dark:bg-gray-800 rounded-lg shadow-md">
-        <thead>
-            <tr class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 uppercase text-sm leading-normal">
-                <th class="py-3 px-6 text-left">Order #</th>
-                <th class="py-3 px-6 text-left">Client</th>
-                <th class="py-3 px-6 text-center">Total Items</th>
-                <th class="py-3 px-6 text-center">Date</th>
-                <th class="py-3 px-6 text-center">Payment (KSh)</th>
-                <th class="py-3 px-6 text-center">Balance (KSh)</th>
-                <th class="py-3 px-6 text-center">Actions</th>
-            </tr>
-        </thead>
-        <tbody id="orders-tbody" class="text-gray-600 dark:text-gray-300 text-sm font-light">
-            {% for order in orders %}
-            <tr class="order-row border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 
-                {{ 'border-l-4 border-yellow-500' if order.balance > 0 else 'border-l-4 border-green-500' }}"
-                data-order-type="{{ order.order_type }}"
-                data-receipt-id="{{ order.receipt_id }}"
-                data-balance="{{ order.balance }}"
-                data-date="{{ order.date.strftime('%Y-%m-%d') }}"
-                data-search="{{ order.receipt_id ~ ' ' ~ (order.shop_name or 'Retail Sale') ~ ' ' ~ order.order_type }}">
-                <td class="py-3 px-6 text-left whitespace-nowrap">{{ order.receipt_id }}</td>
-                <td class="py-3 px-6 text-left">
-                    {{ order.shop_name or 'Retail Sale' }}
-                    <br>
-                    <span class="text-xs font-medium {{ 'text-blue-500' if order.order_type == 'retail' else 'text-green-500' }}">
-                        {{ order.order_type|capitalize }}
-                    </span>
-                </td>
-                <td class="py-3 px-6 text-center">{{ order.total_items }}</td>
-                <td class="py-3 px-6 text-center">{{ order.date.strftime('%d/%m/%Y') }}</td>
-                <td class="py-3 px-6 text-center">{{ order.payment | round(2) }}</td>
-                <td class="py-3 px-6 text-center {{ 'text-red-600' if order.balance > 0 else 'text-green-600' }}">{{ order.balance | round(2) }}</td>
-                <td class="py-3 px-6 text-center relative">
-                    <button class="order-actions-btn p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700" aria-label="Order actions">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600 dark:text-gray-300" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                        </svg>
-                    </button>
-                    <div class="order-actions-menu hidden absolute right-6 top-12 w-48 bg-white dark:bg-gray-700 rounded-lg shadow-lg z-20 py-1">
-                        <a href="{{ url_for('receipt', order_id=order.receipt_id) }}" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600">View Receipt</a>
-                        {% if session.get('user', {}).get('role') == 'manager' or session.get('user', {}).get('firstName', '') + ' ' + session.get('user', {}).get('lastName', '') == order.salesperson_name %}
-                        <button class="edit-order-btn w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600" data-receipt-id="{{ order.receipt_id }}" data-order-type="{{ order.order_type }}" data-shop-name="{{ order.shop_name }}" data-items='{{ order.items_list|tojson|safe }}'>Edit Order</button>
-                        <button class="delete-order-btn w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-600" data-receipt-id="{{ order.receipt_id }}">Delete Order</button>
-                        {% if order.balance > 0 %}
-                        <button class="mark-paid-btn w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-gray-100 dark:hover:bg-gray-600" data-receipt-id="{{ order.receipt_id }}" data-balance="{{ order.balance }}">Mark as Paid</button>
-                        <button class="return-stock-btn w-full text-left px-4 py-2 text-sm text-yellow-600 hover:bg-gray-100 dark:hover:bg-gray-600" data-receipt-id="{{ order.receipt_id }}" data-items='{{ order.items_list|tojson|safe }}'>Return Stock</button>
-                        {% endif %}
-                        {% endif %}
-                    </div>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
+    <!-- Orders Table -->
+    <div class="overflow-x-auto">
+        <table id="orders-table" class="min-w-full border rounded-lg">
+            <thead class="bg-gray-100 dark:bg-gray-700">
+                <tr>
+                    <th class="p-2 text-left">Receipt ID</th>
+                    <th class="p-2 text-left">Client</th>
+                    <th class="p-2 text-left">Items</th>
+                    <th class="p-2 text-center">Type</th>
+                    <th class="p-2 text-center">Date</th>
+                    <th class="p-2 text-center">Total</th>
+                    <th class="p-2 text-center">Balance</th>
+                    <th class="p-2 text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="orders-tbody">
+                {% for order in orders %}
+                <tr class="order-row" data-receipt-id="{{ order.receipt_id }}" 
+                    data-order-type="{{ order.order_type }}" 
+                    data-balance="{{ order.balance }}" 
+                    data-date="{{ order.date_ordered }}" 
+                    data-search="{{ order.receipt_id }} {{ order.shop_name }} {{ order.order_type }} {{ order.items | map(attribute='name') | join(' ') }}">
+                    <td class="p-2">{{ order.receipt_id }}</td>
+                    <td class="p-2">{{ order.shop_name }}<br><span class="text-sm text-gray-500 dark:text-gray-400">Debt: KSh {{ order.debt | format_currency }}</span></td>
+                    <td class="p-2">
+                        {% for item in order.items %}
+                        {{ item.name }} ({{ item.quantity }} {{ item.uom }})<br>
+                        {% endfor %}
+                    </td>
+                    <td class="p-2 text-center">{{ order.order_type | capitalize }}</td>
+                    <td class="p-2 text-center">{{ order.date_ordered | format_datetime }}</td>
+                    <td class="p-2 text-center">KSh {{ order.total | format_currency }}</td>
+                    <td class="p-2 text-center {% if order.balance > 0 %}text-red-600{% else %}text-green-600{% endif %}">
+                        KSh {{ order.balance | format_currency }}
+                    </td>
+                    <td class="p-2 text-center relative">
+                        <button class="order-actions-btn text-blue-500 hover:text-blue-700">⚙️</button>
+                        <div class="order-actions-menu hidden absolute z-10 bg-white dark:bg-gray-800 border rounded-lg shadow-lg right-6 top-12">
+                            {% if order.balance > 0 %}
+                            <button class="mark-paid-btn block w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700" 
+                                    data-receipt-id="{{ order.receipt_id }}" 
+                                    data-balance="{{ order.balance }}">Mark as Paid</button>
+                            {% endif %}
+                            {% if current_user.role == 'admin' %}
+                            <button class="return-stock-btn block w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700" 
+                                    data-receipt-id="{{ order.receipt_id }}" 
+                                    data-items="{{ order.items | tojson | safe }}">Return Stock</button>
+                            <button class="edit-order-btn block w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700" 
+                                    data-receipt-id="{{ order.receipt_id }}" 
+                                    data-items="{{ order.items | tojson | safe }}">Edit Order</button>
+                            <button class="delete-order-btn block w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700" 
+                                    data-receipt-id="{{ order.receipt_id }}">Delete Order</button>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
     <!-- Pagination -->
-    <div class="mt-4 flex justify-between items-center">
-        <button id="prev-page" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50" disabled>Previous</button>
-        <span id="page-info" class="text-gray-600 dark:text-gray-300">Page 1</span>
-        <button id="next-page" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600">Next</button>
+    <div class="flex justify-between items-center mt-4">
+        <button id="prev-page" class="bg-gray-200 dark:bg-gray-700 px-4 py-2 rounded hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50">Previous</button>
+        <span id="page-info" class="text-gray-700 dark:text-gray-300">Page 1 of 1</span>
+        <button id="next-page" class="bg-gray-200 dark:bg-gray-700 px-4 py-2 rounded hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50">Next</button>
     </div>
-</div>
 
-<!-- Retail Order Modal -->
-<div id="retail-modal" class="modal fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="retail-modal-title">
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
-        <h2 id="retail-modal-title" class="text-xl font-bold mb-4 text-gray-900 dark:text-white">New Retail Order</h2>
-        <div id="retail-error" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded mb-4"></div>
-        <form id="retail-form" method="POST" action="{{ url_for('orders') }}" class="space-y-4">
-            <input type="hidden" name="order_type" value="retail">
-            <input type="hidden" name="salesperson_name" value="{{ session['user']['firstName'] }} {{ session['user']['lastName'] }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div class="relative">
-                <label for="retail-client-input" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Client Name</label>
-                <select id="retail-client-input" name="shop_name" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" required></select>
-                <div id="retail-client-debt" class="mt-1 text-sm text-gray-600 dark:text-gray-400 hidden"></div>
-            </div>
-            <div id="retail-items-container" class="space-y-4">
-                <div class="grid grid-cols-6 gap-2 items-center text-sm font-semibold item-row-header">
-                    <span>Item</span>
-                    <span class="text-center">Qty</span>
-                    <span class="text-center">Price</span>
-                    <span class="text-center">Stock</span>
-                    <span class="text-center">Total</span>
-                    <span class="text-center">Action</span>
+    <!-- Retail Order Modal -->
+    <div id="retail-modal" class="modal fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-3xl">
+            <h2 class="text-xl font-bold mb-4 dark:text-white">New Retail Order</h2>
+            <div id="retail-error" class="text-red-600 dark:text-red-400 hidden mb-4"></div>
+            <form id="retail-form" action="/add_retail_order" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="mb-4">
+                    <label class="block text-gray-700 dark:text-gray-300 mb-2">Client</label>
+                    <select id="retail-client-input" name="shop_name" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"></select>
+                    <span id="retail-client-debt" class="text-sm text-gray-500 dark:text-gray-400 hidden mt-1"></span>
                 </div>
-                <button type="button" class="add-item-btn w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600">Add Item</button>
-            </div>
-            <div class="flex justify-between items-center mt-4">
-                <button type="button" id="add-retail-manual" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">Add Manual Item</button>
-                <div class="text-right"><span class="font-semibold">Subtotal:</span> <span id="retail-order-total" class="ml-2">0.00</span></div>
-            </div>
-            <div>
-                <input type="number" name="amount_paid" id="retail-amount-paid" placeholder="Amount Paid (optional)" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" min="0" step="0.01">
-                <div class="text-right mt-2"><span class="font-semibold">Change:</span> <span id="retail-order-change" class="ml-2">0.00</span></div>
-            </div>
-            <div class="flex space-x-2 mt-4">
-                <button type="submit" class="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600 submit-btn">Submit Order</button>
-                <button type="button" id="close-retail-modal" class="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600">Cancel</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- Wholesale Order Modal -->
-<div id="wholesale-modal" class="modal fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="wholesale-modal-title">
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
-        <h2 id="wholesale-modal-title" class="text-xl font-bold mb-4 text-gray-900 dark:text-white">New Wholesale Order</h2>
-        <div id="wholesale-error" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded mb-4"></div>
-        <form id="wholesale-form" method="POST" action="{{ url_for('orders') }}" class="space-y-4">
-            <input type="hidden" name="order_type" value="wholesale">
-            <input type="hidden" name="salesperson_name" value="{{ session['user']['firstName'] }} {{ session['user']['lastName'] }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div class="relative">
-                <label for="wholesale-client-input" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Shop Name</label>
-                <select id="wholesale-client-input" name="shop_name" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" required></select>
-                <div id="wholesale-client-debt" class="mt-1 text-sm text-gray-600 dark:text-gray-400 hidden"></div>
-            </div>
-            <div id="wholesale-items-container" class="space-y-4">
-                <div class="grid grid-cols-6 gap-2 items-center text-sm font-semibold item-row-header">
-                    <span>Item</span>
-                    <span class="text-center">Qty</span>
-                    <span class="text-center">Price</span>
-                    <span class="text-center">Stock</span>
-                    <span class="text-center">Total</span>
-                    <span class="text-center">Action</span>
-                </div>
-                <button type="button" class="add-item-btn w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600">Add Item</button>
-            </div>
-            <div class="flex justify-between items-center mt-4">
-                <button type="button" id="add-wholesale-manual" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">Add Manual Item</button>
-                <div class="text-right"><span class="font-semibold">Subtotal:</span> <span id="wholesale-order-total" class="ml-2">0.00</span></div>
-            </div>
-            <div>
-                <input type="number" name="amount_paid" id="wholesale-amount-paid" placeholder="Amount Paid (optional)" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" min="0" step="0.01">
-                <div class="text-right mt-2"><span class="font-semibold">Change:</span> <span id="wholesale-order-change" class="ml-2">0.00</span></div>
-            </div>
-            <div class="flex space-x-2 mt-4">
-                <button type="submit" class="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600 submit-btn">Submit Order</button>
-                <button type="button" id="close-wholesale-modal" class="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600">Cancel</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- Add Expense Modal -->
-<div id="expenseModal" class="modal fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="expense-modal-title">
-    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg w-96">
-        <h2 id="expense-modal-title" class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Add Expense</h2>
-        <div id="expense-error" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded mb-4"></div>
-        <form id="expense-form" method="POST" action="{{ url_for('expenses') }}" class="flex flex-col space-y-4">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <select name="category" id="expense-category" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" required>
-                <option value="Stock">Stock</option>
-                <option value="Fuel">Fuel</option>
-                <option value="Other">Other</option>
-            </select>
-            <input id="expense-reason" name="reason" placeholder="Reason (e.g., What are you buying?)" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 hidden" required>
-            <input name="description" placeholder="Description (e.g., Fuel for Delivery)" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" required>
-            <input name="amount" type="number" step="0.01" placeholder="Amount (e.g., 500)" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" min="0" required>
-            <div class="flex space-x-2">
-                <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 submit-btn">Submit</button>
-                <button type="button" id="close-expense-modal" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">Cancel</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- Manual Item Modal -->
-<div id="manual-item-modal" class="modal fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="manual-item-modal-title">
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-96 p-6">
-        <h2 id="manual-item-modal-title" class="text-xl font-bold mb-4 text-gray-900 dark:text-white">Add Manual Item</h2>
-        <div id="manual-error" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded mb-4"></div>
-        <form id="manual-item-form" class="space-y-4">
-            <input id="manual-item-name" placeholder="Item Name" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" required>
-            <input id="manual-item-qty" type="number" placeholder="Quantity" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" min="0" step="0.01" required>
-            <input id="manual-item-price" type="number" placeholder="Price per Unit" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" min="0" step="0.01" required>
-            <p id="manual-total" class="text-sm text-gray-600 dark:text-gray-300">Total: 0.00</p>
-            <div class="flex space-x-2">
-                <button type="button" id="add-manual-to-order" class="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600">Add Item</button>
-                <button type="button" id="close-manual-modal" class="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600">Cancel</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- Edit Order Modal -->
-<div id="edit-order-modal" class="modal fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="edit-order-modal-title">
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
-        <h2 id="edit-order-modal-title" class="text-xl font-bold mb-4 text-gray-900 dark:text-white">Edit Order #<span id="edit-order-id"></span></h2>
-        <div id="edit-error" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded mb-4"></div>
-        <form id="edit-order-form" method="POST" action="" class="space-y-4">
-            <input type="hidden" name="order_type" id="edit-order-type">
-            <input type="hidden" name="salesperson_name" value="{{ session['user']['firstName'] }} {{ session['user']['lastName'] }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div id="edit-items-container" class="space-y-4">
-                <div class="grid grid-cols-6 gap-2 items-center text-sm font-semibold item-row-header">
-                    <span>Item</span>
-                    <span class="text-center">Qty</span>
-                    <span class="text-center">Price</span>
-                    <span class="text-center">Stock</span>
-                    <span class="text-center">Total</span>
-                    <span class="text-center">Action</span>
-                </div>
-                <button type="button" class="add-item-btn w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600" data-container="edit-items-container">Add Item</button>
-            </div>
-            <div class="flex justify-between items-center mt-4">
-                <button type="button" id="add-edit-manual" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">Add Manual Item</button>
-                <div class="text-right"><span class="font-semibold">Subtotal:</span> <span id="edit-order-total" class="ml-2">0.00</span></div>
-            </div>
-            <div>
-                <input type="number" name="amount_paid" id="edit-amount-paid" placeholder="Amount Paid (optional)" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" min="0" step="0.01">
-                <div class="text-right mt-2"><span class="font-semibold">Change:</span> <span id="edit-order-change" class="ml-2">0.00</span></div>
-            </div>
-            <div class="flex space-x-2 mt-4">
-                <button type="submit" class="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600 submit-btn">Update Order</button>
-                <button type="button" id="close-edit-modal" class="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600">Cancel</button>
-            </div>
-        </form>
-    </div>
-</div>
-<!-- Mark as Paid Modal -->
-<div id="mark-paid-modal" class="modal hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="mark-paid-modal-title">
-    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-lg w-96 max-h-[80vh] overflow-y-auto">
-        <h3 id="mark-paid-modal-title" class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Mark as Paid for Order #<span id="paid-order-id"></span></h3>
-        <div id="paid-error" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded mb-4"></div>
-        <form id="mark-paid-form" method="POST" action="" class="space-y-4">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div>
-                <label class="font-semibold text-gray-900 dark:text-white">Amount Paid</label>
-                <input id="paid-amount" name="amount_paid" type="number" placeholder="Amount Paid" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 w-full" min="0" step="0.01" required>
-                <p id="full-amount-text" class="text-sm text-gray-700 dark:text-gray-300"></p>
-            </div>
-            <div class="flex space-x-2">
-                <button type="submit" class="btn btn-primary bg-green-500 hover:bg-green-600 flex-1 submit-btn">Confirm</button>
-                <button type="button" id="close-paid-modal" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 flex-1">Cancel</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- Return Stock Modal -->
-<div id="return-stock-modal" class="modal hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="return-stock-modal-title">
-    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-lg w-96 max-h-[80vh] overflow-y-auto">
-        <h3 id="return-stock-modal-title" class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Return Stock for Order #<span id="return-order-id"></span></h3>
-        <div id="return-error" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded mb-4"></div>
-        <form id="return-stock-form" method="POST" action="" class="space-y-4">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div>
-                <label class="font-semibold text-gray-900 dark:text-white">Select Items to Return</label>
-                <div id="return-stock-items-container" class="space-y-3 mt-2"></div>
-            </div>
-            <div class="flex space-x-2">
-                <button type="submit" class="btn btn-primary bg-yellow-500 hover:bg-yellow-600 flex-1 submit-btn">Submit</button>
-                <button type="button" id="close-return-modal" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 flex-1">Cancel</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
-
-<script>
-// Modal Management
-const retailModal = document.getElementById('retail-modal');
-const wholesaleModal = document.getElementById('wholesale-modal');
-const editModal = document.getElementById('edit-order-modal');
-const manualModal = document.getElementById('manual-item-modal');
-const paidModal = document.getElementById('mark-paid-modal');
-const returnModal = document.getElementById('return-stock-modal');
-const openRetail = document.getElementById('open-retail-modal');
-const openWholesale = document.getElementById('open-wholesale-modal');
-const closeRetail = document.getElementById('close-retail-modal');
-const closeWholesale = document.getElementById('close-wholesale-modal');
-const closeEdit = document.getElementById('close-edit-modal');
-const closeManual = document.getElementById('close-manual-modal');
-const closePaid = document.getElementById('close-paid-modal');
-const closeReturn = document.getElementById('close-return-modal');
-const addRetailManual = document.getElementById('add-retail-manual');
-const addWholesaleManual = document.getElementById('add-wholesale-manual');
-const addEditManual = document.getElementById('add-edit-manual');
-const addManualToOrder = document.getElementById('add-manual-to-order');
-const retailContainer = document.getElementById('retail-items-container');
-const wholesaleContainer = document.getElementById('wholesale-items-container');
-const editContainer = document.getElementById('edit-items-container');
-const manualQty = document.getElementById('manual-item-qty');
-const manualPrice = document.getElementById('manual-item-price');
-const manualTotal = document.getElementById('manual-total');
-const retailAmountPaid = document.getElementById('retail-amount-paid');
-const wholesaleAmountPaid = document.getElementById('wholesale-amount-paid');
-const retailOrderChange = document.getElementById('retail-order-change');
-const wholesaleOrderChange = document.getElementById('wholesale-order-change');
-// Expense Modal Management
-const expenseModal = document.getElementById('expenseModal');
-const openExpenseModal = document.getElementById('open-expense-modal');
-const closeExpenseModal = document.getElementById('close-expense-modal');
-const expenseCategory = document.getElementById('expense-category');
-const expenseReason = document.getElementById('expense-reason');
-const expenseForm = document.getElementById('expense-form');
-
-
-let currentContainer;
-let stockDataCache = null;
-
-function closeAllModals() {
-    document.querySelectorAll('.modal').forEach(modal => modal.classList.add('hidden'));
-}
-
-function showModalError(modalId, message) {
-    const errorDiv = document.getElementById(`${modalId}-error`);
-    errorDiv.textContent = message;
-    errorDiv.classList.remove('hidden');
-    setTimeout(() => errorDiv.classList.add('hidden'), 5000);
-}
-
-function resetModal(container) {
-    const header = container.querySelector('.item-row-header');
-    const initialAddBtn = container.querySelector('.add-item-btn');
-    container.innerHTML = '';
-    container.appendChild(header);
-    container.appendChild(initialAddBtn);
-    updateSubtotal(container);
-    const modalId = container.id.split('-')[0];
-    const changeSpan = document.getElementById(`${modalId}-order-change`);
-    const debtElement = document.getElementById(`${modalId}-client-debt`);
-    if (changeSpan) changeSpan.textContent = '0.00';
-    if (debtElement) {
-        debtElement.textContent = '';
-        debtElement.classList.add('hidden');
-    }
-}
-if (openExpenseModal) {
-    openExpenseModal.addEventListener('click', () => {
-        closeAllModals();
-        expenseModal.classList.remove('hidden');
-        expenseForm.reset();
-        expenseReason.classList.add('hidden');
-        expenseReason.removeAttribute('required');
-        document.getElementById('expense-error').classList.add('hidden');
-    });
-}
-
-if (closeExpenseModal) {
-    closeExpenseModal.addEventListener('click', () => {
-        expenseModal.classList.add('hidden');
-        expenseForm.reset();
-        expenseReason.classList.add('hidden');
-        expenseReason.removeAttribute('required');
-    });
-}
-
-// Show/hide reason input for "Other" category
-expenseCategory.addEventListener('change', () => {
-    const isOther = expenseCategory.value === 'Other';
-    expenseReason.classList.toggle('hidden', !isOther);
-    if (isOther) {
-        expenseReason.setAttribute('required', 'required');
-    } else {
-        expenseReason.removeAttribute('required');
-    }
-});
-
-// Form submission with error handling
-expenseForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const submitBtn = expenseForm.querySelector('.submit-btn');
-    submitBtn.classList.add('processing');
-    submitBtn.disabled = true;
-
-    try {
-        const response = await fetch(expenseForm.action, {
-            method: 'POST',
-            body: new FormData(expenseForm),
-            headers: {
-                'X-CSRFToken': expenseForm.querySelector('[name=csrf_token]').value
-            }
-        });
-        if (response.ok) {
-            expenseModal.classList.add('hidden');
-            window.location.href = '/dashboard';
-        } else {
-            const errorText = await response.text();
-            showModalError('expense', `Error adding expense: ${errorText}`);
-        }
-    } catch (error) {
-        showModalError('expense', 'An error occurred while adding the expense.');
-    } finally {
-        submitBtn.classList.remove('processing');
-        submitBtn.disabled = false;
-    }
-});
-
-// Modal Event Listeners
-openRetail.addEventListener('click', () => {
-    closeAllModals();
-    resetModal(retailContainer);
-    retailModal.classList.remove('hidden');
-    currentContainer = retailContainer;
-    attachAddItemListeners(retailContainer);
-    retailModal.dispatchEvent(new Event('modal:open'));
-});
-
-openWholesale.addEventListener('click', () => {
-    closeAllModals();
-    resetModal(wholesaleContainer);
-    wholesaleModal.classList.remove('hidden');
-    currentContainer = wholesaleContainer;
-    attachAddItemListeners(wholesaleContainer);
-    wholesaleModal.dispatchEvent(new Event('modal:open'));
-});
-
-closeRetail.addEventListener('click', () => {
-    resetModal(retailContainer);
-    retailModal.classList.add('hidden');
-});
-
-closeWholesale.addEventListener('click', () => {
-    resetModal(wholesaleContainer);
-    wholesaleModal.classList.add('hidden');
-});
-
-closeEdit.addEventListener('click', () => {
-    resetModal(editContainer);
-    editModal.classList.add('hidden');
-});
-
-closeManual.addEventListener('click', () => {
-    manualModal.classList.add('hidden');
-    document.getElementById('manual-item-form').reset();
-    manualTotal.textContent = 'Total: 0.00';
-});
-
-closePaid.addEventListener('click', () => paidModal.classList.add('hidden'));
-closeReturn.addEventListener('click', () => returnModal.classList.add('hidden'));
-
-addRetailManual.addEventListener('click', () => {
-    manualModal.classList.remove('hidden');
-    currentContainer = retailContainer;
-});
-
-addWholesaleManual.addEventListener('click', () => {
-    manualModal.classList.remove('hidden');
-    currentContainer = wholesaleContainer;
-});
-
-addEditManual.addEventListener('click', () => {
-    manualModal.classList.remove('hidden');
-    currentContainer = editContainer;
-});
-
-// Populate Clients with Choices.js
-async function populateClients(inputElement, debtElement) {
-    try {
-        const response = await fetch('/clients_data');
-        const clients = await response.json();
-        const choices = new Choices(inputElement, {
-            searchEnabled: true,
-            allowHTML: false,
-            placeholderValue: 'Search or type a client name',
-            noResultsText: 'No clients found - type to add a new client',
-            addItems: true,
-            removeItemButton: true,
-            maxItemCount: 1,
-            duplicateItemsAllowed: false,
-            choices: clients.map(client => ({
-                value: client.shop_name,
-                label: `${client.shop_name} (Debt: KSh ${client.debt.toFixed(2)})`
-            })),
-            searchFloor: 1,
-            searchResultLimit: 10,
-            shouldSort: false,
-        });
-
-        inputElement.closest('.modal').addEventListener('modal:open', () => {
-            choices.clearInput();
-            choices.removeActiveItems();
-            debtElement.textContent = '';
-            debtElement.classList.add('hidden');
-        });
-
-        inputElement.addEventListener('change', () => {
-            const value = choices.getValue(true);
-            const selectedClient = clients.find(c => c.shop_name === value);
-            if (selectedClient) {
-                debtElement.textContent = `Debt: KSh ${selectedClient.debt.toFixed(2)}`;
-                debtElement.classList.remove('hidden');
-            } else if (value) {
-                debtElement.textContent = 'Debt: KSh 0.00 (New Client)';
-                debtElement.classList.remove('hidden');
-                if (!choices.getChoiceByValue(value)) {
-                    choices.setChoices([{ value: value, label: value }], 'value', 'label', false);
-                    choices.setChoiceByValue(value);
-                }
-            } else {
-                debtElement.textContent = '';
-                debtElement.classList.add('hidden');
-            }
-        });
-
-        inputElement.addEventListener('search', (event) => {
-            const searchTerm = event.detail.value.toLowerCase();
-            const filteredClients = clients.filter(client => 
-                client.shop_name.toLowerCase().includes(searchTerm)
-            );
-            choices.setChoices(
-                filteredClients.map(client => ({
-                    value: client.shop_name,
-                    label: `${client.shop_name} (Debt: KSh ${client.debt.toFixed(2)})`
-                })),
-                'value',
-                'label',
-                true
-            );
-            if (searchTerm && !filteredClients.some(c => c.shop_name.toLowerCase() === searchTerm)) {
-                choices.setChoices([{ value: searchTerm, label: `${searchTerm} (New)` }], 'value', 'label', false);
-            }
-        });
-    } catch (error) {
-        console.error('Error loading clients:', error);
-        showModalError(inputElement.closest('form').id.replace('-form', ''), 'Failed to load clients.');
-    }
-}
-
-populateClients(document.getElementById('retail-client-input'), document.getElementById('retail-client-debt'));
-populateClients(document.getElementById('wholesale-client-input'), document.getElementById('wholesale-client-debt'));
-populateClients(document.getElementById('edit-client-input'), document.getElementById('edit-client-debt'));
-</script>
-<script>
-// Fetch Stock Data from Firestore
-async function fetchStockData() {
-    if (stockDataCache) return stockDataCache;
-    try {
-        const response = await fetch('/stock_data', {
-            credentials: 'include' // Ensure session cookies are sent for @login_required
-        });
-        if (!response.ok) {
-            throw new Error(`HTTP error: ${response.status}`);
-        }
-        const data = await response.json();
-        if (!Array.isArray(data)) {
-            throw new Error('Invalid response format: Expected an array');
-        }
-        stockDataCache = data.map(item => ({
-            stock_name: item.stock_name,
-            selling_price: parseFloat(item.selling_price) || 0,
-            wholesale: parseFloat(item.wholesale) || 0,
-            stock_quantity: parseFloat(item.stock_quantity) || 0,
-            uom: item.uom || 'Unit'
-        }));
-        if (!stockDataCache.length) {
-            console.warn('No stock items returned from /stock_data');
-        }
-        return stockDataCache;
-    } catch (error) {
-        console.error('Error fetching stock data from /stock_data:', error);
-        return [];
-    }
-}
-
-// Attach Action Button Listeners
-// Ensure markPaid buttons are correctly bound
-function attachActionButtonListeners() {
-    document.querySelectorAll('.order-actions-btn').forEach(btn => {
-        const newBtn = btn.cloneNode(true);
-        btn.parentNode.replaceChild(newBtn, btn);
-        
-        newBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const menu = newBtn.nextElementSibling;
-            const isOpen = !menu.classList.contains('hidden');
-            
-            document.querySelectorAll('.order-actions-menu').forEach(m => {
-                if (m !== menu) m.classList.add('hidden');
-            });
-            
-            menu.classList.toggle('hidden');
-
-            const menuRect = menu.getBoundingClientRect();
-            const tableRect = document.getElementById('orders-table').getBoundingClientRect();
-            if (menuRect.bottom > tableRect.bottom) {
-                menu.style.top = 'auto';
-                menu.style.bottom = '40px';
-            } else {
-                menu.style.top = '12px';
-                menu.style.bottom = 'auto';
-            }
-            if (menuRect.right > tableRect.right) {
-                menu.style.right = '0';
-                menu.style.left = 'auto';
-            } else {
-                menu.style.right = '6px';
-                menu.style.left = 'auto';
-            }
-        });
-    });
-
-    // Attach Mark as Paid button listeners
-    document.querySelectorAll('.mark-paid-btn').forEach(btn => {
-        btn.removeEventListener('click', handleMarkPaid); // Prevent duplicate listeners
-        btn.addEventListener('click', handleMarkPaid);
-    });
-
-    function handleMarkPaid(e) {
-        e.stopPropagation();
-        const receiptId = e.target.getAttribute('data-receipt-id');
-        const balance = parseFloat(e.target.getAttribute('data-balance'));
-        console.log('Mark Paid clicked:', { receiptId, balance });
-        markPaid(receiptId, balance);
-    }
-
-    // Other button listeners (edit, delete, return)
-    document.querySelectorAll('.return-stock-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const receiptId = btn.getAttribute('data-receipt-id');
-            const itemsJson = btn.getAttribute('data-items');
-            returnStock(receiptId, itemsJson);
-        });
-    });
-
-    document.querySelectorAll('.edit-order-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const orderRow = btn.closest('.order-row');
-            const receiptId = orderRow.getAttribute('data-receipt-id');
-            const orderType = orderRow.getAttribute('data-order-type');
-            const shopName = orderRow.querySelector('td:nth-child(2)').textContent.split('\n')[0].trim();
-            const itemsJson = btn.getAttribute('data-items');
-            editOrder(receiptId, orderType, shopName, itemsJson);
-        });
-    });
-
-    document.querySelectorAll('.delete-order-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const receiptId = btn.getAttribute('data-receipt-id');
-            deleteOrder(receiptId);
-        });
-    });
-}
-function markPaid(receiptId, balance) {
-    closeAllModals();
-    paidModal.classList.remove('hidden');
-    document.getElementById('paid-order-id').textContent = receiptId;
-    document.getElementById('full-amount-text').textContent = `Remaining Balance: ${parseFloat(balance).toFixed(2)}`;
-    const form = document.getElementById('mark-paid-form');
-    form.action = `/mark_paid/${receiptId}`;
-    document.getElementById('paid-amount').max = balance;
-    document.getElementById('paid-amount').value = '';
-
-    form.onsubmit = function(e) {
-        e.preventDefault();
-        const submitBtn = form.querySelector('.submit-btn');
-        submitBtn.classList.add('processing');
-        submitBtn.disabled = true;
-        const amountPaid = parseFloat(document.getElementById('paid-amount').value) || 0;
-        if (amountPaid <= 0 || amountPaid > parseFloat(balance)) {
-            showModalError('mark-paid', 'Please enter a valid amount (greater than 0, up to the balance).');
-            submitBtn.classList.remove('processing');
-            submitBtn.disabled = false;
-            return;
-        }
-
-        const formData = new FormData(this);
-        fetch(this.action, {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => {
-            if (response.ok) {
-                paidModal.classList.add('hidden');
-                window.location.href = '/orders';
-            } else {
-                response.text().then(text => showModalError('mark-paid', 'Error processing payment: ' + text));
-                submitBtn.classList.remove('processing');
-                submitBtn.disabled = false;
-            }
-        })
-        .catch(error => {
-            showModalError('mark-paid', 'An error occurred while processing the payment.');
-            submitBtn.classList.remove('processing');
-            submitBtn.disabled = false;
-        });
-    };
-}
-// Pagination and Filtering
-const ordersPerPage = 10;
-let currentPage = 1;
-const ordersTbody = document.getElementById('orders-tbody');
-const prevPageBtn = document.getElementById('prev-page');
-const nextPageBtn = document.getElementById('next-page');
-const pageInfo = document.getElementById('page-info');
-const orderSearch = document.getElementById('order-search');
-let currentFilter = 'all';
-const allRows = Array.from(document.querySelectorAll('.order-row'));
-
-function updateOrdersDisplay() {
-    const searchTerm = orderSearch.value.toLowerCase();
-    let filteredRows = allRows.filter(row => {
-        const balance = parseFloat(row.getAttribute('data-balance'));
-        const searchText = row.getAttribute('data-search').toLowerCase();
-        const matchesFilter = currentFilter === 'all' || 
-                             (currentFilter === 'pending' && balance > 0) || 
-                             (currentFilter === 'paid' && balance === 0);
-        const matchesSearch = searchTerm === '' || searchText.includes(searchTerm);
-        return matchesFilter && matchesSearch;
-    });
-
-    filteredRows.sort((a, b) => new Date(b.getAttribute('data-date')) - new Date(a.getAttribute('data-date')));
-    const totalPages = Math.ceil(filteredRows.length / ordersPerPage) || 1;
-    if (currentPage > totalPages) currentPage = totalPages;
-    const start = (currentPage - 1) * ordersPerPage;
-    const end = start + ordersPerPage;
-    const visibleRows = filteredRows.slice(start, end);
-
-    ordersTbody.innerHTML = '';
-    visibleRows.forEach(row => ordersTbody.appendChild(row.cloneNode(true)));
-    pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
-    prevPageBtn.disabled = currentPage === 1;
-    nextPageBtn.disabled = currentPage === totalPages || filteredRows.length === 0;
-    attachActionButtonListeners();
-}
-
-prevPageBtn.addEventListener('click', () => {
-    if (currentPage > 1) {
-        currentPage--;
-        updateOrdersDisplay();
-    }
-});
-
-nextPageBtn.addEventListener('click', () => {
-    const filteredRows = allRows.filter(row => {
-        const balance = parseFloat(row.getAttribute('data-balance'));
-        const searchText = row.getAttribute('data-search').toLowerCase();
-        const matchesFilter = currentFilter === 'all' || 
-                             (currentFilter === 'pending' && balance > 0) || 
-                             (currentFilter === 'paid' && balance === 0);
-        return matchesFilter && (orderSearch.value.toLowerCase() === '' || searchText.includes(orderSearch.value.toLowerCase()));
-    });
-    const totalPages = Math.ceil(filteredRows.length / ordersPerPage);
-    if (currentPage < totalPages) {
-        currentPage++;
-        updateOrdersDisplay();
-    }
-});
-
-orderSearch.addEventListener('input', () => {
-    currentPage = 1;
-    updateOrdersDisplay();
-});
-
-document.querySelectorAll('.filter-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        document.querySelectorAll('.filter-btn').forEach(b => {
-            b.classList.remove('bg-blue-500', 'text-white');
-            b.classList.add('text-gray-600', 'dark:text-gray-300', 'hover:bg-gray-100', 'dark:hover:bg-gray-700');
-        });
-        btn.classList.remove('text-gray-600', 'dark:text-gray-300', 'hover:bg-gray-100', 'dark:hover:bg-gray-700');
-        btn.classList.add('bg-blue-500', 'text-white');
-        currentFilter = btn.getAttribute('data-filter');
-        currentPage = 1;
-        updateOrdersDisplay();
-    });
-});
-
-document.querySelector('[data-filter="all"]').click();
-
-// Add Item Functionality
-function attachAddItemListeners(container) {
-    container.removeEventListener('click', handleAddItemClick);
-    container.addEventListener('click', handleAddItemClick);
-}
-
-function handleAddItemClick(event) {
-    if (event.target.classList.contains('add-item-btn')) {
-        addItem(event.target.closest('.space-y-4'));
-    }
-}
-
-async function addItem(container) {
-    const isRetail = container.id === 'retail-items-container';
-    const isWholesale = container.id === 'wholesale-items-container';
-    const isEdit = container.id === 'edit-items-container';
-    const priceField = isRetail ? 'selling_price' : isWholesale ? 'wholesale' : (isEdit && container.closest('#edit-order-modal').querySelector('#edit-order-type').value === 'retail' ? 'selling_price' : 'wholesale');
-    const div = document.createElement('div');
-    div.className = 'grid grid-cols-6 gap-2 item-row';
-    div.innerHTML = `
-        <select name="items[]" class="col-span-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-select w-full">
-            <option value="">Search or select a product</option>
-        </select>
-        <input name="items[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="0.01">
-        <input type="number" class="price-display p-2 border rounded-lg text-center w-full" readonly>
-        <input type="number" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-        <input type="number" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-        <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
-    `;
-    const addBtn = container.querySelector('.add-item-btn');
-    container.insertBefore(div, addBtn);
-
-    const select = div.querySelector('.product-select');
-    const choices = new Choices(select, {
-        searchEnabled: true,
-        searchChoices: true,
-        itemSelectText: '',
-        placeholderValue: 'Search or select a product'
-    });
-
-    try {
-        const stockItems = await fetchStockData();
-        if (!stockItems.length) {
-            showModalError(container.id.split('-')[0], 'No stock items available.');
-        }
-        const choicesData = stockItems.map(item => ({
-            value: `product|${item.stock_name}|quantity|0|price|${item[priceField]}|stock|${item.stock_quantity}|uom|${item.uom}`,
-            label: `${item.stock_name} (${item.uom})`
-        }));
-        choices.setChoices(choicesData, 'value', 'label', true);
-    } catch (error) {
-        showModalError(container.id.split('-')[0], 'Failed to load stock items.');
-    }
-
-    div.querySelector('.remove-item').addEventListener('click', () => {
-        div.remove();
-        updateSubtotal(container);
-    });
-
-    attachPriceListener(div);
-    updateSubtotal(container);
-}
-
-addManualToOrder.addEventListener('click', () => {
-    const name = document.getElementById('manual-item-name').value.trim();
-    const qty = parseFloat(manualQty.value) || 0;
-    const price = parseFloat(manualPrice.value) || 0;
-    if (!name) {
-        showModalError('manual-item', 'Item name is required.');
-        return;
-    }
-    if (qty <= 0) {
-        showModalError('manual-item', 'Quantity must be greater than 0.');
-        return;
-    }
-    if (price <= 0) {
-        showModalError('manual-item', 'Price must be greater than 0.');
-        return;
-    }
-    const div = document.createElement('div');
-    div.className = 'grid grid-cols-6 gap-2 item-row';
-    div.innerHTML = `
-        <input name="items[]" type="hidden" value="product|${name}|quantity|0|price|${price}|stock|0|uom|Unit">
-        <span class="col-span-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center">${name}</span>
-        <input name="items[]" type="number" value="${qty}" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="0.01">
-        <input type="number" value="${price}" class="price-display p-2 border rounded-lg text-center w-full" readonly>
-        <input type="number" value="0" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-        <input type="number" value="${price * qty}" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-        <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
-    `;
-    const addBtn = currentContainer.querySelector('.add-item-btn');
-    currentContainer.insertBefore(div, addBtn);
-    div.querySelector('.remove-item').addEventListener('click', () => {
-        div.remove();
-        updateSubtotal(currentContainer);
-    });
-    div.querySelector('.qty-input').addEventListener('input', () => updatePriceAndTotal(div));
-    manualModal.classList.add('hidden');
-    document.getElementById('manual-item-form').reset();
-    manualTotal.textContent = 'Total: 0.00';
-    updateSubtotal(currentContainer);
-});
-
-function markPaid(receiptId, balance) {
-    closeAllModals();
-    paidModal.classList.remove('hidden');
-    document.getElementById('paid-order-id').textContent = receiptId;
-    document.getElementById('full-amount-text').textContent = `Remaining Balance: ${parseFloat(balance).toFixed(2)}`;
-    const form = document.getElementById('mark-paid-form');
-    form.action = `/mark_paid/${receiptId}`;
-    document.getElementById('paid-amount').max = balance;
-    document.getElementById('paid-amount').value = '';
-    let isSubmitting = false;
-
-    form.onsubmit = function(e) {
-        e.preventDefault();
-        if (isSubmitting) return;
-        isSubmitting = true;
-        const submitBtn = form.querySelector('.submit-btn');
-        submitBtn.classList.add('processing');
-        submitBtn.disabled = true;
-        const amountPaid = parseFloat(document.getElementById('paid-amount').value) || 0;
-        if (amountPaid <= 0 || amountPaid > parseFloat(balance)) {
-            console.error(`Invalid amount paid: ${amountPaid}, Balance: ${balance}`);
-            showModalError('mark-paid', 'Please enter a valid amount (greater than 0, up to the balance).');
-            submitBtn.classList.remove('processing');
-            submitBtn.disabled = false;
-            isSubmitting = false;
-            return;
-        }
-
-        const formData = new FormData(this);
-        console.log('Sending request to:', form.action);
-        console.log('Form data:', Object.fromEntries(formData));
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15-second timeout
-
-        fetch(form.action, {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'X-CSRFToken': formData.get('csrf_token'),
-                'Accept': 'application/json'
-            },
-            signal: controller.signal
-        })
-        .then(response => {
-            clearTimeout(timeoutId);
-            console.log('Response Status:', response.status);
-            console.log('Response OK:', response.ok);
-            return response.json().then(data => ({ status: response.status, data }));
-        })
-        .then(({ status, data }) => {
-            if (status === 200) {
-                console.log('Payment successful:', data);
-                paidModal.classList.add('hidden');
-                window.location.href = '/orders';
-            } else {
-                console.error('Server Error:', data.error || 'Unknown error');
-                showModalError('mark-paid', data.error || 'Error processing payment');
-                submitBtn.classList.remove('processing');
-                submitBtn.disabled = false;
-                isSubmitting = false;
-            }
-        })
-        .catch(error => {
-            clearTimeout(timeoutId);
-            console.error('Fetch Error:', error.name, error.message);
-            showModalError('mark-paid', `Request failed: ${error.message}`);
-            submitBtn.classList.remove('processing');
-            submitBtn.disabled = false;
-            isSubmitting = false;
-        });
-    };
-}
-
-function returnStock(receiptId, itemsJson) {
-    closeAllModals();
-    returnModal.classList.remove('hidden');
-    document.getElementById('return-order-id').textContent = receiptId;
-    const form = document.getElementById('return-stock-form');
-    const returnItemsContainer = document.getElementById('return-stock-items-container');
-    form.action = `/return_stock/${receiptId}`;
-
-    returnItemsContainer.innerHTML = '';
-    let items = typeof itemsJson === 'string' ? JSON.parse(itemsJson) : itemsJson;
-    if (Array.isArray(items) && items.length > 0) {
-        items.forEach(item => {
-            if (item.name && item.quantity > 0) {
-                const div = document.createElement('div');
-                div.className = 'flex items-center justify-between p-2 bg-gray-100 dark:bg-gray-700 rounded-lg';
-                div.innerHTML = `
-                    <div class="flex items-center space-x-2">
-                        <input type="checkbox" name="return_item_${item.name}" class="return-item-checkbox h-5 w-5 text-yellow-500 rounded">
-                        <span class="text-gray-900 dark:text-white">${item.name} (Ordered: ${item.quantity})</span>
+                <div id="retail-items-container" class="space-y-4">
+                    <div class="item-row-header">
+                        <span class="font-bold">Item</span>
+                        <span class="font-bold">Qty</span>
+                        <span class="font-bold">Price</span>
+                        <span class="font-bold">Stock</span>
+                        <span class="font-bold">Total</span>
+                        <span></span>
                     </div>
-                    <input type="number" name="return_qty_${item.name}" placeholder="Qty to Return" class="return-qty-input p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 w-24 text-center hidden" min="0" max="${item.quantity}" value="0">
-                `;
-                returnItemsContainer.appendChild(div);
+                    <button type="button" class="add-item-btn bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Add Item</button>
+                </div>
+                <div class="mt-4">
+                    <button type="button" id="add-retail-manual" class="text-blue-500 hover:text-blue-700">Add Manual Item</button>
+                </div>
+                <div class="mt-4 flex justify-between">
+                    <div>
+                        <label class="block text-gray-700 dark:text-gray-300">Amount Paid</label>
+                        <input type="number" id="retail-amount-paid" name="amount_paid" step="0.01" min="0" 
+                               class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white w-32">
+                    </div>
+                    <div class="text-right">
+                        <p class="text-gray-700 dark:text-gray-300">Total: <span id="retail-order-total">0.00</span></p>
+                        <p class="text-gray-700 dark:text-gray-300">Change: <span id="retail-order-change">0.00</span></p>
+                    </div>
+                </div>
+                <div class="mt-4 flex justify-end space-x-2">
+                    <button type="button" id="close-retail-modal" class="bg-gray-300 dark:bg-gray-600 px-4 py-2 rounded hover:bg-gray-400 dark:hover:bg-gray-500">Cancel</button>
+                    <button type="submit" class="submit-btn bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Submit</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-                const checkbox = div.querySelector('.return-item-checkbox');
-                const qtyInput = div.querySelector('.return-qty-input');
-                checkbox.addEventListener('change', () => {
-                    qtyInput.classList.toggle('hidden', !checkbox.checked);
-                    if (!checkbox.checked) qtyInput.value = 0;
-                });
-            }
-        });
-    } else {
-        returnItemsContainer.innerHTML = '<p class="text-gray-700 dark:text-gray-300">No items available for return.</p>';
-    }
+    <!-- Wholesale Order Modal -->
+    <div id="wholesale-modal" class="modal fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-3xl">
+            <h2 class="text-xl font-bold mb-4 dark:text-white">New Wholesale Order</h2>
+            <div id="wholesale-error" class="text-red-600 dark:text-red-400 hidden mb-4"></div>
+            <form id="wholesale-form" action="/add_wholesale_order" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="mb-4">
+                    <label class="block text-gray-700 dark:text-gray-300 mb-2">Client</label>
+                    <select id="wholesale-client-input" name="shop_name" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"></select>
+                    <span id="wholesale-client-debt" class="text-sm text-gray-500 dark:text-gray-400 hidden mt-1"></span>
+                </div>
+                <div id="wholesale-items-container" class="space-y-4">
+                    <div class="item-row-header">
+                        <span class="font-bold">Item</span>
+                        <span class="font-bold">Qty</span>
+                        <span class="font-bold">Price</span>
+                        <span class="font-bold">Stock</span>
+                        <span class="font-bold">Total</span>
+                        <span></span>
+                    </div>
+                    <button type="button" class="add-item-btn bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Add Item</button>
+                </div>
+                <div class="mt-4">
+                    <button type="button" id="add-wholesale-manual" class="text-blue-500 hover:text-blue-700">Add Manual Item</button>
+                </div>
+                <div class="mt-4 flex justify-between">
+                    <div>
+                        <label class="block text-gray-700 dark:text-gray-300">Amount Paid</label>
+                        <input type="number" id="wholesale-amount-paid" name="amount_paid" step="0.01" min="0" 
+                               class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white w-32">
+                    </div>
+                    <div class="text-right">
+                        <p class="text-gray-700 dark:text-gray-300">Total: <span id="wholesale-order-total">0.00</span></p>
+                        <p class="text-gray-700 dark:text-gray-300">Change: <span id="wholesale-order-change">0.00</span></p>
+                    </div>
+                </div>
+                <div class="mt-4 flex justify-end space-x-2">
+                    <button type="button" id="close-wholesale-modal" class="bg-gray-300 dark:bg-gray-600 px-4 py-2 rounded hover:bg-gray-400 dark:hover:bg-gray-500">Cancel</button>
+                    <button type="submit" class="submit-btn bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Submit</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-    let isSubmitting = false;
-    form.onsubmit = function(e) {
-        e.preventDefault();
-        if (isSubmitting) return;
+    <!-- Expense Modal -->
+    <div id="expenseModal" class="modal fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
+            <h2 class="text-xl font-bold mb-4 dark:text-white">Add Expense</h2>
+            <div id="expense-error" class="text-red-600 dark:text-red-400 hidden mb-4"></div>
+            <form id="expense-form" action="/add_expense" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="mb-4">
+                    <label class="block text-gray-700 dark:text-gray-300 mb-2">Category</label>
+                    <select id="expense-category" name="category" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                        <option value="Fuel">Fuel</option>
+                        <option value="Maintenance">Maintenance</option>
+                        <option value="Salary">Salary</option>
+                        <option value="Rent">Rent</option>
+                        <option value="Utilities">Utilities</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div id="expense-reason" class="mb-4 hidden">
+                    <label class="block text-gray-700 dark:text-gray-300 mb-2">Reason</label>
+                    <input type="text" name="reason" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700 dark:text-gray-300 mb-2">Amount</label>
+                    <input type="number" name="amount" step="0.01" min="0" required 
+                           class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                </div>
+                <div class="flex justify-end space-x-2">
+                    <button type="button" id="close-expense-modal" class="bg-gray-300 dark:bg-gray-600 px-4 py-2 rounded hover:bg-gray-400 dark:hover:bg-gray-500">Cancel</button>
+                    <button type="submit" class="submit-btn bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Submit</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-        const submitBtn = form.querySelector('.submit-btn');
-        submitBtn.classList.add('processing');
-        submitBtn.disabled = true;
-        isSubmitting = true;
+    <!-- Manual Item Modal -->
+    <div id="manual-item-modal" class="modal fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
+            <h2 class="text-xl font-bold mb-4 dark:text-white">Add Manual Item</h2>
+            <div id="manual-item-error" class="text-red-600 dark:text-red-400 hidden mb-4"></div>
+            <form id="manual-item-form">
+                <div class="mb-4">
+                    <label class="block text-gray-700 dark:text-gray-300 mb-2">Item Name</label>
+                    <input type="text" id="manual-item-name" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700 dark:text-gray-300 mb-2">Quantity</label>
+                    <input type="number" id="manual-item-qty" step="0.01" min="0" 
+                           class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700 dark:text-gray-300 mb-2">Price per Unit</label>
+                    <input type="number" id="manual-item-price" step="0.01" min="0" 
+                           class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                </div>
+                <div class="mb-4">
+                    <p class="text-gray-700 dark:text-gray-300">Total: <span id="manual-total">0.00</span></p>
+                </div>
+                <div class="flex justify-end space-x-2">
+                    <button type="button" id="close-manual-modal" class="bg-gray-300 dark:bg-gray-600 px-4 py-2 rounded hover:bg-gray-400 dark:hover:bg-gray-500">Cancel</button>
+                    <button type="button" id="add-manual-to-order" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Add to Order</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-        const formData = new FormData(this);
-        let hasReturns = false;
-        items.forEach(item => {
-            const qty = parseInt(formData.get(`return_qty_${item.name}`)) || 0;
-            if (qty > 0) {
-                hasReturns = true;
-                if (qty > item.quantity) {
-                    showModalError('return-stock', `Cannot return more than ${item.quantity} units of ${item.name}.`);
-                    submitBtn.classList.remove('processing');
-                    submitBtn.disabled = false;
-                    isSubmitting = false;
-                    return;
-                }
-            }
-        });
+    <!-- Edit Order Modal -->
+    <div id="edit-order-modal" class="modal fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-3xl">
+            <h2 class="text-xl font-bold mb-4 dark:text-white">Edit Order #<span id="edit-order-id"></span></h2>
+            <div id="edit-order-error" class="text-red-600 dark:text-red-400 hidden mb-4"></div>
+            <form id="edit-order-form" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" id="edit-order-type" name="order_type">
+                <div class="mb-4">
+                    <label class="block text-gray-700 dark:text-gray-300 mb-2">Client</label>
+                    <input type="text" id="edit-client-input" name="shop_name" 
+                           class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    <span id="edit-client-debt" class="text-sm text-gray-500 dark:text-gray-400 hidden mt-1"></span>
+                </div>
+                <div id="edit-items-container" class="space-y-4">
+                    <div class="item-row-header">
+                        <span class="font-bold">Item</span>
+                        <span class="font-bold">Qty</span>
+                        <span class="font-bold">Price</span>
+                        <span class="font-bold">Stock</span>
+                        <span class="font-bold">Total</span>
+                        <span></span>
+                    </div>
+                    <button type="button" class="add-item-btn bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Add Item</button>
+                </div>
+                <div class="mt-4">
+                    <button type="button" id="add-edit-manual" class="text-blue-500 hover:text-blue-700">Add Manual Item</button>
+                </div>
+                <div class="mt-4 flex justify-between">
+                    <div>
+                        <label class="block text-gray-700 dark:text-gray-300">Amount Paid</label>
+                        <input type="number" id="edit-amount-paid" name="amount_paid" step="0.01" min="0" 
+                               class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white w-32">
+                    </div>
+                    <div class="text-right">
+                        <p class="text-gray-700 dark:text-gray-300">Total: <span id="edit-order-total">0.00</span></p>
+                        <p class="text-gray-700 dark:text-gray-300">Change: <span id="edit-order-change">0.00</span></p>
+                    </div>
+                </div>
+                <div class="mt-4 flex justify-end space-x-2">
+                    <button type="button" id="close-edit-modal" class="bg-gray-300 dark:bg-gray-600 px-4 py-2 rounded hover:bg-gray-400 dark:hover:bg-gray-500">Cancel</button>
+                    <button type="submit" class="submit-btn bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Submit</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-        if (!hasReturns) {
-            showModalError('return-stock', 'Please specify at least one item to return.');
-            submitBtn.classList.remove('processing');
-            submitBtn.disabled = false;
-            isSubmitting = false;
-            return;
-        }
+    <!-- Return Stock Modal -->
+    <div id="return-stock-modal" class="modal fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
+            <h2 class="text-xl font-bold mb-4 dark:text-white">Return Stock for Order #<span id="return-order-id"></span></h2>
+            <div id="return-stock-error" class="text-red-600 dark:text-red-400 hidden mb-4"></div>
+            <form id="return-stock-form" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div id="return-stock-items-container" class="space-y-2 mb-4"></div>
+                <div class="flex justify-end space-x-2">
+                    <button type="button" id="close-return-modal" class="bg-gray-300 dark:bg-gray-600 px-4 py-2 rounded hover:bg-gray-400 dark:hover:bg-gray-500">Cancel</button>
+                    <button type="submit" class="submit-btn bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Submit</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-        fetch(this.action, {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => {
-            if (response.ok) {
-                returnModal.classList.add('hidden');
-                alert('Stock returns logged successfully. Please update the stock manually.');
-                window.location.href = '/orders';
-            } else {
-                response.text().then(text => showModalError('return-stock', 'Error logging stock returns: ' + text));
-                submitBtn.classList.remove('processing');
-                submitBtn.disabled = false;
-                isSubmitting = false;
-            }
-        })
-        .catch(error => {
-            showModalError('return-stock', 'An error occurred while logging the stock returns: ' + error);
-            submitBtn.classList.remove('processing');
-            submitBtn.disabled = false;
-            isSubmitting = false;
-        });
-    };
-}
+    <!-- Mark as Paid Modal -->
+    <div id="mark-paid-modal" class="modal fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
+            <h2 class="text-xl font-bold mb-4 dark:text-white">Mark Order #<span id="paid-order-id"></span> as Paid</h2>
+            <div id="mark-paid-error" class="text-red-600 dark:text-red-400 hidden mb-4"></div>
+            <form id="mark-paid-form" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="mb-4">
+                    <p id="full-amount-text" class="text-gray-700 dark:text-gray-300 mb-2"></p>
+                    <label class="block text-gray-700 dark:text-gray-300 mb-2">Amount Paid</label>
+                    <input type="number" id="paid-amount" name="amount_paid" step="0.01" min="0" 
+                           class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                </div>
+                <div class="flex justify-end space-x-2">
+                    <button type="button" id="close-paid-modal" class="bg-gray-300 dark:bg-gray-600 px-4 py-2 rounded hover:bg-gray-400 dark:hover:bg-gray-500">Cancel</button>
+                    <button type="submit" class="submit-btn bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Submit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
-function editOrder(orderId, orderType, itemsJson, subtotal, amountPaid) {
-    closeAllModals();
-    editModal.classList.remove('hidden');
-    document.getElementById('edit-order-id').textContent = orderId;
-    document.getElementById('edit-order-type').value = orderType;
-    const form = document.getElementById('edit-order-form');
-    form.action = `/edit_order/${orderId}`;
-    resetModal(editContainer);
-
-    // Load existing items
-    let items = typeof itemsJson === 'string' ? JSON.parse(itemsJson) : itemsJson;
-    if (Array.isArray(items)) {
-        items.forEach(item => {
-            const div = document.createElement('div');
-            div.className = 'grid grid-cols-6 gap-2 item-row';
-            const price = parseFloat(item.price) || 0;
-            const quantity = parseInt(item.quantity) || 0;
-            div.innerHTML = `
-                <input name="items[]" type="text" value="${item.name}" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-input w-full">
-                <input name="items[]" type="number" value="${quantity}" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="1">
-                <input name="items[]" type="number" value="${price}" class="price-display p-2 border rounded-lg text-center w-full">
-                <input type="number" value="0" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-                <input type="number" value="${price * quantity}" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-                <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
-            `;
-            const addBtn = editContainer.querySelector('.add-item-btn');
-            editContainer.insertBefore(div, addBtn);
-            attachPriceListener(div);
-            div.querySelector('.remove-item').addEventListener('click', () => {
-                div.remove();
-                updateSubtotal(editContainer);
-            });
-        });
-    }
-
-    // Set initial subtotal and amount paid
-    const initialSubtotal = parseFloat(subtotal) || 0;
-    document.getElementById('edit-order-total').textContent = initialSubtotal.toFixed(2);
-    document.getElementById('edit-amount-paid').value = parseFloat(amountPaid || 0).toFixed(2);
-    updateSubtotal(editContainer);
-
-    // Add item button (mimics manual item)
-    const addItemBtn = editContainer.querySelector('.add-item-btn');
-    addItemBtn.addEventListener('click', () => {
-        const div = document.createElement('div');
-        div.className = 'grid grid-cols-6 gap-2 item-row';
-        div.innerHTML = `
-            <input name="items[]" type="text" placeholder="Item name" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-input w-full">
-            <input name="items[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="1">
-            <input name="items[]" type="number" placeholder="Price" class="price-display p-2 border rounded-lg text-center w-full">
-            <input type="number" value="0" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-            <input type="number" value="0" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-            <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
-        `;
-        const addBtn = editContainer.querySelector('.add-item-btn');
-        editContainer.insertBefore(div, addBtn);
-        attachPriceListener(div);
-        div.querySelector('.remove-item').addEventListener('click', () => {
-            div.remove();
-            updateSubtotal(editContainer);
-        });
-        updateSubtotal(editContainer);
-    });
-
-    // Form submission
-    form.onsubmit = async function(e) {
-        e.preventDefault();
-        const submitBtn = form.querySelector('.submit-btn');
-        submitBtn.classList.add('processing');
-        submitBtn.disabled = true;
-
-        try {
-            const response = await fetch(this.action, {
-                method: 'POST',
-                body: new FormData(this),
-                headers: { 'X-CSRFToken': form.querySelector('[name=csrf_token]').value }
-            });
-            const result = await response.json();
-            if (response.ok && result.status === 'success') {
-                editModal.classList.add('hidden');
-                showSuccessMessage(result.message);
-                setTimeout(() => window.location.reload(), 2000);
-            } else {
-                showModalError('edit-order', `Error updating order: ${result.error || 'Unknown error'}`);
-            }
-        } catch (error) {
-            showModalError('edit-order', `An error occurred: ${error.message}`);
-        } finally {
-            submitBtn.classList.remove('processing');
-            submitBtn.disabled = false;
-        }
-    };
-}
-
-// Success message
-function showSuccessMessage(message) {
-    const div = document.createElement('div');
-    div.className = 'fixed top-4 right-4 bg-green-500 text-white p-4 rounded-lg shadow-lg z-50';
-    div.textContent = message;
-    document.body.appendChild(div);
-    setTimeout(() => div.remove(), 3000);
-}
-
-// Update subtotal (aligned with add-edit-manual)
-function updateSubtotal(container) {
-    let subtotal = 0;
-    container.querySelectorAll('.item-row').forEach(row => {
-        const qty = parseInt(row.querySelector('.qty-input').value) || 0;
-        const price = parseFloat(row.querySelector('.price-display').value) || 0;
-        const total = qty * price;
-        row.querySelector('.total-display').value = total.toFixed(2);
-        subtotal += total;
-    });
-    const totalSpan = container.parentElement.querySelector('#edit-order-total');
-    totalSpan.textContent = subtotal.toFixed(2);
-
-    const amountPaidInput = container.parentElement.querySelector('#edit-amount-paid');
-    const changeSpan = container.parentElement.querySelector('#edit-order-change');
-    const amountPaid = parseFloat(amountPaidInput.value) || 0;
-    changeSpan.textContent = (amountPaid - subtotal).toFixed(2);
-}
-
-// Price listener for manual items
-function attachPriceListener(row) {
-    const qtyInput = row.querySelector('.qty-input');
-    const priceInput = row.querySelector('.price-display');
-    const updateTotal = () => {
-        const qty = parseInt(qtyInput.value) || 0;
-        const price = parseFloat(priceInput.value) || 0;
-        const total = qty * price;
-        row.querySelector('.total-display').value = total.toFixed(2);
-        updateSubtotal(row.closest('#edit-items-container'));
-    };
-    qtyInput.addEventListener('input', updateTotal);
-    priceInput.addEventListener('input', updateTotal);
-}
-
-// Reset modal
-function resetModal(container) {
-    container.querySelectorAll('.item-row').forEach(row => row.remove());
-}
-
-// Update edit button listeners
-document.querySelectorAll('.edit-order-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        const orderRow = btn.closest('.order-row');
-        const orderId = btn.getAttribute('data-order-id') || orderRow.getAttribute('data-receipt-id'); // Fallback to receipt_id
-        const orderType = orderRow.getAttribute('data-order-type');
-        const itemsJson = btn.getAttribute('data-items');
-        const subtotal = orderRow.getAttribute('data-subtotal') || orderRow.querySelector('td:nth-child(6)').textContent.trim(); // Balance column
-        const amountPaid = orderRow.getAttribute('data-payment') || orderRow.querySelector('td:nth-child(5)').textContent.trim(); // Payment column
-        editOrder(orderId, orderType, itemsJson, subtotal, amountPaid);
-    });
-});
-
-function deleteOrder(receiptId) {
-    if (!confirm(`Are you sure you want to delete order #${receiptId}?`)) return;
-
-    fetch(`/delete_order/${receiptId}`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': '{{ csrf_token() }}'
-        }
-    })
-    .then(response => {
-        if (response.ok) {
-            alert('Order deleted successfully.');
-            window.location.href = '/orders';
-        } else {
-            response.text().then(text => alert('Error deleting order: ' + text));
-        }
-    })
-    .catch(error => {
-        alert('An error occurred while deleting the order: ' + error);
-    });
-}
-
-manualQty.addEventListener('input', updateManualTotal);
-manualPrice.addEventListener('input', updateManualTotal);
-function updateManualTotal() {
-    const qty = parseFloat(manualQty.value) || 0;
-    const price = parseFloat(manualPrice.value) || 0;
-    manualTotal.textContent = `Total: ${(qty * price).toFixed(2)}`;
-}
-
-function attachPriceListener(row) {
-    const select = row.querySelector('.product-select');
-    const priceDisplay = row.querySelector('.price-display');
-    const stockDisplay = row.querySelector('.stock-display');
-    const totalDisplay = row.querySelector('.total-display');
-    const qtyInput = row.querySelector('.qty-input');
-    let basePrice = 0;
-    let maxStock = 0;
-
-    select.addEventListener('change', () => {
-        const selectedOption = select.options[select.selectedIndex];
-        if (selectedOption.value) {
-            const values = selectedOption.value.split('|');
-            basePrice = parseFloat(values[5]) || 0;
-            maxStock = parseFloat(values[7]) || 0;
-            priceDisplay.value = basePrice.toFixed(2);
-            stockDisplay.value = maxStock.toFixed(2);
-            qtyInput.max = maxStock;
-            const qty = parseFloat(qtyInput.value) || 0;
-            if (qty > maxStock) {
-                qtyInput.value = maxStock;
-                showModalError(row.closest('.modal').id.split('-')[0], `Cannot order more than ${maxStock} units of ${values[1]}.`);
-            }
-            totalDisplay.value = (basePrice * (parseFloat(qtyInput.value) || 0)).toFixed(2);
-            updateSubtotal(row.closest('.space-y-4'));
-        } else {
-            basePrice = 0;
-            maxStock = 0;
-            priceDisplay.value = '';
-            stockDisplay.value = '';
-            totalDisplay.value = '';
-            qtyInput.max = '';
-            updateSubtotal(row.closest('.space-y-4'));
-        }
-    });
-
-    qtyInput.addEventListener('input', () => {
-        const qty = parseFloat(qtyInput.value) || 0;
-        if (qty > maxStock) {
-            qtyInput.value = maxStock;
-            showModalError(row.closest('.modal').id.split('-')[0], `Cannot order more than ${maxStock} units.`);
-        }
-        totalDisplay.value = (basePrice * (parseFloat(qtyInput.value) || 0)).toFixed(2);
-        updateSubtotal(row.closest('.space-y-4'));
-    });
-}
-
-function updatePriceAndTotal(row) {
-    const qtyInput = row.querySelector('.qty-input');
-    const priceDisplay = row.querySelector('.price-display');
-    const totalDisplay = row.querySelector('.total-display');
-    const basePrice = parseFloat(row.querySelector('input[type="hidden"]')?.value.split('|')[5]) || parseFloat(priceDisplay.value) || 0;
-    const qty = parseFloat(qtyInput.value) || 0;
-    totalDisplay.value = (basePrice * qty).toFixed(2);
-    updateSubtotal(row.closest('.space-y-4'));
-}
-
-function updateSubtotal(container) {
-    let subtotal = 0;
-    const rows = container.querySelectorAll('.item-row');
-    rows.forEach(row => {
-        const totalDisplay = row.querySelector('.total-display');
-        if (totalDisplay && totalDisplay.value) subtotal += parseFloat(totalDisplay.value) || 0;
-    });
-    const totalSpan = container.parentElement.querySelector('[id$="-order-total"]');
-    if (totalSpan) totalSpan.textContent = subtotal.toFixed(2);
-    updateChange(container);
-}
-
-function updateChange(container) {
-    const modalId = container.id.split('-')[0];
-    const amountPaidInput = document.getElementById(`${modalId}-amount-paid`);
-    const changeSpan = document.getElementById(`${modalId}-order-change`);
-    const totalSpan = container.parentElement.querySelector('[id$="-order-total"]');
-    const subtotal = parseFloat(totalSpan.textContent) || 0;
-    const amountPaid = parseFloat(amountPaidInput.value) || 0;
-    const change = amountPaid - subtotal;
-    changeSpan.textContent = change >= 0 ? change.toFixed(2) : '0.00';
-    changeSpan.parentElement.classList.toggle('text-green-600', change >= 0);
-    changeSpan.parentElement.classList.toggle('text-red-600', change < 0);
-}
-
-retailAmountPaid.addEventListener('input', () => updateChange(retailContainer));
-wholesaleAmountPaid.addEventListener('input', () => updateChange(wholesaleContainer));
-
-document.getElementById('retail-form').addEventListener('submit', function(e) {
-    e.preventDefault();
-    const submitBtn = this.querySelector('.submit-btn');
-    submitBtn.classList.add('processing');
-    submitBtn.disabled = true;
-    const formData = new FormData(this);
-    fetch(this.action, {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => {
-        if (response.ok) {
-            retailModal.classList.add('hidden');
-            window.location.reload();
-        } else {
-            response.text().then(text => showModalError('retail', 'Error submitting retail order: ' + text));
-            submitBtn.classList.remove('processing');
-            submitBtn.disabled = false;
-        }
-    })
-    .catch(error => {
-        showModalError('retail', 'An error occurred while submitting the retail order.');
-        submitBtn.classList.remove('processing');
-        submitBtn.disabled = false;
-    });
-});
-
-document.getElementById('wholesale-form').addEventListener('submit', function(e) {
-    e.preventDefault();
-    const submitBtn = this.querySelector('.submit-btn');
-    submitBtn.classList.add('processing');
-    submitBtn.disabled = true;
-    const formData = new FormData(this);
-    fetch(this.action, {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => {
-        if (response.ok) {
-            wholesaleModal.classList.add('hidden');
-            window.location.reload();
-        } else {
-            response.text().then(text => showModalError('wholesale', 'Error submitting wholesale order: ' + text));
-            submitBtn.classList.remove('processing');
-            submitBtn.disabled = false;
-        }
-    })
-    .catch(error => {
-        showModalError('wholesale', 'An error occurred while submitting the wholesale order.');
-        submitBtn.classList.remove('processing');
-        submitBtn.disabled = false;
-    });
-});
-
-// Close Menus on Outside Click
-document.addEventListener('click', (e) => {
-    if (!e.target.closest('.order-actions-btn') && !e.target.closest('.order-actions-menu')) {
-        document.querySelectorAll('.order-actions-menu').forEach(menu => {
-            menu.classList.add('hidden');
-        });
-    }
-});
-</script>
-
-<style>
-body { overflow-y: auto; }
-input[type="number"], input[type="number"][readonly] {
-    -moz-appearance: textfield;
-}
-input[type="number"]::-webkit-inner-spin-button,
-input[type="number"]::-webkit-outer-spin-button,
-input[type="number"][readonly]::-webkit-inner-spin-button,
-input[type="number"][readonly]::-webkit-outer-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-}
-.choices__inner { 
-    background-color: #fff; 
-    border-color: #d1d5db; 
-    color: #374151; 
-    min-height: 2.5rem; 
-    padding: 0.5rem; 
-    border-radius: 0.5rem; 
-    width: 100%; 
-}
-.choices__list--single { padding: 0; }
-.choices__list--dropdown { 
-    background-color: #fff; 
-    border-color: #d1d5db; 
-    color: #374151; 
-    border-radius: 0.5rem; 
-    width: 100%; 
-    max-height: 200px; 
-    overflow-y: auto;
-}
-.choices__item--selectable { color: #374151; }
-.choices__input { 
-    background-color: #fff; 
-    color: #374151; 
-    width: 100%; 
-}
-.dark .choices__inner { 
-    background-color: #374151; 
-    border-color: #4b5563; 
-    color: #d1d5db; 
-}
-.dark .choices__list--dropdown { 
-    background-color: #374151; 
-    border-color: #4b5563; 
-    color: #d1d5db; 
-    border-radius: 0.5rem; 
-    max-height: 200px; 
-    overflow-y: auto;
-}
-.dark .choices__item--selectable { color: #d1d5db; }
-.dark .choices__input { 
-    background-color: #374151; 
-    color: #d1d5db; 
-}
-.modal { 
-    overflow-y: hidden; 
-    z-index: 50; 
-}
-#manual-item-modal { 
-    z-index: 60; 
-}
-.modal > div { 
-    max-height: 80vh; 
-    overflow-y: auto; 
-}
-.item-row-header, .item-row {
-    display: grid;
-    grid-template-columns: 2fr 1fr 1fr 1fr 1fr 0.5fr;
-    gap: 0.5rem;
-    align-items: center;
-}
-.item-row-header span {
-    font-size: 0.875rem;
-    height: 2rem;
-    line-height: 2rem;
-    padding: 0 0.5rem;
-}
-.item-row-header span:first-child {
-    text-align: left;
-    padding-left: 0.5rem;
-}
-.item-row-header span:not(:first-child) {
-    text-align: center;
-}
-.item-row input, .item-row select {
-    height: 2.5rem;
-    font-size: 0.875rem;
-    padding: 0.5rem;
-    border-radius: 0.5rem;
-    box-sizing: border-box;
-    width: 100%;
-}
-.item-row .product-select {
-    width: 100%;
-}
-.item-row .qty-input,
-.item-row .stock-display,
-.item-row .total-display,
-.item-row .remove-item {
-    text-align: center;
-}
-.item-row .price-display {
-    text-align: center;
-    background-color: #f0f9ff;
-    border: 1px solid #38bdf8;
-}
-.dark .item-row .price-display {
-    background-color: #1e3a8a;
-    border: 1px solid #60a5fa;
-}
-.return-item-checkbox:checked {
-    background-color: #f59e0b;
-    border-color: #f59e0b;
-}
-.return-item-checkbox:focus {
-    outline: none;
-    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.5);
-}
-.submit-btn.processing {
-    position: relative;
-    overflow: hidden;
-    transition: all 0.3s ease;
-}
-.submit-btn.processing::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 0;
-    height: 0;
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 50%;
-    transform: translate(-50%, -50%);
-    animation: ripple 0.6s linear;
-}
-.submit-btn.processing::before {
-    content: '\f1ce';
-    font-family: 'Font Awesome 6 Free';
-    font-weight: 900;
-    display: inline-block;
-    margin-right: 0.5rem;
-    animation: spin 1s linear infinite;
-}
-@keyframes ripple {
-    to {
-        width: 300%;
-        height: 300%;
-        opacity: 0;
-    }
-}
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
-}
-.submit-btn:disabled {
-    opacity: 0.7;
-    cursor: not-allowed;
-}
-.order-actions-menu {
-    min-width: 180px;
-}
-table {
-    border-collapse: collapse;
-    width: 100%;
-}
-th, td {
-    border: 1px solid #e5e7eb;
-}
-.dark th, .dark td {
-    border: 1px solid #4b5563;
-}
-.text-blue-500 { color: #3b82f6; }
-.text-green-500 { color: #10b981; }
-.dark .text-blue-500 { color: #3b82f6; }
-.dark .text-green-500 { color: #10b981; }
-</style>
+<!-- External CSS and JavaScript -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
+<link rel="stylesheet" href="/static/css/styles.css" />
+<script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+<script type="module" src="/static/js/utils.js"></script>
+<script type="module" src="/static/js/retailModal.js"></script>
+<script type="module" src="/static/js/wholesaleModal.js"></script>
+<script type="module" src="/static/js/expenseModal.js"></script>
+<script type="module" src="/static/js/manualItemModal.js"></script>
+<script type="module" src="/static/js/editOrderModal.js"></script>
+<script type="module" src="/static/js/returnStockModal.js"></script>
+<script type="module" src="/static/js/markPaidModal.js"></script>
+<script type="module" src="/static/js/main.js"></script>
 {% endblock %}
