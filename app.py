@@ -428,7 +428,7 @@ def group_orders(filtered_orders, time_filter, today_start, today_end, now):
             days[day_key]['debt'] += order['balance']
         grouped_orders = sorted(days.values(), key=lambda x: x['rows'][0]['date'], reverse=True)
     elif time_filter == 'week':
-    weeks = {}
+        weeks = {}
     for order in filtered_orders:
         sale_date = order['date']
         start_of_week = sale_date - timedelta(days=sale_date.weekday())
