@@ -138,7 +138,7 @@ def calculate_dashboard_stats(orders, retail_collection, today_start, today_end)
         'total_debts': round(total_debts, 2),
         'open_orders_count': open_orders_count,
         'closed_orders_count': closed_orders_count,
- eer        'retail_open_orders': retail_open_orders,
+        'retail_open_orders': retail_open_orders,
         'retail_closed_orders': retail_closed_orders,
         'wholesale_open_orders': wholesale_open_orders,
         'wholesale_closed_orders': wholesale_closed_orders
