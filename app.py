@@ -428,23 +428,23 @@ def group_orders(filtered_orders, time_filter, today_start, today_end, now):
             days[day_key]['debt'] += order['balance']
         grouped_orders = sorted(days.values(), key=lambda x: x['rows'][0]['date'], reverse=True)
     elif time_filter == 'week':
-        weeks = {}
-        for order in filtered_orders:
-            sale_date = order['date']
-            start_of_week = sale_date - timedelta(days=sale_date.weekday())
-            week_key = start_of_week.strftime('%Y-%m-%d')
-            if week_key not in weeks:
-                end_of_week = start_of_week + timedelta(days=6)
-                weeks[week_key] = {
-                    'label': f"Week: {start_of_week.strftime('%d %b')} – {end_of_week.strftime('%d %b %Y')}",
-                    'rows': [],
-                    'total': 0,
-                    'debt': 0
-                }
-            weeks[week_key]['rows'].append(order)
-            weeks[week_key]['total'] += order['payment'] + order['balance']
-            weeks[day_key]['debt'] += order['balance']
-        grouped_orders = sorted(weeks.values(), key=lambda x: x['rows'][0]['date'], reverse=True)
+    weeks = {}
+    for order in filtered_orders:
+        sale_date = order['date']
+        start_of_week = sale_date - timedelta(days=sale_date.weekday())
+        week_key = start_of_week.strftime('%Y-%m-%d')
+        if week_key not in weeks:
+            end_of_week = start_of_week + timedelta(days=6)
+            weeks[week_key] = {
+                'label': f"Week: {start_of_week.strftime('%d %b')} – {end_of_week.strftime('%d %b %Y')}",
+                'rows': [],
+                'total': 0,
+                'debt': 0
+            }
+        weeks[week_key]['rows'].append(order)
+        weeks[week_key]['total'] += order['payment'] + order['balance']
+        weeks[week_key]['debt'] += order['balance']  # Fixed: Changed day_key to week_key
+    grouped_orders = sorted(weeks.values(), key=lambda x: x['rows'][0]['date'], reverse=True)
     elif time_filter == 'month':
         months = {}
         for order in filtered_orders:
