@@ -47,6 +47,16 @@ def format_currency(value):
 app.jinja_env.filters['format_datetime'] = format_datetime
 app.jinja_env.filters['format_currency'] = format_currency   
     
+
+
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,  # Rate limit based on IP address
+    default_limits=["200 per day", "50 per hour"], # Global limits for the app
+    storage_uri="memory://"
+)
+logger.info("Flask-Limiter initialized for rate limiting.")
+
 def calculate_dashboard_stats(orders, retail_collection, today_start, today_end):
     """Calculate dashboard statistics for sales, debts, and order counts."""
     retail_sales_today = 0.0
@@ -66,7 +76,6 @@ def calculate_dashboard_stats(orders, retail_collection, today_start, today_end)
         order_type = order_dict.get('order_type', 'wholesale')
         payment = float(order_dict.get('payment', 0))
         balance = float(order_dict.get('balance', 0))
-        pending_payment = float(order_dict.get('pending_payment', 0))
         payment_history = order_dict.get('payment_history', [])
         status = order_dict.get('status', 'pending' if balance > 0 else 'completed')
 
@@ -105,20 +114,6 @@ def calculate_dashboard_stats(orders, retail_collection, today_start, today_end)
                     wholesale_sales_today += payment_amount
                     logger.debug(f"Order {order.id} (payment today, type {order_type}): Added {payment_amount} to wholesale_sales_today")
 
-        # Account for orders fully closed today
-        if closed_date and closed_date >= today_start and closed_date < today_end and pending_payment > 0:
-            if order_type in ['retail', 'app']:
-                retail_sales_today += pending_payment
-                logger.debug(f"Order {order.id} (closed today, type {order_type}): Added {pending_payment} to retail_sales_today")
-            else:
-                wholesale_sales_today += pending_payment
-                logger.debug(f"Order {order.id} (closed today, type {order_type}): Added {pending_payment} to wholesale_sales_today")
-            try:
-                db.collection('orders').document(order.id).update({'pending_payment': 0.0})
-                logger.debug(f"Reset pending_payment for order {order.id}")
-            except Exception as e:
-                logger.error(f"Failed to reset pending_payment for order {order.id}: {e}")
-
     # Add retail collection amounts
     retail_collection_total = sum(
         float(r.to_dict().get('amount', 0))
@@ -143,14 +138,6 @@ def calculate_dashboard_stats(orders, retail_collection, today_start, today_end)
         'wholesale_open_orders': wholesale_open_orders,
         'wholesale_closed_orders': wholesale_closed_orders
     }
-
-limiter = Limiter(
-    app=app,
-    key_func=get_remote_address,  # Rate limit based on IP address
-    default_limits=["200 per day", "50 per hour"], # Global limits for the app
-    storage_uri="memory://"
-)
-logger.info("Flask-Limiter initialized for rate limiting.")
 
 
 # Initialize Firebase
@@ -418,6 +405,7 @@ def process_order(doc):
         'status': status,
         'user_id': order_dict.get('user_id', '')
     }
+
 def group_orders(filtered_orders, time_filter, today_start, today_end, now):
     grouped_orders = []
     if time_filter == 'day':
@@ -455,7 +443,7 @@ def group_orders(filtered_orders, time_filter, today_start, today_end, now):
                 }
             weeks[week_key]['rows'].append(order)
             weeks[week_key]['total'] += order['payment'] + order['balance']
-            weeks[week_key]['debt'] += order['balance']
+            weeks[day_key]['debt'] += order['balance']
         grouped_orders = sorted(weeks.values(), key=lambda x: x['rows'][0]['date'], reverse=True)
     elif time_filter == 'month':
         months = {}
@@ -1286,10 +1274,18 @@ def mark_paid(receipt_id):
         # Update payment and balance
         new_payment = current_payment + amount_paid
         new_balance = max(current_balance - amount_paid, 0)
+        payment_history = order_dict.get('payment_history', [])
+
+        # Append new payment to payment_history
+        payment_history.append({
+            'amount': amount_paid,
+            'date': now
+        })
 
         update_data = {
             'payment': new_payment,
-            'balance': new_balance
+            'balance': new_balance,
+            'payment_history': payment_history
         }
         if new_balance == 0:
             update_data['closed_date'] = now
@@ -1306,7 +1302,7 @@ def mark_paid(receipt_id):
             new_debt = max(float(client_data.get('debt', 0)) - amount_paid, 0)
             db.collection('clients').document(client_doc.id).update({'debt': new_debt})
 
-        # Create notification aligned with CheckoutPage
+        # Create notification
         user_id = order_dict.get('user_id')
         if user_id:
             notification_title = "Payment Processed"
@@ -1320,10 +1316,10 @@ def mark_paid(receipt_id):
                 'title': notification_title,
                 'body': notification_body,
                 'data': {
-                    'orderId': order_doc.id,  # Use Firestore document ID
+                    'orderId': order_doc.id,
                     'receipt_id': receipt_id
                 },
-                'timestamp': firestore.SERVER_TIMESTAMP,  # Use Firestore server timestamp
+                'timestamp': firestore.SERVER_TIMESTAMP,
                 'read': False
             })
 
