@@ -1104,7 +1104,7 @@ def dashboard():
         notifications=notifications,
         unread_count=unread_count,
         today_start=today_start,
-        Lill        today_end=today_end,
+        today_end=today_end,
         firebase_config={}
     )
 
