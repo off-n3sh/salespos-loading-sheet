@@ -408,6 +408,112 @@ def timeout(seconds):
         signal.alarm(0)
         signal.signal(signal.SIGALRM, old_handler)
 
+def process_order(doc):
+    order_dict = doc.to_dict()
+    balance = float(order_dict.get('balance', 0))
+    closed_date = process_date(order_dict.get('closed_date'))
+    status = order_dict.get('status', 'pending' if balance > 0 else 'completed')
+    if balance > 0:
+        closed_date = None
+    salesperson_name = resolve_salesperson_name(order_dict)
+    return {
+        'receipt_id': order_dict.get('receipt_id', doc.id),
+        'salesperson_name': salesperson_name,
+        'salesperson_name_lower': salesperson_name.lower(),
+        'shop_name': order_dict.get('shop_name', 'Unknown Shop'),
+        'shop_name_lower': order_dict.get('shop_name_lower', 'unknown shop'),
+        'items': json.dumps(order_dict.get('items', [])),
+        'photoUrl': order_dict.get('photoUrl', ''),
+        'payment': float(order_dict.get('payment', 0)),
+        'balance': balance,
+        'date': process_date(order_dict.get('date')),
+        'closed_date': closed_date,
+        'order_type': order_dict.get('order_type', 'wholesale'),
+        'payment_history': [
+            {'amount': float(ph.get('amount', 0)), 'date': process_date(ph.get('date'))}
+            for ph in order_dict.get('payment_history', [])
+        ],
+        'notes': order_dict.get('notes', ''),
+        'status': status,
+        'user_id': order_dict.get('user_id', '')
+    }
+def group_orders(filtered_orders, time_filter, today_start, today_end, now):
+    grouped_orders = []
+    if time_filter == 'day':
+        days = {}
+        for order in filtered_orders:
+            # Use today's date for orders with payments or closure today
+            has_payment_today = any(today_start <= ph['date'] < today_end for ph in order['payment_history'])
+            is_closed_today = order['closed_date'] and today_start <= order['closed_date'] < today_end and order['balance'] <= 0
+            relevant_date = now if (has_payment_today or is_closed_today) else order['date']
+            day_key = relevant_date.strftime('%Y-%m-%d')
+            if day_key not in days:
+                days[day_key] = {
+                    'label': f"Day: {relevant_date.strftime('%d %b %Y')}",
+                    'rows': [],
+                    'total': 0,
+                    'debtវ    debt': 0
+                }
+            days[day_key]['rows'].append(order)
+            days[day_key]['total'] += order['payment'] + order['balance']
+            days[day_key]['debt'] += order['balance']
+        grouped_orders = sorted(days.values(), key=lambda x: x['rows'][0]['date'], reverse=True)
+    elif time_filter == 'week':
+        weeks = {}
+        for order in filtered_orders:
+            sale_date = order['date']
+            start_of_week = sale_date - timedelta(days=sale_date.weekday())
+            week_key = start_of_week.strftime('%Y-%m-%d')
+            if week_key not in weeks:
+                end_of_week = start_of_week + timedelta(days=6)
+                weeks[week_key] = {
+                    'label': f"Week: {start_of_week.strftime('%d %b')} – {end_of_week.strftime('%d %b %Y')}",
+                    'rows': [],
+                    'total': 0,
+                    'debt': 0
+                }
+            weeks[week_key]['rows'].append(order)
+            weeks[week_key]['total'] += order['payment'] + order['balance']
+            weeks[week_key]['debt'] += order['balance']
+        grouped_orders = sorted(weeks.values(), key=lambda x: x['rows'][0]['date'], reverse=True)
+    elif time_filter == 'month':
+        months = {}
+        for order in filtered_orders:
+            sale_date = order['date']
+            month_key = sale_date.strftime('%Y-%m')
+            if month_key not in months:
+                months[month_key] = {
+                    'label': f"Month: {sale_date.strftime('%B %Y')}",
+                    'rows': [],
+                    'total': 0,
+                    'debt': 0
+                }
+            months[month_key]['rows'].append(order)
+            months[month_key]['total'] += order['payment'] + order['balance']
+            months[month_key]['debt'] += order['balance']
+        grouped_orders = sorted(months.values(), key=lambda x: x['rows'][0]['date'], reverse=True)
+    elif time_filter == 'year':
+        years = {}
+        for order in filtered_orders:
+            sale_date = order['date']
+            year_key = sale_date.strftime('%Y')
+            if year_key not in years:
+                years[year_key] = {
+                    'label': f"Year: {year_key}",
+                    'rows': [],
+                    'total': 0,
+                    'debt': 0
+                }
+            years[year_key]['rows'].append(order)
+            years[year_key]['total'] += order['payment'] + order['balance']
+            years[year_key]['debt'] += order['balance']
+        grouped_orders = sorted(years.values(), key=lambda x: x['rows'][0]['date'], reverse=True)
+    else:
+        total = sum(order['payment'] + order['balance'] for order in filtered_orders)
+        debt = sum(order['balance'] for order in filtered_orders)
+        grouped_orders = [{'label': 'All Orders', 'rows': filtered_orders, 'total': total, 'debt': debt}]
+    return grouped_orders
+    
 @app.route('/stock_data', methods=['GET'])
 @no_cache
 @login_required
@@ -840,6 +946,7 @@ def login():
     logger.debug("Serving login.html")
     response = make_response(render_template('login.html', firebase_config=firebase_config))
     return response
+
 @app.route('/dashboard', methods=['GET'])
 @no_cache
 @login_required
@@ -856,7 +963,7 @@ def dashboard():
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     today_end = today_start + timedelta(days=1)
 
-    # Fetch all orders for stats
+    # Fetch all orders
     all_orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING)
     all_orders = list(all_orders_ref.stream())
 
@@ -888,139 +995,22 @@ def dashboard():
         for doc_id in matching_order_ids:
             doc = db.collection('orders').document(doc_id).get()
             if doc.exists:
-                order_dict = doc.to_dict()
-                balance = float(order_dict.get('balance', 0))
-                closed_date = process_date(order_dict.get('closed_date'))
-                status = order_dict.get('status', 'pending' if balance > 0 else 'completed')
-                if balance > 0:
-                    closed_date = None
-                salesperson_name = resolve_salesperson_name(order_dict)
-                filtered_orders.append({
-                    'receipt_id': order_dict.get('receipt_id', doc.id),
-                    'salesperson_name': salesperson_name,
-                    'salesperson_name_lower': salesperson_name.lower(),
-                    'shop_name': order_dict.get('shop_name', 'Unknown Shop'),
-                    'shop_name_lower': order_dict.get('shop_name_lower', 'unknown shop'),
-                    'items': json.dumps(order_dict.get('items', [])),
-                    'photoUrl': order_dict.get('photoUrl', ''),
-                    'payment': float(order_dict.get('payment', 0)),
-                    'balance': balance,
-                    'date': process_date(order_dict.get('date')),
-                    'closed_date': closed_date,
-                    'order_type': order_dict.get('order_type', 'wholesale'),
-                    'payment_history': [
-                        {'amount': float(ph.get('amount', 0)), 'date': process_date(ph.get('date'))}
-                        for ph in order_dict.get('payment_history', [])
-                    ],
-                    'notes': order_dict.get('notes', ''),
-                    'status': status,
-                    'user_id': order_dict.get('user_id', '')
-                })
+                filtered_orders.append(process_order(doc))
     else:
         for doc in orders_ref.stream():
-            order_dict = doc.to_dict()
-            balance = float(order_dict.get('balance', 0))
-            closed_date = process_date(order_dict.get('closed_date'))
-            status = order_dict.get('status', 'pending' if balance > 0 else 'completed')
-            if balance > 0:
-                closed_date = None
-            salesperson_name = resolve_salesperson_name(order_dict)
-            filtered_orders.append({
-                'receipt_id': order_dict.get('receipt_id', doc.id),
-                'salesperson_name': salesperson_name,
-                'salesperson_name_lower': salesperson_name.lower(),
-                'shop_name': order_dict.get('shop_name', 'Unknown Shop'),
-                'shop_name_lower': order_dict.get('shop_name_lower', 'unknown shop'),
-                'items': json.dumps(order_dict.get('items', [])),
-                'photoUrl': order_dict.get('photoUrl', ''),
-                'payment': float(order_dict.get('payment', 0)),
-                'balance': balance,
-                'date': process_date(order_dict.get('date')),
-                'closed_date': closed_date,
-                'order_type': order_dict.get('order_type', 'wholesale'),
-                'payment_history': [
-                    {'amount': float(ph.get('amount', 0)), 'date': process_date(ph.get('date'))}
-                    for ph in order_dict.get('payment_history', [])
-                ],
-                'notes': order_dict.get('notes', ''),
-                'status': status,
-                'user_id': order_dict.get('user_id', '')
-            })
+            filtered_orders.append(process_order(doc))
+
+    # Include orders with today's payments when time_filter == 'day'
+    if time_filter == 'day':
+        filtered_orders = [
+            order for order in filtered_orders
+            if order['date'].strftime('%Y-%m-%d') == now.strftime('%Y-%m-%d') or
+            any(today_start <= ph['date'] < today_end for ph in order['payment_history']) or
+            (order['closed_date'] and order['closed_date'] >= today_start and order['closed_date'] < today_end and order['balance'] <= 0)
+        ]
 
     # Group orders based on time filter
-    grouped_orders = []
-    if time_filter == 'day':
-        days = {}
-        for order in filtered_orders:
-            relevant_date = order['date']
-            if order['closed_date'] and order['closed_date'] >= today_start and order['closed_date'] < today_end and order['balance'] <= 0:
-                relevant_date = order['closed_date']
-            day_key = relevant_date.strftime('%Y-%m-%d')
-            if day_key not in days:
-                days[day_key] = {
-                    'label': f"Day: {relevant_date.strftime('%d %b %Y')}",
-                    'rows': [],
-                    'total': 0,
-                    'debt': 0
-                }
-            days[day_key]['rows'].append(order)
-            days[day_key]['total'] += order['payment'] + order['balance']
-            days[day_key]['debt'] += order['balance']
-        grouped_orders = sorted(days.values(), key=lambda x: x['rows'][0]['date'], reverse=True)
-    elif time_filter == 'week':
-        weeks = {}
-        for order in filtered_orders:
-            sale_date = order['date']
-            start_of_week = sale_date - timedelta(days=sale_date.weekday())
-            week_key = start_of_week.strftime('%Y-%m-%d')
-            if week_key not in weeks:
-                end_of_week = start_of_week + timedelta(days=6)
-                weeks[week_key] = {
-                    'label': f"Week: {start_of_week.strftime('%d %b')} – {end_of_week.strftime('%d %b %Y')}",
-                    'rows': [],
-                    'total': 0,
-                    'debt': 0
-                }
-            weeks[week_key]['rows'].append(order)
-            weeks[week_key]['total'] += order['payment'] + order['balance']
-            weeks[week_key]['debt'] += order['balance']
-        grouped_orders = sorted(weeks.values(), key=lambda x: x['rows'][0]['date'], reverse=True)
-    elif time_filter == 'month':
-        months = {}
-        for order in filtered_orders:
-            sale_date = order['date']
-            month_key = sale_date.strftime('%Y-%m')
-            if month_key not in months:
-                months[month_key] = {
-                    'label': f"Month: {sale_date.strftime('%B %Y')}",
-                    'rows': [],
-                    'total': 0,
-                    'debt': 0
-                }
-            months[month_key]['rows'].append(order)
-            months[month_key]['total'] += order['payment'] + order['balance']
-            months[month_key]['debt'] += order['balance']
-        grouped_orders = sorted(months.values(), key=lambda x: x['rows'][0]['date'], reverse=True)
-    elif time_filter == 'year':
-        years = {}
-        for order in filtered_orders:
-            sale_date = order['date']
-            year_key = sale_date.strftime('%Y')
-            if year_key not in years:
-                years[year_key] = {
-                    'label': f"Year: {year_key}",
-                    'rows': [],
-                    'total': 0,
-                    'debt': 0
-                }
-            years[year_key]['rows'].append(order)
-            years[year_key]['total'] += order['payment'] + order['balance']
-            years[year_key]['debt'] += order['balance']
-        grouped_orders = sorted(years.values(), key=lambda x: x['rows'][0]['date'], reverse=True)
-    else:
-        total = sum(order['payment'] + order['balance'] for order in filtered_orders)
-        debt = sum(order['balance'] for order in filtered_orders)
-        grouped_orders = [{'label': 'All Orders', 'rows': filtered_orders, 'total': total, 'debt': debt}]
+    grouped_orders = group_orders(filtered_orders, time_filter, today_start, today_end, now)
 
     # Pagination
     flat_orders = [(group['label'], order) for group in grouped_orders for order in group['rows']]
@@ -1044,7 +1034,11 @@ def dashboard():
             }
             grouped_sales_history.append(current_group)
         order_copy = order.copy()
-        order_copy['highlight'] = order['date'] >= today_start
+        order_copy['highlight'] = (
+            any(today_start <= ph['date'] < today_end for ph in order['payment_history']) or
+            order['date'] >= today_start or
+            (order['closed_date'] and order['closed_date'] >= today_start and order['closed_date'] < today_end)
+        )
         current_group['rows'].append(order_copy)
 
     # Fetch expenses
@@ -1080,7 +1074,6 @@ def dashboard():
     ]
     unread_count = sum(1 for notif in notifications if not notif['read'])
 
-    # Render template
     return render_template(
         'dashboard.html',
         user=session['user'],
@@ -1111,9 +1104,10 @@ def dashboard():
         notifications=notifications,
         unread_count=unread_count,
         today_start=today_start,
-        today_end=today_end,
-        firebase_config={}  # Replace with actual config if needed
+        Lill        today_end=today_end,
+        firebase_config={}
     )
+
  
 @app.route('/dashboard_stats', methods=['GET'])
 @login_required
@@ -1290,7 +1284,6 @@ def orders():
 
 @app.route('/mark_paid/<receipt_id>', methods=['POST'])
 def mark_paid(receipt_id):
-    # Query order by receipt_id field
     orders_ref = db.collection('orders').where('receipt_id', '==', receipt_id).limit(1).stream()
     order_doc = next(orders_ref, None)
     if not order_doc:
@@ -1319,7 +1312,7 @@ def mark_paid(receipt_id):
             'balance': new_balance
         }
         if new_balance == 0:
-            update_data['closed_date'] = now  # Optional: set closed_date when fully paid
+            update_data['closed_date'] = now
 
         # Update order
         order_ref.update(update_data)
@@ -1333,20 +1326,25 @@ def mark_paid(receipt_id):
             new_debt = max(float(client_data.get('debt', 0)) - amount_paid, 0)
             db.collection('clients').document(client_doc.id).update({'debt': new_debt})
 
-        # Create notification
+        # Create notification aligned with CheckoutPage
         user_id = order_dict.get('user_id')
         if user_id:
-            notification_message = (
+            notification_title = "Payment Processed"
+            notification_body = (
                 f"Order #{receipt_id} fully paid on {now.strftime('%d/%m/%Y %H:%M')}"
                 if new_balance == 0 else
-                f"Order #{receipt_id} partially paid. New balance: KSh {new_balance} on {now.strftime('%d/%m/%Y %H:%M')}"
+                f"Order #{receipt_id} partially paid. New balance: KSh {new_balance:.2f} on {now.strftime('%d/%m/%Y %H:%M')}"
             )
             db.collection('users').document(user_id).collection('notifications').add({
-                'message': notification_message,
-                'timestamp': now,
-                'order_id': receipt_id,
-                'read': False,
-                'type': 'payment_closed' if new_balance == 0 else 'payment_partial'
+                'type': 'payment_processed' if new_balance == 0 else 'payment_partial',
+                'title': notification_title,
+                'body': notification_body,
+                'data': {
+                    'orderId': order_doc.id,  # Use Firestore document ID
+                    'receipt_id': receipt_id
+                },
+                'timestamp': firestore.SERVER_TIMESTAMP,  # Use Firestore server timestamp
+                'read': False
             })
 
         return jsonify({"success": True, "message": "Payment processed successfully", "new_balance": new_balance}), 200
