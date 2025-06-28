@@ -58,10 +58,8 @@ def calculate_dashboard_stats(orders, retail_collection, today_start, today_end)
     retail_closed_orders = 0
     wholesale_open_orders = 0
     wholesale_closed_orders = 0
-    orders_with_payment_counted = set()
 
     for order in orders:
-        order_id = order.id
         order_dict = order.to_dict()
         order_date = process_date(order_dict.get('date'))
         closed_date = process_date(order_dict.get('closed_date'))
@@ -95,48 +93,31 @@ def calculate_dashboard_stats(orders, retail_collection, today_start, today_end)
         if balance > 0:
             total_debts += balance
 
-        # Calculate today's sales
-        if order_date and order_date >= today_start and order_date < today_end:
-            if payment > 0 and order_id not in orders_with_payment_counted:
-                if order_type in ['retail', 'app']:
-                    retail_sales_today += payment
-                    logger.debug(f"Order {order_id} (created today, type {order_type}): Added {payment} to retail_sales_today")
-                else:
-                    wholesale_sales_today += payment
-                    logger.debug(f"Order {order_id} (created today, type {order_type}): Added {payment} to wholesale_sales_today")
-                orders_with_payment_counted.add(order_id)
-
-        # Check payment_history for payments made today
+        # Calculate today's sales from payment_history
         for payment_entry in payment_history:
             payment_date = process_date(payment_entry.get('date'))
             payment_amount = float(payment_entry.get('amount', 0))
-            if payment_date and payment_date >= today_start and payment_date < today_end:
-                if order_id not in orders_with_payment_counted and payment_amount > 0:
-                    if order_type in ['retail', 'app']:
-                        retail_sales_today += payment_amount
-                        logger.debug(f"Order {order_id} (partial payment today, type {order_type}): Added {payment_amount} to retail_sales_today")
-                    else:
-                        wholesale_sales_today += payment_amount
-                        logger.debug(f"Order {order_id} (partial payment today, type {order_type}): Added {payment_amount} to wholesale_sales_today")
-                    orders_with_payment_counted.add(order_id)
+            if payment_date and payment_date >= today_start and payment_date < today_end and payment_amount > 0:
+                if order_type in ['retail', 'app']:
+                    retail_sales_today += payment_amount
+                    logger.debug(f"Order {order.id} (payment today, type {order_type}): Added {payment_amount} to retail_sales_today")
+                else:
+                    wholesale_sales_today += payment_amount
+                    logger.debug(f"Order {order.id} (payment today, type {order_type}): Added {payment_amount} to wholesale_sales_today")
 
         # Account for orders fully closed today
-        if closed_date and closed_date >= today_start and closed_date < today_end:
-            amount_to_add = pending_payment if pending_payment > 0 else payment
-            if order_id not in orders_with_payment_counted and amount_to_add > 0:
-                if order_type in ['retail', 'app']:
-                    retail_sales_today += amount_to_add
-                    logger.debug(f"Order {order_id} (closed today, type {order_type}): Added {amount_to_add} to retail_sales_today")
-                else:
-                    wholesale_sales_today += amount_to_add
-                    logger.debug(f"Order {order_id} (closed today, type {order_type}): Added {amount_to_add} to wholesale_sales_today")
-                orders_with_payment_counted.add(order_id)
-                if pending_payment > 0:
-                    try:
-                        db.collection('orders').document(order_id).update({'pending_payment': 0.0})
-                        logger.debug(f"Reset pending_payment for order {order_id}")
-                    except Exception as e:
-                        logger.error(f"Failed to reset pending_payment for order {order_id}: {e}")
+        if closed_date and closed_date >= today_start and closed_date < today_end and pending_payment > 0:
+            if order_type in ['retail', 'app']:
+                retail_sales_today += pending_payment
+                logger.debug(f"Order {order.id} (closed today, type {order_type}): Added {pending_payment} to retail_sales_today")
+            else:
+                wholesale_sales_today += pending_payment
+                logger.debug(f"Order {order.id} (closed today, type {order_type}): Added {pending_payment} to wholesale_sales_today")
+            try:
+                db.collection('orders').document(order.id).update({'pending_payment': 0.0})
+                logger.debug(f"Reset pending_payment for order {order.id}")
+            except Exception as e:
+                logger.error(f"Failed to reset pending_payment for order {order.id}: {e}")
 
     # Add retail collection amounts
     retail_collection_total = sum(
@@ -157,7 +138,7 @@ def calculate_dashboard_stats(orders, retail_collection, today_start, today_end)
         'total_debts': round(total_debts, 2),
         'open_orders_count': open_orders_count,
         'closed_orders_count': closed_orders_count,
-        'retail_open_orders': retail_open_orders,
+ eer        'retail_open_orders': retail_open_orders,
         'retail_closed_orders': retail_closed_orders,
         'wholesale_open_orders': wholesale_open_orders,
         'wholesale_closed_orders': wholesale_closed_orders
@@ -452,7 +433,7 @@ def group_orders(filtered_orders, time_filter, today_start, today_end, now):
                     'label': f"Day: {relevant_date.strftime('%d %b %Y')}",
                     'rows': [],
                     'total': 0,
-                    'debtវ    debt': 0
+                    'debt': 0
                 }
             days[day_key]['rows'].append(order)
             days[day_key]['total'] += order['payment'] + order['balance']
@@ -1000,13 +981,13 @@ def dashboard():
         for doc in orders_ref.stream():
             filtered_orders.append(process_order(doc))
 
-    # Include orders with today's payments when time_filter == 'day'
+    # Include orders with today's payments or closure when time_filter == 'day'
     if time_filter == 'day':
         filtered_orders = [
             order for order in filtered_orders
             if order['date'].strftime('%Y-%m-%d') == now.strftime('%Y-%m-%d') or
             any(today_start <= ph['date'] < today_end for ph in order['payment_history']) or
-            (order['closed_date'] and order['closed_date'] >= today_start and order['closed_date'] < today_end and order['balance'] <= 0)
+            (order['closed_date'] and today_start <= order['closed_date'] < today_end and order['balance'] <= 0)
         ]
 
     # Group orders based on time filter
@@ -1037,7 +1018,7 @@ def dashboard():
         order_copy['highlight'] = (
             any(today_start <= ph['date'] < today_end for ph in order['payment_history']) or
             order['date'] >= today_start or
-            (order['closed_date'] and order['closed_date'] >= today_start and order['closed_date'] < today_end)
+            (order['closed_date'] and today_start <= order['closed_date'] < today_end)
         )
         current_group['rows'].append(order_copy)
 
@@ -1107,7 +1088,6 @@ def dashboard():
         today_end=today_end,
         firebase_config={}
     )
-
  
 @app.route('/dashboard_stats', methods=['GET'])
 @login_required
