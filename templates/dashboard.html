@@ -151,7 +151,7 @@
         </div>
     </div>
 
-    <!-- Sales History Section -->
+   <!-- Sales History Section -->
 <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden mb-6 sm:mb-8">
     <div class="p-4 sm:p-5 border-b border-gray-200 dark:border-gray-700">
         <h2 class="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">Sales History</h2>
@@ -235,7 +235,13 @@
                                     </span>
                                 {% endif %}
                             </div>
-                            <div class="text-xs text-gray-500 dark:text-gray-400">Location: {{ sale.shop_name }}</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">
+                                {% if sale.order_type == 'app' %}
+                                    Location: {{ sale.shop_name }}
+                                {% else %}
+                                    Client: {{ sale.shop_name }}
+                                {% endif %}
+                            </div>
                             <div class="text-xs text-gray-500 dark:text-gray-400">
                                 Ordered: {{ sale.date.strftime('%d/%m/%Y %H:%M:%S') }}
                             </div>
