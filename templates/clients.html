@@ -3,26 +3,26 @@
 {% block content %}
     <!-- Page Header -->
     <div class="mb-8">
-        <div class="bg-gradient-to-r from-blue-600 to-blue-800 rounded-xl shadow-lg p-6 text-white">
-            <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center">
-                <div>
-                    <h1 class="text-3xl font-bold mb-2">Client Management</h1>
-                    <p class="text-blue-100">Monitor client relationships, debt status, and order history</p>
+    <div class="bg-gradient-to-r from-blue-600 to-blue-800 rounded-xl shadow-lg p-6 text-white">
+        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center">
+            <div>
+                <h1 class="text-3xl font-bold mb-2">Client Management</h1>
+                <p class="text-blue-100">Monitor client relationships, debt status, and order history</p>
+            </div>
+            <div class="mt-4 lg:mt-0 flex items-center space-x-4">
+                <!-- Statistics Cards -->
+                <div class="bg-white/10 backdrop-blur-sm rounded-lg p-3 text-center">
+                    <div class="text-2xl font-bold">{{ total_clients }}</div>
+                    <div class="text-xs text-blue-100">Total Clients</div>
                 </div>
-                <div class="mt-4 lg:mt-0 flex items-center space-x-4">
-                    <!-- Statistics Cards -->
-                    <div class="bg-white/10 backdrop-blur-sm rounded-lg p-3 text-center">
-                        <div class="text-2xl font-bold">{{ total_clients | default(clients|length) }}</div>
-                        <div class="text-xs text-blue-100">Total Clients</div>
-                    </div>
-                    <div class="bg-white/10 backdrop-blur-sm rounded-lg p-3 text-center">
-                        <div class="text-2xl font-bold text-red-200">{{ clients_with_debt | default(clients | selectattr('debt', 'gt', 0) | list | length) }}</div>
-                        <div class="text-xs text-blue-100">With Debt</div>
-                    </div>
+                <div class="bg-white/10 backdrop-blur-sm rounded-lg p-3 text-center">
+                    <div class="text-2xl font-bold text-red-200">{{ clients_with_debt }}</div>
+                    <div class="text-xs text-blue-100">With Debt</div>
                 </div>
             </div>
         </div>
     </div>
+</div>
 
     <!-- Search and Filters -->
     <div class="mb-6">
@@ -197,23 +197,21 @@
     </div>
 
     <!-- Pagination Controls -->
-    {% if clients %}
-    <div class="mt-6 flex justify-center items-center space-x-4">
-        <a href="{{ url_for('clients', page=pagination.page-1, search=search) }}" 
-           class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed" 
-           {% if pagination.page <= 1 %}disabled{% endif %}>
-            Previous
-        </a>
-        <div class="text-gray-700 dark:text-gray-300">
-            Page {{ pagination.page }} of {{ pagination.total_pages }}
-        </div>
-        <a href="{{ url_for('clients', page=pagination.page+1, search=search) }}" 
-           class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed" 
-           {% if pagination.page >= pagination.total_pages %}disabled{% endif %}>
-            Next
-        </a>
+{% if clients %}
+<div class="mt-6 flex justify-center items-center space-x-4">
+    <a href="{{ url_for('clients', page=pagination.page-1, search=search) }}" 
+       class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 {% if pagination.page <= 1 %}pointer-events-none bg-gray-400{% endif %}">
+        Previous
+    </a>
+    <div class="text-gray-700 dark:text-gray-300">
+        Page {{ pagination.page }} of {{ pagination.total_pages }}
     </div>
-    {% endif %}
+    <a href="{{ url_for('clients', page=pagination.page+1, search=search) }}" 
+       class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 {% if pagination.page >= pagination.total_pages %}pointer-events-none bg-gray-400{% endif %}">
+        Next
+    </a>
+</div>
+{% endif %}
 
     <!-- Client Details Modal -->
     <div id="client-modal" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm overflow-y-auto h-full w-full z-50 hidden">

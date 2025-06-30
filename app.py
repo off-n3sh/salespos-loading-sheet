@@ -47,7 +47,9 @@ def format_currency(value):
 app.jinja_env.filters['format_datetime'] = format_datetime
 app.jinja_env.filters['format_currency'] = format_currency   
     
-
+def update_clients_counter(change, context):
+    count = sum(1 for _ in db.collection('clients').stream())
+    db.collection('metadata').document('clients_counter').set({'count': count})
 
 limiter = Limiter(
     app=app,
@@ -563,22 +565,28 @@ def clients_data():
         clients_query = clients_query.where('shop_name_lower', '>=', search_query.lower())\
                                     .where('shop_name_lower', '<=', search_query.lower() + '\uf8ff')
 
-    clients_ref = clients_query.stream()
     clients_list = []
-
-    for doc in clients_ref:
-        client_dict = doc.to_dict()
-        shop_name = client_dict.get('shop_name', 'Unknown Shop')
-        clients_list.append({
-            'shop_name': shop_name,
-            'debt': float(client_dict.get('debt', 0)),
-            'last_order_date': process_date(client_dict.get('last_order_date')).isoformat() if client_dict.get('last_order_date') else None,
-            'recent_order_amount': client_dict.get('recent_order_amount', 0.0),
-            'phone': client_dict.get('phone'),
-            'location': client_dict.get('location'),
-            'created_at': process_date(client_dict.get('created_at')).isoformat() if client_dict.get('created_at') else None,
-            'order_types': client_dict.get('order_types', [])
-        })
+    try:
+        for doc in clients_query.stream():
+            client_dict = doc.to_dict()
+            shop_name = client_dict.get('shop_name', 'Unknown Shop')
+            try:
+                clients_list.append({
+                    'shop_name': shop_name,
+                    'debt': float(client_dict.get('debt', 0)),
+                    'last_order_date': process_date(client_dict.get('last_order_date')).isoformat() if client_dict.get('last_order_date') else None,
+                    'recent_order_amount': float(client_dict.get('recent_order_amount', 0)),
+                    'phone': client_dict.get('phone'),
+                    'location': client_dict.get('location'),
+                    'created_at': process_date(client_dict.get('created_at')).isoformat() if client_dict.get('created_at') else None,
+                    'order_types': client_dict.get('order_types', [])
+                })
+            except (TypeError, ValueError) as e:
+                logging.error(f"Error processing client {shop_name}: {e}")
+                continue  # Skip invalid client data
+    except Exception as e:
+        logging.error(f"Error fetching clients data: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
 
     return jsonify(clients_list)
     
@@ -600,9 +608,14 @@ def clients():
         clients_query = clients_query.where('shop_name_lower', '>=', search_query.lower())\
                                     .where('shop_name_lower', '<=', search_query.lower() + '\uf8ff')
 
-    # Fetch total count from a counter document (optional, for large datasets)
-    total_clients = db.collection('metadata').document('clients_counter').get().to_dict().get('count', 0) if db.collection('metadata').document('clients_counter').get().exists else 0
-    
+    # Fetch total count (fallback to counting documents if counter is missing)
+    counter_doc = db.collection('metadata').document('clients_counter').get()
+    if counter_doc.exists and not search_query:
+        total_clients = counter_doc.to_dict().get('count', 0)
+    else:
+        # Count filtered clients for search queries or if counter is missing
+        total_clients = sum(1 for _ in clients_query.stream())
+
     # Paginate query
     clients_ref = clients_query.offset(offset).limit(per_page).stream()
     clients_list = []
@@ -619,9 +632,9 @@ def clients():
         recent_order_amount = None
         if latest_order:
             order_dict = latest_order[0].to_dict()
-            last_order_date = process_date(order_dict.get('date'))
-            items = order_dict.get('items', [])
             try:
+                last_order_date = process_date(order_dict.get('date'))
+                items = order_dict.get('items', [])
                 recent_order_amount = sum(
                     float(item[5]) * float(item[3])
                     for item in items
@@ -642,8 +655,8 @@ def clients():
             'order_types': client_dict.get('order_types', [])
         })
 
-    total_pages = (total_clients + per_page - 1) // per_page
-    clients_with_debt = len([c for c in clients_list if c['debt'] > 0])
+    total_pages = max(1, (total_clients + per_page - 1) // per_page)  # Ensure at least 1 page
+    clients_with_debt = sum(1 for c in db.collection('clients').stream() if float(c.to_dict().get('debt', 0)) > 0)
 
     return render_template(
         'clients.html',
@@ -653,7 +666,7 @@ def clients():
         clients_with_debt=clients_with_debt,
         pagination={'page': page, 'per_page': per_page, 'total_pages': total_pages},
         firebase_config=firebase_config
-    )              
+    )            
 
 @app.route('/edit_client/<shop_name>', methods=['POST'])
 @no_cache
