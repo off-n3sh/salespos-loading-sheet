@@ -323,211 +323,213 @@
 
     <!-- JavaScript -->
     <script>
-        // DOM Elements
-        const searchInput = document.getElementById('search-input');
-        const debtFilter = document.getElementById('debt-filter');
-        const clientCards = document.querySelectorAll('.client-card');
-        const clientModal = document.getElementById('client-modal');
-        const closeModal = document.getElementById('close-modal');
-        const editContact = document.getElementById('edit-contact');
-        const contactView = document.getElementById('contact-view');
-        const contactEditForm = document.getElementById('contact-edit-form');
-        const cancelEdit = document.getElementById('cancel-edit');
+    // DOM Elements
+    const searchInput = document.getElementById('search-input');
+    const debtFilter = document.getElementById('debt-filter');
+    const clientCards = document.querySelectorAll('.client-card');
+    const clientModal = document.getElementById('client-modal');
+    const closeModal = document.getElementById('close-modal');
+    const editContact = document.getElementById('edit-contact');
+    const contactView = document.getElementById('contact-view');
+    const contactEditForm = document.getElementById('contact-edit-form');
+    const cancelEdit = document.getElementById('cancel-edit');
 
-        // Filter functionality
-        function applyFilters() {
-            const searchQuery = searchInput.value.toLowerCase();
-            const debtFilterValue = debtFilter.value;
+    // Filter functionality
+    function applyFilters() {
+        const searchQuery = searchInput.value.toLowerCase();
+        const debtFilterValue = debtFilter.value;
 
-            clientCards.forEach(card => {
-                const clientName = card.dataset.clientName;
-                const debt = parseFloat(card.dataset.debt) || 0;
-                
-                let show = true;
+        clientCards.forEach(card => {
+            const clientName = card.dataset.clientName;
+            const debt = parseFloat(card.dataset.debt) || 0;
+            
+            let show = true;
 
-                // Search filter
-                if (searchQuery && !clientName.includes(searchQuery)) {
-                    show = false;
-                }
-
-                // Debt filter
-                if (debtFilterValue === 'with-debt' && debt <= 0) {
-                    show = false;
-                } else if (debtFilterValue === 'no-debt' && debt > 0) {
-                    show = false;
-                }
-
-                card.style.display = show ? 'block' : 'none';
-            });
-        }
-
-        // Event listeners for filters
-        searchInput.addEventListener('input', applyFilters);
-        debtFilter.addEventListener('change', applyFilters);
-
-        // Edit contact functionality
-        let currentShopName = '';
-        editContact.addEventListener('click', () => {
-            contactView.classList.add('hidden');
-            contactEditForm.classList.remove('hidden');
-            const location = document.getElementById('modal-contact-location').textContent;
-            const phone = document.getElementById('modal-contact-phone').textContent;
-            document.getElementById('edit-location').value = location === 'Not available' ? '' : location;
-            document.getElementById('edit-phone').value = phone === 'Not available' ? '' : phone;
-            document.getElementById('original-shop-name').value = currentShopName;
-            document.getElementById('shop-name').value = currentShopName;
-        });
-
-        cancelEdit.addEventListener('click', () => {
-            contactView.classList.remove('hidden');
-            contactEditForm.classList.add('hidden');
-        });
-
-        contactEditForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const formData = new FormData(contactEditForm);
-            const shopName = formData.get('shop_name');
-            const location = formData.get('location') || null;
-            const phone = formData.get('phone') || null;
-
-            try {
-                const response = await fetch(`/edit_client/${encodeURIComponent(shopName)}`, {
-                    method: 'POST',
-                    body: formData,
-                });
-
-                if (response.ok) {
-                    document.getElementById('modal-contact-location').textContent = location || 'Not available';
-                    document.getElementById('modal-client-location').textContent = location || 'Not specified';
-                    document.getElementById('modal-contact-phone').textContent = phone || 'Not available';
-                    contactView.classList.remove('hidden');
-                    contactEditForm.classList.add('hidden');
-                    alert('Contact information updated successfully.');
-                    // Refresh client cards to reflect updated location/phone
-                    window.location.reload();
-                } else {
-                    const errorText = await response.text();
-                    alert(`Failed to update contact information: ${errorText}`);
-                }
-            } catch (error) {
-                console.error('Error updating client:', error);
-                alert('An error occurred while updating contact information.');
+            // Search filter
+            if (searchQuery && !clientName.includes(searchQuery)) {
+                show = false;
             }
+
+            // Debt filter
+            if (debtFilterValue === 'with-debt' && debt <= 0) {
+                show = false;
+            } else if (debtFilterValue === 'no-debt' && debt > 0) {
+                show = false;
+            }
+
+            card.style.display = show ? 'block' : 'none';
         });
+    }
 
-        // Open client modal
-        async function openClientModal(shopName) {
-            try {
-                currentShopName = shopName;
-                // Show modal with loading state
-                clientModal.classList.remove('hidden');
-                
-                // Update modal header
-                document.getElementById('modal-client-name').textContent = shopName;
-                document.getElementById('modal-client-initial').textContent = shopName[0].toUpperCase();
-                
-                // Fetch client data
-                const clientResponse = await fetch(`/clients_data?search=${encodeURIComponent(shopName)}`);
-                const clients = await clientResponse.json();
-                const client = clients.find(c => c.shop_name.toLowerCase() === shopName.toLowerCase()) || {};
+    // Event listeners for filters
+    searchInput.addEventListener('input', applyFilters);
+    debtFilter.addEventListener('change', applyFilters);
 
-                // Fetch orders data for outstanding orders
-                const ordersResponse = await fetch(`/orders_data?shop_name=${encodeURIComponent(shopName)}`);
-                const ordersData = await ordersResponse.json();
-                
-                // Calculate total orders and outstanding orders
-                const totalOrders = ordersData.length;
-                const outstandingOrders = ordersData.filter(order => 
-                    (order.balance && order.balance > 0) || (order.pending_payment && order.pending_payment > 0)
-                );
+    // Edit contact functionality
+    let currentShopName = '';
+    editContact.addEventListener('click', () => {
+        contactView.classList.add('hidden');
+        contactEditForm.classList.remove('hidden');
+        const location = document.getElementById('modal-contact-location').textContent;
+        const phone = document.getElementById('modal-contact-phone').textContent;
+        document.getElementById('edit-location').value = location === 'Not available' ? '' : location;
+        document.getElementById('edit-phone').value = phone === 'Not available' ? '' : phone;
+        document.getElementById('original-shop-name').value = currentShopName;
+        document.getElementById('shop-name').value = currentShopName;
+    });
 
-                // Update modal content
-                document.getElementById('modal-client-location').textContent = client.location || 'Not specified';
-                document.getElementById('modal-contact-location').textContent = client.location || 'Not available';
-                document.getElementById('modal-contact-phone').textContent = client.phone || 'Not available';
-                document.getElementById('modal-total-debt').textContent = `KSh ${(client.debt || 0).toLocaleString('en-KE', {minimumFractionDigits: 2})}`;
-                document.getElementById('modal-total-orders').textContent = totalOrders.toString();
-                document.getElementById('modal-last-order').textContent = client.last_order_date ? 
-                    new Date(client.last_order_date).toLocaleDateString('en-GB') : 'N/A';
-                document.getElementById('modal-enrolled-on').textContent = client.created_at ? 
-                    new Date(client.created_at).toLocaleDateString('en-GB') : 'N/A';
+    cancelEdit.addEventListener('click', () => {
+        contactView.classList.remove('hidden');
+        contactEditForm.classList.add('hidden');
+    });
 
-                // Populate outstanding orders
-                const ordersContainer = document.getElementById('modal-outstanding-orders');
-                ordersContainer.innerHTML = '';
+    contactEditForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(contactEditForm);
+        const shopName = formData.get('shop_name');
+        const location = formData.get('location') || null;
+        const phone = formData.get('phone') || null;
 
-                if (outstandingOrders.length > 0) {
-                    outstandingOrders.forEach(order => {
-                        const orderElement = document.createElement('div');
-                        orderElement.className = 'p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors';
-                        
-                        const orderDate = new Date(order.date);
-                        const balance = order.balance || order.pending_payment || 0;
-                        
-                        orderElement.innerHTML = `
-                            <div class="flex justify-between items-start">
-                                <div class="flex-1">
-                                    <div class="flex items-center space-x-2 mb-2">
-                                        <h4 class="font-semibold text-gray-900 dark:text-white">Receipt #${order.receipt_id}</h4>
-                                        <span class="px-2 py-1 text-xs bg-${order.order_type === 'app' ? 'blue' : order.order_type === 'retail' ? 'green' : 'purple'}-100 text-${order.order_type === 'app' ? 'blue' : order.order_type === 'retail' ? 'green' : 'purple'}-800 rounded-full">
-                                            ${order.order_type || 'Unknown'}
-                                        </span>
-                                    </div>
-                                    <p class="text-sm text-gray-600 dark:text-gray-300">
-                                        Date: ${orderDate.toLocaleDateString('en-GB')}
-                                    </p>
-                                    ${order.salesperson_name ? `<p class="text-sm text-gray-600 dark:text-gray-300">Salesperson: ${order.salesperson_name}</p>` : ''}
-                                    ${order.notes ? `<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">${order.notes}</p>` : ''}
+        try {
+            const response = await fetch(`/edit_client/${encodeURIComponent(shopName)}`, {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (response.ok) {
+                document.getElementById('modal-contact-location').textContent = location || 'Not available';
+                document.getElementById('modal-client-location').textContent = location || 'Not specified';
+                document.getElementById('modal-contact-phone').textContent = phone || 'Not available';
+                contactView.classList.remove('hidden');
+                contactEditForm.classList.add('hidden');
+                alert('Contact information updated successfully.');
+                window.location.reload();
+            } else {
+                const errorText = await response.text();
+                alert(`Failed to update contact information: ${errorText}`);
+            }
+        } catch (error) {
+            console.error('Error updating client:', error);
+            alert('An error occurred while updating contact information.');
+        }
+    });
+
+    // Open client modal
+    async function openClientModal(shopName) {
+        try {
+            currentShopName = shopName;
+            clientModal.classList.remove('hidden');
+            
+            document.getElementById('modal-client-name').textContent = shopName;
+            document.getElementById('modal-client-initial').textContent = shopName[0].toUpperCase();
+            
+            const clientResponse = await fetch(`/clients_data?search=${encodeURIComponent(shopName)}`);
+            if (!clientResponse.ok) {
+                throw new Error(`HTTP error ${clientResponse.status}`);
+            }
+            const clients = await clientResponse.json();
+            
+            // Check if clients is an array
+            if (!Array.isArray(clients)) {
+                console.error('Invalid response format:', clients);
+                throw new Error('Invalid data format from server');
+            }
+
+            const client = clients.find(c => c.shop_name.toLowerCase() === shopName.toLowerCase()) || {};
+
+            const ordersResponse = await fetch(`/orders_data?shop_name=${encodeURIComponent(shopName)}`);
+            const ordersData = await ordersResponse.json();
+            
+            const totalOrders = ordersData.length;
+            const outstandingOrders = ordersData.filter(order => 
+                (order.balance && order.balance > 0) || (order.pending_payment && order.pending_payment > 0)
+            );
+
+            document.getElementById('modal-client-location').textContent = client.location || 'Not specified';
+            document.getElementById('modal-contact-location').textContent = client.location || 'Not available';
+            document.getElementById('modal-contact-phone').textContent = client.phone || 'Not available';
+            document.getElementById('modal-total-debt').textContent = `KSh ${(client.debt || 0).toLocaleString('en-KE', {minimumFractionDigits: 2})}`;
+            document.getElementById('modal-total-orders').textContent = totalOrders.toString();
+            document.getElementById('modal-last-order').textContent = client.last_order_date ? 
+                new Date(client.last_order_date).toLocaleDateString('en-GB') : 'N/A';
+            document.getElementById('modal-enrolled-on').textContent = client.created_at ? 
+                new Date(client.created_at).toLocaleDateString('en-GB') : 'N/A';
+
+            const ordersContainer = document.getElementById('modal-outstanding-orders');
+            ordersContainer.innerHTML = '';
+
+            if (outstandingOrders.length > 0) {
+                outstandingOrders.forEach(order => {
+                    const orderElement = document.createElement('div');
+                    orderElement.className = 'p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors';
+                    
+                    const orderDate = new Date(order.date);
+                    const balance = order.balance || order.pending_payment || 0;
+                    
+                    orderElement.innerHTML = `
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1">
+                                <div class="flex items-center space-x-2 mb-2">
+                                    <h4 class="font-semibold text-gray-900 dark:text-white">Receipt #${order.receipt_id}</h4>
+                                    <span class="px-2 py-1 text-xs bg-${order.order_type === 'app' ? 'blue' : order.order_type === 'retail' ? 'green' : 'purple'}-100 text-${order.order_type === 'app' ? 'blue' : order.order_type === 'retail' ? 'green' : 'purple'}-800 rounded-full">
+                                        ${order.order_type || 'Unknown'}
+                                    </span>
                                 </div>
-                                <div class="text-right ml-4">
-                                    <p class="text-lg font-bold text-red-600 dark:text-red-400">KSh ${balance.toLocaleString('en-KE', {minimumFractionDigits: 2})}</p>
-                                    <a href="/receipt/${order.receipt_id}" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">View Receipt</a>
-                                </div>
+                                <p class="text-sm text-gray-600 dark:text-gray-300">
+                                    Date: ${orderDate.toLocaleDateString('en-GB')}
+                                </p>
+                                ${order.salesperson_name ? `<p class="text-sm text-gray-600 dark:text-gray-300">Salesperson: ${order.salesperson_name}</p>` : ''}
+                                ${order.notes ? `<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">${order.notes}</p>` : ''}
                             </div>
-                        `;
-                        ordersContainer.appendChild(orderElement);
-                    });
-                } else {
-                    ordersContainer.innerHTML = `
-                        <div class="p-8 text-center">
-                            <svg class="w-12 h-12 mx-auto text-green-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                            <p class="text-gray-600 dark:text-gray-400">No outstanding orders</p>
-                            <p class="text-sm text-gray-500 dark:text-gray-500 mt-1">This client is in good standing</p>
+                            <div class="text-right ml-4">
+                                <p class="text-lg font-bold text-red-600 dark:text-red-400">KSh ${balance.toLocaleString('en-KE', {minimumFractionDigits: 2})}</p>
+                                <a href="/receipt/${order.receipt_id}" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">View Receipt</a>
+                            </div>
                         </div>
                     `;
-                }
-
-            } catch (error) {
-                console.error('Error loading client details:', error);
-                alert('Failed to load client details. Please try again.');
+                    ordersContainer.appendChild(orderElement);
+                });
+            } else {
+                ordersContainer.innerHTML = `
+                    <div class="p-8 text-center">
+                        <svg class="w-12 h-12 mx-auto text-green-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <p class="text-gray-600 dark:text-gray-400">No outstanding orders</p>
+                        <p class="text-sm text-gray-500 dark:text-gray-500 mt-1">This client is in good standing</p>
+                    </div>
+                `;
             }
+        } catch (error) {
+            console.error('Error loading client details:', error);
+            alert(`Failed to load client details: ${error.message || 'Please try again'}`);
+            clientModal.classList.add('hidden');
         }
+    }
 
-        // Close modal
-        closeModal.addEventListener('click', () => {
+    // Close modal
+    closeModal.addEventListener('click', () => {
+        clientModal.classList.add('hidden');
+        contactView.classList.remove('hidden');
+        contactEditForm.classList.add('hidden');
+    });
+
+    // Close modal on outside click
+    clientModal.addEventListener('click', (e) => {
+        if (e.target === clientModal) {
             clientModal.classList.add('hidden');
             contactView.classList.remove('hidden');
             contactEditForm.classList.add('hidden');
-        });
+        }
+    });
 
-        // Close modal on outside click
-        clientModal.addEventListener('click', (e) => {
-            if (e.target === clientModal) {
-                clientModal.classList.add('hidden');
-                contactView.classList.remove('hidden');
-                contactEditForm.classList.add('hidden');
-            }
-        });
-
-        // Close modal on Escape key
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && !clientModal.classList.contains('hidden')) {
-                clientModal.classList.add('hidden');
-                contactView.classList.remove('hidden');
-                contactEditForm.classList.add('hidden');
-            }
-        });
-    </script>
+    // Close modal on Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !clientModal.classList.contains('hidden')) {
+            clientModal.classList.add('hidden');
+            contactView.classList.remove('hidden');
+            contactEditForm.classList.add('hidden');
+        }
+    });
+</script>
 {% endblock %}

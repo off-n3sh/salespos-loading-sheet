@@ -552,7 +552,6 @@ def splash():
         return redirect(url_for('dashboard'))
     return render_template('splash.html')
     
-
 @app.route('/clients_data', methods=['GET'])
 @no_cache
 @login_required
@@ -571,22 +570,43 @@ def clients_data():
             client_dict = doc.to_dict()
             shop_name = client_dict.get('shop_name', 'Unknown Shop')
             try:
+                # Ensure shop_name_lower exists
+                if 'shop_name_lower' not in client_dict:
+                    client_dict['shop_name_lower'] = shop_name.lower()
+                    doc.reference.update({'shop_name_lower': shop_name.lower()})
+                
+                created_at = None
+                if client_dict.get('created_at'):
+                    try:
+                        created_at = process_date(client_dict['created_at'])
+                    except (TypeError, ValueError) as e:
+                        logging.error(f"Error processing created_at for shop {shop_name}: {e}")
+                        created_at = None
+
+                last_order_date = None
+                if client_dict.get('last_order_date'):
+                    try:
+                        last_order_date = process_date(client_dict['last_order_date'])
+                    except (TypeError, ValueError) as e:
+                        logging.error(f"Error processing last_order_date for shop {shop_name}: {e}")
+                        last_order_date = None
+
                 clients_list.append({
                     'shop_name': shop_name,
                     'debt': float(client_dict.get('debt', 0)),
-                    'last_order_date': process_date(client_dict.get('last_order_date')).isoformat() if client_dict.get('last_order_date') else None,
+                    'last_order_date': last_order_date.isoformat() if last_order_date else None,
                     'recent_order_amount': float(client_dict.get('recent_order_amount', 0)),
                     'phone': client_dict.get('phone'),
                     'location': client_dict.get('location'),
-                    'created_at': process_date(client_dict.get('created_at')).isoformat() if client_dict.get('created_at') else None,
+                    'created_at': created_at.isoformat() if created_at else None,
                     'order_types': client_dict.get('order_types', [])
                 })
-            except (TypeError, ValueError) as e:
+            except Exception as e:
                 logging.error(f"Error processing client {shop_name}: {e}")
-                continue  # Skip invalid client data
+                continue  # Skip invalid client
     except Exception as e:
         logging.error(f"Error fetching clients data: {e}")
-        return jsonify({'error': 'Internal server error'}), 500
+        return jsonify([]), 200  # Return empty array on error
 
     return jsonify(clients_list)
     
