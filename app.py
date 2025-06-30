@@ -651,6 +651,8 @@ def clients():
         key=lambda x: x['last_order_date'] or datetime.min.replace(tzinfo=NAIROBI_TZ),
         reverse=True
     )
+    total_clients = len(clients_list)
+    clients_with_debt = len([c for c in clients_list if c['debt'] > 0])
 
     return render_template(
         'clients.html',
@@ -741,26 +743,67 @@ def edit_client(shop_name):
 @no_cache
 @login_required
 def orders_data():
-    """Return JSON data for all orders."""
-    orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).stream()
+    """Return JSON data for orders, optionally filtered by shop_name."""
+    shop_name = request.args.get('shop_name', '').strip()
+    
+    if shop_name:
+        # Filter orders for specific shop
+        orders_query = db.collection('orders').where('shop_name', '==', shop_name)
+    else:
+        # Return all orders
+        orders_query = db.collection('orders')
+    
+    orders_ref = orders_query.order_by('date', direction=firestore.Query.DESCENDING).stream()
     orders_list = []
 
     for doc in orders_ref:
         order_dict = doc.to_dict()
+        order_date = process_date(order_dict.get('date'))
+        
+        # Calculate balance/pending payment
+        payment = float(order_dict.get('payment', 0))
+        pending_payment = float(order_dict.get('pending_payment', 0))
+        
+        # Calculate total order amount
         items = order_dict.get('items', [])
-        total_amount = sum(
-            float(item[5]) * float(item[3]) 
-            for item in items 
-            if len(item) > 5 and item[0] == 'product'
-        )
+        total_amount = 0
+        try:
+            if isinstance(items, list) and items:
+                # Handle the different item formats
+                if order_dict.get('order_type') == 'app':
+                    # App orders have items as list of dicts
+                    for item in items:
+                        if isinstance(item, dict):
+                            total_amount += float(item.get('price', 0)) * float(item.get('quantity', 0))
+                else:
+                    # Retail/wholesale orders have items as flat list
+                    for i in range(0, len(items), 6):
+                        if i + 5 < len(items) and items[i] == 'product':
+                            price = float(items[i + 5])
+                            quantity = float(items[i + 3])
+                            total_amount += price * quantity
+        except (TypeError, ValueError, IndexError) as e:
+            logging.error(f"Error calculating total_amount for order {order_dict.get('receipt_id')}: {e}")
+            total_amount = payment + pending_payment
+        
+        # Add delivery fee for app orders
+        if order_dict.get('order_type') == 'app':
+            total_amount += float(order_dict.get('delivery_fee', 0))
+        
+        balance = total_amount - payment
+        
         orders_list.append({
-            'receipt_id': order_dict.get('receipt_id', doc.id),
-            'shop_name': order_dict.get('shop_name', 'Unknown Shop'),
-            'balance': float(order_dict.get('balance', 0)),
-            'payment': float(order_dict.get('payment', 0)),
+            'receipt_id': order_dict.get('receipt_id'),
+            'shop_name': order_dict.get('shop_name'),
+            'date': order_date.isoformat() if order_date else None,
+            'payment': payment,
+            'pending_payment': pending_payment,
+            'balance': balance,
             'total_amount': total_amount,
-            'date': process_date(order_dict.get('date')).isoformat(),
-            'closed_date': process_date(order_dict.get('closed_date')).isoformat() if order_dict.get('closed_date') else None
+            'order_type': order_dict.get('order_type', 'unknown'),
+            'salesperson_name': order_dict.get('salesperson_name'),
+            'notes': order_dict.get('notes'),
+            'status': order_dict.get('status', 'unknown')
         })
 
     return jsonify(orders_list)
