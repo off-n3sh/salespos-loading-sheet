@@ -16,7 +16,7 @@
                         <div class="text-xs text-blue-100">Total Clients</div>
                     </div>
                     <div class="bg-white/10 backdrop-blur-sm rounded-lg p-3 text-center">
-                        <div class="text-2xl font-bold text-red-200">{{ clients_with_debt | default(0) }}</div>
+                        <div class="text-2xl font-bold text-red-200">{{ clients_with_debt | default(clients | selectattr('debt', 'gt', 0) | list | length) }}</div>
                         <div class="text-xs text-blue-100">With Debt</div>
                     </div>
                 </div>
@@ -40,6 +40,7 @@
                                    placeholder="Search by client name, location, or receipt ID..." 
                                    class="pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-l-lg w-full dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
                                    value="{{ search | default('') }}">
+                            <input type="hidden" name="page" value="{{ pagination.page | default(1) }}">
                         </div>
                         <button type="submit" class="px-6 py-3 bg-blue-600 text-white rounded-r-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors">
                             Search
@@ -57,7 +58,7 @@
                 </div>
                 
                 {% if search %}
-                <a href="{{ url_for('clients') }}" class="px-4 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 focus:outline-none transition-colors">
+                <a href="{{ url_for('clients', page=1) }}" class="px-4 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 focus:outline-none transition-colors">
                     Clear Search
                 </a>
                 {% endif %}
@@ -126,12 +127,12 @@
                 
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Recent Order</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Enrolled On</p>
                         <p class="text-lg font-semibold text-gray-900 dark:text-white">
-                            {% if client.recent_order_amount %}
-                                KSh {{ "{:,.0f}".format(client.recent_order_amount) }}
+                            {% if client.created_at %}
+                                {{ client.created_at.strftime('%d %b %Y') }}
                             {% else %}
-                                No orders
+                                Unknown
                             {% endif %}
                         </p>
                     </div>
@@ -152,10 +153,10 @@
             <div class="px-5 py-3 bg-gray-50 dark:bg-gray-700 border-t border-gray-100 dark:border-gray-600 rounded-b-xl">
                 <div class="flex justify-between items-center">
                     <span class="text-xs text-gray-500 dark:text-gray-400">
-                        {% if client.recent_order_amount %}
-                            Recent: KSh {{ "{:,.2f}".format(client.recent_order_amount) }}
+                        {% if client.created_at %}
+                            Enrolled: {{ client.created_at.strftime('%d %b %Y') }}
                         {% else %}
-                            No recent orders
+                            No enrollment date
                         {% endif %}
                     </span>
                     <div class="flex items-center text-blue-600 dark:text-blue-400">
@@ -186,7 +187,7 @@
                     {% endif %}
                 </p>
                 {% if search %}
-                <a href="{{ url_for('clients') }}" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                <a href="{{ url_for('clients', page=1) }}" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
                     View All Clients
                 </a>
                 {% endif %}
@@ -194,6 +195,25 @@
         </div>
         {% endif %}
     </div>
+
+    <!-- Pagination Controls -->
+    {% if clients %}
+    <div class="mt-6 flex justify-center items-center space-x-4">
+        <a href="{{ url_for('clients', page=pagination.page-1, search=search) }}" 
+           class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed" 
+           {% if pagination.page <= 1 %}disabled{% endif %}>
+            Previous
+        </a>
+        <div class="text-gray-700 dark:text-gray-300">
+            Page {{ pagination.page }} of {{ pagination.total_pages }}
+        </div>
+        <a href="{{ url_for('clients', page=pagination.page+1, search=search) }}" 
+           class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed" 
+           {% if pagination.page >= pagination.total_pages %}disabled{% endif %}>
+            Next
+        </a>
+    </div>
+    {% endif %}
 
     <!-- Client Details Modal -->
     <div id="client-modal" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm overflow-y-auto h-full w-full z-50 hidden">
@@ -222,8 +242,11 @@
                 <div class="lg:col-span-1 space-y-6">
                     <!-- Contact Information -->
                     <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Contact Information</h3>
-                        <div class="space-y-2">
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Contact Information</h3>
+                            <button id="edit-contact" class="text-blue-600 dark:text-blue-400 hover:underline text-sm">Edit</button>
+                        </div>
+                        <div id="contact-view" class="space-y-2">
                             <div class="flex items-center text-sm">
                                 <svg class="w-4 h-4 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
@@ -239,6 +262,22 @@
                                 <span id="modal-contact-phone" class="ml-2 text-gray-900 dark:text-white">Not available</span>
                             </div>
                         </div>
+                        <form id="contact-edit-form" class="space-y-4 hidden">
+                            <div>
+                                <label for="edit-location" class="text-sm text-gray-600 dark:text-gray-300">Location</label>
+                                <input type="text" id="edit-location" name="location" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter location">
+                            </div>
+                            <div>
+                                <label for="edit-phone" class="text-sm text-gray-600 dark:text-gray-300">Phone</label>
+                                <input type="text" id="edit-phone" name="phone" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter phone number">
+                            </div>
+                            <input type="hidden" id="original-shop-name" name="original_shop_name">
+                            <input type="hidden" id="shop-name" name="shop_name">
+                            <div class="flex space-x-2">
+                                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save</button>
+                                <button type="button" id="cancel-edit" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">Cancel</button>
+                            </div>
+                        </form>
                     </div>
 
                     <!-- Financial Summary -->
@@ -256,6 +295,10 @@
                             <div class="flex justify-between items-center">
                                 <span class="text-sm text-gray-600 dark:text-gray-300">Last Order:</span>
                                 <span id="modal-last-order" class="text-sm text-gray-900 dark:text-white">N/A</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-gray-600 dark:text-gray-300">Enrolled On:</span>
+                                <span id="modal-enrolled-on" class="text-sm text-gray-900 dark:text-white">N/A</span>
                             </div>
                         </div>
                     </div>
@@ -288,6 +331,10 @@
         const clientCards = document.querySelectorAll('.client-card');
         const clientModal = document.getElementById('client-modal');
         const closeModal = document.getElementById('close-modal');
+        const editContact = document.getElementById('edit-contact');
+        const contactView = document.getElementById('contact-view');
+        const contactEditForm = document.getElementById('contact-edit-form');
+        const cancelEdit = document.getElementById('cancel-edit');
 
         // Filter functionality
         function applyFilters() {
@@ -320,9 +367,60 @@
         searchInput.addEventListener('input', applyFilters);
         debtFilter.addEventListener('change', applyFilters);
 
+        // Edit contact functionality
+        let currentShopName = '';
+        editContact.addEventListener('click', () => {
+            contactView.classList.add('hidden');
+            contactEditForm.classList.remove('hidden');
+            const location = document.getElementById('modal-contact-location').textContent;
+            const phone = document.getElementById('modal-contact-phone').textContent;
+            document.getElementById('edit-location').value = location === 'Not available' ? '' : location;
+            document.getElementById('edit-phone').value = phone === 'Not available' ? '' : phone;
+            document.getElementById('original-shop-name').value = currentShopName;
+            document.getElementById('shop-name').value = currentShopName;
+        });
+
+        cancelEdit.addEventListener('click', () => {
+            contactView.classList.remove('hidden');
+            contactEditForm.classList.add('hidden');
+        });
+
+        contactEditForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(contactEditForm);
+            const shopName = formData.get('shop_name');
+            const location = formData.get('location') || null;
+            const phone = formData.get('phone') || null;
+
+            try {
+                const response = await fetch(`/edit_client/${encodeURIComponent(shopName)}`, {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (response.ok) {
+                    document.getElementById('modal-contact-location').textContent = location || 'Not available';
+                    document.getElementById('modal-client-location').textContent = location || 'Not specified';
+                    document.getElementById('modal-contact-phone').textContent = phone || 'Not available';
+                    contactView.classList.remove('hidden');
+                    contactEditForm.classList.add('hidden');
+                    alert('Contact information updated successfully.');
+                    // Refresh client cards to reflect updated location/phone
+                    window.location.reload();
+                } else {
+                    const errorText = await response.text();
+                    alert(`Failed to update contact information: ${errorText}`);
+                }
+            } catch (error) {
+                console.error('Error updating client:', error);
+                alert('An error occurred while updating contact information.');
+            }
+        });
+
         // Open client modal
         async function openClientModal(shopName) {
             try {
+                currentShopName = shopName;
                 // Show modal with loading state
                 clientModal.classList.remove('hidden');
                 
@@ -353,6 +451,8 @@
                 document.getElementById('modal-total-orders').textContent = totalOrders.toString();
                 document.getElementById('modal-last-order').textContent = client.last_order_date ? 
                     new Date(client.last_order_date).toLocaleDateString('en-GB') : 'N/A';
+                document.getElementById('modal-enrolled-on').textContent = client.created_at ? 
+                    new Date(client.created_at).toLocaleDateString('en-GB') : 'N/A';
 
                 // Populate outstanding orders
                 const ordersContainer = document.getElementById('modal-outstanding-orders');
@@ -410,12 +510,16 @@
         // Close modal
         closeModal.addEventListener('click', () => {
             clientModal.classList.add('hidden');
+            contactView.classList.remove('hidden');
+            contactEditForm.classList.add('hidden');
         });
 
         // Close modal on outside click
         clientModal.addEventListener('click', (e) => {
             if (e.target === clientModal) {
                 clientModal.classList.add('hidden');
+                contactView.classList.remove('hidden');
+                contactEditForm.classList.add('hidden');
             }
         });
 
@@ -423,6 +527,8 @@
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && !clientModal.classList.contains('hidden')) {
                 clientModal.classList.add('hidden');
+                contactView.classList.remove('hidden');
+                contactEditForm.classList.add('hidden');
             }
         });
     </script>

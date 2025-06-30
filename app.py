@@ -557,45 +557,27 @@ def splash():
 def clients_data():
     """Return JSON data for clients with search filtering."""
     search_query = request.args.get('search', '').lower()
-    clients_ref = db.collection('clients').order_by('created_at', direction=firestore.Query.DESCENDING).stream()
+    clients_query = db.collection('clients').order_by('created_at', direction=firestore.Query.DESCENDING)
+    
+    if search_query:
+        clients_query = clients_query.where('shop_name_lower', '>=', search_query.lower())\
+                                    .where('shop_name_lower', '<=', search_query.lower() + '\uf8ff')
+
+    clients_ref = clients_query.stream()
     clients_list = []
 
     for doc in clients_ref:
         client_dict = doc.to_dict()
         shop_name = client_dict.get('shop_name', 'Unknown Shop')
-        if search_query and search_query not in shop_name.lower():
-            continue
-
-        # Fetch latest order for additional details
-        latest_order = db.collection('orders')\
-            .where('shop_name', '==', shop_name)\
-            .order_by('date', direction=firestore.Query.DESCENDING)\
-            .limit(1).get()
-        last_order_date = None
-        recent_order_amount = None
-        if latest_order:
-            order_dict = latest_order[0].to_dict()
-            last_order_date = process_date(order_dict.get('date'))
-            items = order_dict.get('items', [])
-            # Handle inconsistent items data
-            try:
-                recent_order_amount = sum(
-                    float(item[5]) * float(item[3])
-                    for item in items
-                    if isinstance(item, (list, tuple)) and len(item) > 5 and item[0] == 'product'
-                )
-            except (TypeError, IndexError, ValueError) as e:
-                # Log the error for debugging, but don't fail the entire request
-                logging.error(f"Error calculating recent_order_amount for shop {shop_name}: {e}")
-                recent_order_amount = 0.0
-
         clients_list.append({
             'shop_name': shop_name,
             'debt': float(client_dict.get('debt', 0)),
-            'last_order_date': last_order_date.isoformat() if last_order_date else None,
-            'recent_order_amount': recent_order_amount,
+            'last_order_date': process_date(client_dict.get('last_order_date')).isoformat() if client_dict.get('last_order_date') else None,
+            'recent_order_amount': client_dict.get('recent_order_amount', 0.0),
             'phone': client_dict.get('phone'),
-            'location': client_dict.get('location')
+            'location': client_dict.get('location'),
+            'created_at': process_date(client_dict.get('created_at')).isoformat() if client_dict.get('created_at') else None,
+            'order_types': client_dict.get('order_types', [])
         })
 
     return jsonify(clients_list)
@@ -604,17 +586,30 @@ def clients_data():
 @no_cache
 @login_required
 def clients():
-    """Render the clients page with initial data."""
-    search_query = request.args.get('search', '')
-    clients_ref = db.collection('clients').order_by('created_at', direction=firestore.Query.DESCENDING).stream()
+    """Render the clients page with paginated data."""
+    search_query = request.args.get('search', '').strip()
+    page = int(request.args.get('page', 1))
+    per_page = 12  # Number of clients per page
+    offset = (page - 1) * per_page
+
+    # Initialize Firestore query
+    clients_query = db.collection('clients').order_by('created_at', direction=firestore.Query.DESCENDING)
+    
+    # Apply search filter using shop_name_lower for efficiency
+    if search_query:
+        clients_query = clients_query.where('shop_name_lower', '>=', search_query.lower())\
+                                    .where('shop_name_lower', '<=', search_query.lower() + '\uf8ff')
+
+    # Fetch total count from a counter document (optional, for large datasets)
+    total_clients = db.collection('metadata').document('clients_counter').get().to_dict().get('count', 0) if db.collection('metadata').document('clients_counter').get().exists else 0
+    
+    # Paginate query
+    clients_ref = clients_query.offset(offset).limit(per_page).stream()
     clients_list = []
 
     for doc in clients_ref:
         client_dict = doc.to_dict()
         shop_name = client_dict.get('shop_name', 'Unknown Shop')
-        if search_query and search_query.lower() not in shop_name.lower():
-            continue
-
         # Fetch latest order for additional details
         latest_order = db.collection('orders')\
             .where('shop_name', '==', shop_name)\
@@ -626,7 +621,6 @@ def clients():
             order_dict = latest_order[0].to_dict()
             last_order_date = process_date(order_dict.get('date'))
             items = order_dict.get('items', [])
-            # Handle inconsistent items data
             try:
                 recent_order_amount = sum(
                     float(item[5]) * float(item[3])
@@ -643,57 +637,23 @@ def clients():
             'last_order_date': last_order_date,
             'recent_order_amount': recent_order_amount,
             'phone': client_dict.get('phone'),
-            'location': client_dict.get('location')
+            'location': client_dict.get('location'),
+            'created_at': process_date(client_dict.get('created_at')),
+            'order_types': client_dict.get('order_types', [])
         })
 
-    # Sort by last order date (None goes last)
-    clients_list.sort(
-        key=lambda x: x['last_order_date'] or datetime.min.replace(tzinfo=NAIROBI_TZ),
-        reverse=True
-    )
-    total_clients = len(clients_list)
+    total_pages = (total_clients + per_page - 1) // per_page
     clients_with_debt = len([c for c in clients_list if c['debt'] > 0])
 
     return render_template(
         'clients.html',
         clients=clients_list,
         search=search_query,
+        total_clients=total_clients,
+        clients_with_debt=clients_with_debt,
+        pagination={'page': page, 'per_page': per_page, 'total_pages': total_pages},
         firebase_config=firebase_config
-    )                                                 
-@app.route('/add_client', methods=['POST'])
-@no_cache
-@login_required
-def add_client():
-    """Add a new client to the clients collection."""
-    shop_name = request.form.get('shop_name')
-    phone = request.form.get('phone')
-    location = request.form.get('location')
-
-    if not shop_name:
-        return "Client name is required", 400
-
-    # Check if client already exists
-    existing_client = db.collection('clients')\
-        .where('shop_name', '==', shop_name)\
-        .limit(1).get()
-    if existing_client:
-        return "Client already exists", 400
-
-    client_data = {
-        'shop_name': shop_name,
-        'debt': 0.0,
-        'created_at': datetime.now(NAIROBI_TZ),
-        'last_order_date': None,
-        'recent_order_amount': None
-    }
-    if phone:
-        client_data['phone'] = phone
-    if location:
-        client_data['location'] = location
-
-    db.collection('clients').document(shop_name.replace('/', '-')).set(client_data)
-    log_user_action('Added Client', f"Manually added client: {shop_name}")
-    return '', 200
+    )              
 
 @app.route('/edit_client/<shop_name>', methods=['POST'])
 @no_cache
