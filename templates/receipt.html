@@ -2,7 +2,7 @@
 {% block title %}Receipt - {{ order.receipt_id }}{% endblock %}
 {% block content %}
 <div class="receipt-container p-0 mx-auto" style="width: 72mm; background-color: #ffffff; color: #000000;">
-    <!-- Debug Output (hidden, for inspection) -->
+    <!-- Debug Output (hidden) -->
     <div style="display: none;">
         Debug Order: {{ order | tojson }}
     </div>
@@ -56,32 +56,24 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% if order.order_type == 'app' or order.order_type == 'wholesale' %}
-                        {% if order.items_list is iterable and order.items_list is not string %}
-                            {% for item in order.items_list %}
+                    {% set items = order.items_list if order.order_type in ['app', 'wholesale'] else order.order_items %}
+                    {% if items is iterable and items is not string %}
+                        {% for item in items | sort(attribute='name') %}
                             <tr style="border-bottom: 1px dotted #ccc;">
                                 <td style="text-align: left; padding: 4px 2px;">{{ item.name | default('Unknown') }}</td>
                                 <td style="text-align: center; padding: 4px 2px;">{{ item.quantity | default(0) }}</td>
                                 <td style="text-align: right; padding: 4px 2px;">{{ item.price | default(0) }}</td>
-                                <td style="text-align: right; padding: 4px 2px;">{{ (item.quantity | default(0) * item.price | default(0)) | round(2) }}</td>
+                                <td style="text-align: right; padding: 4px 2px;">
+                                    {% if order.order_type in ['app', 'wholesale'] %}
+                                        {{ (item.quantity | default(0) * item.price | default(0)) | round(2) }}
+                                    {% else %}
+                                        {{ item.amount | default(0) }}
+                                    {% endif %}
+                                </td>
                             </tr>
-                            {% endfor %}
-                        {% else %}
-                            <tr><td colspan="4" style="text-align: center; padding: 4px 2px;">No items available</td></tr>
-                        {% endif %}
+                        {% endfor %}
                     {% else %}
-                        {% if order.order_items is iterable and order.order_items is not string %}
-                            {% for item in order.order_items %}
-                            <tr style="border-bottom: 1px dotted #ccc;">
-                                <td style="text-align: left; padding: 4px 2px;">{{ item.name | default('Unknown') }}</td>
-                                <td style="text-align: center; padding: 4px 2px;">{{ item.quantity | default(0) }}</td>
-                                <td style="text-align: right; padding: 4px 2px;">{{ item.price | default(0) }}</td>
-                                <td style="text-align: right; padding: 4px 2px;">{{ item.amount | default(0) }}</td>
-                            </tr>
-                            {% endfor %}
-                        {% else %}
-                            <tr><td colspan="4" style="text-align: center; padding: 4px 2px;">No items available</td></tr>
-                        {% endif %}
+                        <tr><td colspan="4" style="text-align: center; padding: 4px 2px;">No items available</td></tr>
                     {% endif %}
                 </tbody>
             </table>
@@ -92,37 +84,33 @@
             <div class="flex justify-between mb-1">
                 <div>Subtotal:</div>
                 <div>
-                    {% if order.order_type == 'app' or order.order_type == 'wholesale' %}
+                    {% if order.order_type in ['app', 'wholesale'] %}
                         {% set subtotal = 0 %}
-                        {% if order.items_list is iterable and order.items_list is not string %}
-                            {% for item in order.items_list %}
+                        {% if items is iterable and items is not string %}
+                            {% for item in items %}
                                 {% set subtotal = subtotal + (item.quantity | default(0) * item.price | default(0)) %}
                             {% endfor %}
                         {% endif %}
                         {{ subtotal | round(2) }}
                     {% else %}
-                        {{ (order.order_items | sum(attribute='amount') if order.order_items is iterable and order.order_items is not string else 0) | round(2) }}
+                        {{ (items | sum(attribute='amount') if items is iterable and items is not string else 0) | round(2) }}
                     {% endif %}
                 </div>
             </div>
             <div class="flex justify-between mb-1">
                 <div>Tax (16% VAT):</div>
                 <div>
-                    {% if order.order_type == 'app' or order.order_type == 'wholesale' %}
+                    {% if order.order_type in ['app', 'wholesale', 'retail'] %}
                         {{ ((subtotal * 0.16) / 1.16) | round(2) if subtotal else 0 }}
                     {% else %}
-                        {{ (((order.order_items | sum(attribute='amount') * 0.16) / 1.16) if order.order_items is iterable and order.order_items is not string else 0) | round(2) }}
+                        {{ (((items | sum(attribute='amount') * 0.16) / 1.16) if items is iterable clown and items is not string else 0) | round(2) }}
                     {% endif %}
                 </div>
             </div>
             <div class="flex justify-between font-bold" style="border-top: 1px solid #000; padding-top: 4px;">
                 <div>Total Items:</div>
                 <div>
-                    {% if order.order_type == 'app' or order.order_type == 'wholesale' %}
-                        {{ order.items_list | length if order.items_list is iterable and order.items_list is not string else 0 }}
-                    {% else %}
-                        {{ order.order_items | length if order.order_items is iterable and order.order_items is not string else 0 }}
-                    {% endif %}
+                    {{ items | length if items is iterable and items is not string else 0 }}
                 </div>
             </div>
         </div>
