@@ -1632,6 +1632,7 @@ def reports():
     time_filter = request.args.get('time', 'month')
     now = datetime.now(NAIROBI_TZ)
 
+    # Set start date based on time filter
     if time_filter == 'day':
         start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     elif time_filter == 'week':
@@ -1644,38 +1645,41 @@ def reports():
     else:
         start = None
 
+    # Fetch orders
     orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).stream()
     orders = []
     for doc in orders_ref:
         order_dict = doc.to_dict()
         order_date = process_date(order_dict.get('date'))
-        if start and order_date < start:
+        if start and order_date and order_date < start:
             continue
         orders.append({
             'receipt_id': order_dict.get('receipt_id', doc.id),
             'salesperson_name': order_dict.get('salesperson_name', 'N/A'),
             'shop_name': order_dict.get('shop_name', 'Unknown Shop'),
-            'items': process_items(order_dict.get('items')),
+            'items': order_dict.get('items_list', []),  # Use items_list for consistency with receipt template
             'payment': order_dict.get('payment', 0),
             'balance': order_dict.get('balance', 0),
             'date': order_date,
-            'closed_date': process_date(order_dict.get('closed_date', None)) if order_dict.get('closed_date') else None,
+            'closed_date': process_date(order_dict.get('closed_date')) if order_dict.get('closed_date') else None,
             'order_type': order_dict.get('order_type', 'wholesale')
         })
 
+    # Fetch retail sales
     retail_sales = []
     retail_ref = db.collection('retail').order_by('date', direction=firestore.Query.DESCENDING).stream()
     for doc in retail_ref:
         retail_dict = doc.to_dict()
-        retail_date = process_date(datetime.strptime(retail_dict.get('date'), '%Y-%m-%d'))
-        if start and retail_date < start:
+        retail_date = process_date(retail_dict.get('date'))  # Handle DatetimeWithNanoseconds directly
+        if start and retail_date and retail_date < start:
             continue
         retail_dict['date'] = retail_date
         retail_sales.append(retail_dict)
 
-    total_sales_retail = sum(o['payment'] for o in orders if o['order_type'] == 'retail') + sum(r['amount'] for r in retail_sales)
+    # Calculate metrics
+    total_sales_retail = sum(o['payment'] for o in orders if o['order_type'] == 'retail') + sum(r.get('amount', 0) for r in retail_sales)
     total_sales_wholesale = sum(o['payment'] for o in orders if o['order_type'] == 'wholesale')
-    total_paid_retail = sum(o['payment'] for o in orders if o['order_type'] == 'retail') + sum(r['amount'] for r in retail_sales)
+    total_paid_retail = sum(o['payment'] for o in orders if o['order_type'] == 'retail') + sum(r.get('amount', 0) for r in retail_sales)
     total_paid_wholesale = sum(o['payment'] for o in orders if o['order_type'] == 'wholesale')
     total_debt_retail = sum(o['balance'] for o in orders if o['order_type'] == 'retail' and o['balance'] > 0)
     total_debt_wholesale = sum(o['balance'] for o in orders if o['order_type'] == 'wholesale' and o['balance'] > 0)
@@ -1683,6 +1687,7 @@ def reports():
     total_money_bank_wholesale = total_paid_wholesale
     total_debt = total_debt_retail + total_debt_wholesale
 
+    # Chart data
     chart_data = {
         'sales_vs_debts': {
             'labels': ['Retail Sales', 'Wholesale Sales', 'Retail Debt', 'Wholesale Debt'],
@@ -1701,16 +1706,36 @@ def reports():
         }
     }
 
-    stock_logs = [doc.to_dict() for doc in db.collection('stock_logs').order_by('timestamp', direction=firestore.Query.DESCENDING).get()]
-    expenses = [doc.to_dict() for doc in db.collection('expenses').order_by('date', direction=firestore.Query.DESCENDING).get()]
-    user_actions = [doc.to_dict() for doc in db.collection('user_actions').order_by('timestamp', direction=firestore.Query.DESCENDING).get()]
-    recent_activity = [{'receipt_id': doc.to_dict().get('receipt_id', doc.id), 'salesperson_name': doc.to_dict().get('salesperson_name', 'N/A'), 
-                        'shop_name': doc.to_dict().get('shop_name', 'Unknown Shop'), 'date': process_date(doc.to_dict().get('date'))} 
-                       for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).limit(3).get()]
+    # Fetch logs
+    stock_logs = []
+    for doc in db.collection('stock_logs').order_by('timestamp', direction=firestore.Query.DESCENDING).stream():
+        log = doc.to_dict()
+        log['timestamp'] = process_date(log.get('timestamp'))
+        stock_logs.append(log)
+
+    expenses = []
+    for doc in db.collection('expenses').order_by('date', direction=firestore.Query.DESCENDING).stream():
+        expense = doc.to_dict()
+        expense['date'] = process_date(expense.get('date'))
+        expenses.append(expense)
+
+    user_actions = []
+    for doc in db.collection('user_actions').order_by('timestamp', direction=firestore.Query.DESCENDING).stream():
+        action = doc.to_dict()
+        action['timestamp'] = process_date(action.get('timestamp'))
+        user_actions.append(action)
+
+    recent_activity = [
+        {
+            'receipt_id': doc.to_dict().get('receipt_id', doc.id),
+            'salesperson_name': doc.to_dict().get('salesperson_name', 'N/A'),
+            'shop_name': doc.to_dict().get('shop_name', 'Unknown Shop'),
+            'date': process_date(doc.to_dict().get('date'))
+        } for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).limit(3).stream()
+    ]
 
     return render_template('reports.html', orders=orders, stock_logs=stock_logs, expenses=expenses, user_actions=user_actions,
-                          recent_activity=recent_activity, chart_data=chart_data, time_filter=time_filter, total_debt=total_debt)
-        
+                          recent_activity=recent_activity, chart_data=chart_data, time_filter=time_filter, total_debt=total_debt)       
 
 @app.route('/return_stock/<order_id>', methods=['POST'])
 @no_cache
