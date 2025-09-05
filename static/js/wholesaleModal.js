@@ -7,7 +7,7 @@ const wholesaleAmountPaid = document.getElementById('wholesale-amount-paid');
 let currentContainer = wholesaleContainer;
 
 function openWholesaleModal() {
-    console.log('Opening wholesale modal, userRole:', window.userRole); // Debug role
+    console.log('Opening wholesale modal, userRole:', window.userRole);
     document.querySelectorAll('.modal').forEach(modal => modal.classList.add('hidden'));
     resetModal(wholesaleContainer);
     wholesaleModal.classList.remove('hidden');
@@ -46,14 +46,14 @@ function handleAddItemClick(event) {
 
 async function addItem(container) {
     const isManager = window.userRole === 'manager';
-    console.log('Adding item, isManager:', isManager); // Debug manager check
+    console.log('Adding item, isManager:', isManager);
     const div = document.createElement('div');
     div.className = 'grid grid-cols-6 gap-2 item-row';
     div.innerHTML = `
         <select name="items[]" class="col-span-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-select w-full">
             <option value="">Search or select a product</option>
         </select>
-        <input name="items[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="0.01">
+        <input name="items[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="0.01" disabled>
         <input type="number" class="price-display p-2 border rounded-lg text-center w-full" ${isManager ? '' : 'readonly'} step="0.01" min="0">
         <input type="number" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
         <input type="number" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
@@ -63,6 +63,7 @@ async function addItem(container) {
     container.insertBefore(div, addBtn);
 
     const select = div.querySelector('.product-select');
+    const qtyInput = div.querySelector('.qty-input');
     const choices = new Choices(select, {
         searchEnabled: true,
         searchChoices: true,
@@ -111,6 +112,7 @@ function attachPriceListener(row) {
             priceDisplay.value = basePrice.toFixed(2);
             stockDisplay.value = maxStock.toFixed(2);
             qtyInput.max = maxStock;
+            qtyInput.disabled = false; // Enable quantity input
             const qty = parseFloat(qtyInput.value) || 0;
             if (qty > maxStock) {
                 qtyInput.value = maxStock;
@@ -125,13 +127,15 @@ function attachPriceListener(row) {
             stockDisplay.value = '';
             totalDisplay.value = '';
             qtyInput.max = '';
+            qtyInput.disabled = true; // Disable quantity input
+            qtyInput.value = '';
             updateSubtotal(row.closest('.space-y-4'));
         }
     });
 
     qtyInput.addEventListener('input', () => {
         const qty = parseFloat(qtyInput.value) || 0;
-        if (qty > maxStock) {
+        if (maxStock !== undefined && qty > maxStock) {
             qtyInput.value = maxStock;
             showModalError(row.closest('.modal').id.split('-')[0], `Cannot order more than ${maxStock} units.`);
         }
@@ -141,7 +145,7 @@ function attachPriceListener(row) {
     });
 
     if (window.userRole === 'manager') {
-        console.log('Attaching price edit listener for manager'); // Debug price edit
+        console.log('Attaching price edit listener for manager');
         priceDisplay.addEventListener('input', () => {
             const qty = parseFloat(qtyInput.value) || 0;
             const newPrice = parseFloat(priceDisplay.value) || 0;
