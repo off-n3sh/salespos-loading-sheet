@@ -8,8 +8,11 @@ let currentContainer = wholesaleContainer;
 let eventListeners = [];
 
 function openWholesaleModal() {
+    if (!wholesaleModal) {
+        console.warn('Wholesale modal not found');
+        return;
+    }
     console.log('Opening wholesale modal, userRole:', window.userRole);
-    if (!wholesaleModal) return;
     document.querySelectorAll('.modal').forEach(modal => modal.classList.add('hidden'));
     resetModal(wholesaleContainer);
     wholesaleModal.classList.remove('hidden');
@@ -19,7 +22,10 @@ function openWholesaleModal() {
 }
 
 function resetModal(container) {
-    if (!container) return;
+    if (!container) {
+        console.warn('Container not found');
+        return;
+    }
     const header = container.querySelector('.item-row-header');
     const initialAddBtn = container.querySelector('.add-item-btn');
     container.innerHTML = '';
@@ -37,7 +43,10 @@ function resetModal(container) {
 }
 
 function attachAddItemListeners(container) {
-    if (!container) return;
+    if (!container) {
+        console.warn('Container not found for add item listeners');
+        return;
+    }
     container.removeEventListener('click', handleAddItemClick);
     container.addEventListener('click', handleAddItemClick);
     eventListeners.push({ element: container, type: 'click', handler: handleAddItemClick });
@@ -50,7 +59,10 @@ function handleAddItemClick(event) {
 }
 
 async function addItem(container) {
-    if (!container || !wholesaleModal || wholesaleModal.classList.contains('hidden')) return;
+    if (!container || !wholesaleModal || wholesaleModal.classList.contains('hidden')) {
+        console.warn('Skipping addItem: modal is hidden or not found');
+        return;
+    }
     const isManager = window.userRole === 'manager';
     console.log('Adding item, isManager:', isManager);
     const div = document.createElement('div');
@@ -88,6 +100,7 @@ async function addItem(container) {
         }));
         choices.setChoices(choicesData, 'value', 'label', true);
     } catch (error) {
+        console.error('Failed to load stock items:', error);
         showModalError(container.id.split('-')[0], 'Failed to load stock items.');
     }
 
@@ -103,32 +116,46 @@ async function addItem(container) {
 }
 
 function attachPriceListener(row) {
-    if (!row || !wholesaleModal || wholesaleModal.classList.contains('hidden')) return;
+    if (!row || !wholesaleModal || wholesaleModal.classList.contains('hidden')) {
+        console.warn('Skipping attachPriceListener: modal is hidden or row not found');
+        return;
+    }
     const select = row.querySelector('.product-select');
     const priceDisplay = row.querySelector('.price-display');
     const stockDisplay = row.querySelector('.stock-display');
     const totalDisplay = row.querySelector('.total-display');
     const qtyInput = row.querySelector('.qty-input');
     let basePrice = 0;
+    let maxStock = 0;
 
     const selectHandler = () => {
-        if (!wholesaleModal || wholesaleModal.classList.contains('hidden')) return;
+        if (!wholesaleModal || wholesaleModal.classList.contains('hidden')) {
+            console.warn('Skipping selectHandler: modal is hidden');
+            return;
+        }
         const selectedOption = select.options[select.selectedIndex];
         if (selectedOption.value) {
             const values = selectedOption.value.split('|');
             basePrice = parseFloat(values[5]) || 0;
-            const stock = parseFloat(values[7]) || 0;
+            maxStock = parseFloat(values[7]) || 0;
             priceDisplay.value = basePrice.toFixed(2);
-            stockDisplay.value = stock.toFixed(2);
+            stockDisplay.value = maxStock.toFixed(2);
+            qtyInput.max = maxStock;
             qtyInput.disabled = false;
             const qty = parseFloat(qtyInput.value) || 0;
+            if (maxStock !== undefined && qty > maxStock) {
+                qtyInput.value = maxStock;
+                showModalError(row.closest('.modal').id.split('-')[0], `Cannot order more than ${maxStock} units of ${values[1]}.`);
+            }
             totalDisplay.value = (basePrice * qty).toFixed(2);
             updateSubtotal(row.closest('.space-y-4'));
         } else {
             basePrice = 0;
+            maxStock = 0;
             priceDisplay.value = '';
             stockDisplay.value = '';
             totalDisplay.value = '';
+            qtyInput.max = '';
             qtyInput.disabled = true;
             qtyInput.value = '';
             updateSubtotal(row.closest('.space-y-4'));
@@ -138,8 +165,15 @@ function attachPriceListener(row) {
     eventListeners.push({ element: select, type: 'change', handler: selectHandler });
 
     const qtyHandler = () => {
-        if (!wholesaleModal || wholesaleModal.classList.contains('hidden')) return;
+        if (!wholesaleModal || wholesaleModal.classList.contains('hidden')) {
+            console.warn('Skipping qtyHandler: modal is hidden');
+            return;
+        }
         const qty = parseFloat(qtyInput.value) || 0;
+        if (maxStock !== undefined && qty > maxStock) {
+            qtyInput.value = maxStock;
+            showModalError(row.closest('.modal').id.split('-')[0], `Cannot order more than ${maxStock} units.`);
+        }
         const currentPrice = window.userRole === 'manager' ? parseFloat(priceDisplay.value) || basePrice : basePrice;
         totalDisplay.value = (currentPrice * qty).toFixed(2);
         updateSubtotal(row.closest('.space-y-4'));
@@ -150,7 +184,10 @@ function attachPriceListener(row) {
     if (window.userRole === 'manager') {
         console.log('Attaching price edit listener for manager');
         const priceHandler = () => {
-            if (!wholesaleModal || wholesaleModal.classList.contains('hidden')) return;
+            if (!wholesaleModal || wholesaleModal.classList.contains('hidden')) {
+                console.warn('Skipping priceHandler: modal is hidden');
+                return;
+            }
             const qty = parseFloat(qtyInput.value) || 0;
             const newPrice = parseFloat(priceDisplay.value) || 0;
             totalDisplay.value = (newPrice * qty).toFixed(2);
@@ -163,75 +200,86 @@ function attachPriceListener(row) {
 
 function cleanupEventListeners() {
     eventListeners.forEach(({ element, type, handler }) => {
-        element.removeEventListener(type, handler);
+        if (element) {
+            element.removeEventListener(type, handler);
+        }
     });
     eventListeners = [];
 }
 
-closeWholesale.addEventListener('click', () => {
-    resetModal(wholesaleContainer);
-    wholesaleModal.classList.add('hidden');
-    cleanupEventListeners();
-});
-eventListeners.push({ element: closeWholesale, type: 'click', handler: () => {
-    resetModal(wholesaleContainer);
-    wholesaleModal.classList.add('hidden');
-    cleanupEventListeners();
-} });
+if (closeWholesale) {
+    const closeHandler = () => {
+        resetModal(wholesaleContainer);
+        wholesaleModal.classList.add('hidden');
+        cleanupEventListeners();
+    };
+    closeWholesale.addEventListener('click', closeHandler);
+    eventListeners.push({ element: closeWholesale, type: 'click', handler: closeHandler });
+}
 
-wholesaleAmountPaid.addEventListener('input', () => {
-    if (!wholesaleModal || wholesaleModal.classList.contains('hidden')) return;
-    updateChange(wholesaleContainer);
-});
-eventListeners.push({ element: wholesaleAmountPaid, type: 'input', handler: () => {
-    if (!wholesaleModal || wholesaleModal.classList.contains('hidden')) return;
-    updateChange(wholesaleContainer);
-} });
-
-document.getElementById('wholesale-form').addEventListener('submit', function(e) {
-    e.preventDefault();
-    if (!wholesaleModal || wholesaleModal.classList.contains('hidden')) return;
-    const submitBtn = this.querySelector('.submit-btn');
-    submitBtn.classList.add('processing');
-    submitBtn.disabled = true;
-
-    const formData = new FormData(this);
-    const itemRows = wholesaleContainer.querySelectorAll('.item-row');
-    const items = [];
-    itemRows.forEach(row => {
-        const select = row.querySelector('.product-select');
-        const qtyInput = row.querySelector('.qty-input');
-        const priceInput = row.querySelector('.price-display');
-        if (select.value && qtyInput.value) {
-            const values = select.value.split('|');
-            values[5] = parseFloat(priceInput.value) || parseFloat(values[5]);
-            items.push(values.join('|'));
-            items.push(qtyInput.value);
+if (wholesaleAmountPaid) {
+    const amountPaidHandler = () => {
+        if (!wholesaleModal || wholesaleModal.classList.contains('hidden')) {
+            console.warn('Skipping amountPaidHandler: modal is hidden');
+            return;
         }
-    });
-    formData.delete('items[]');
-    items.forEach(item => formData.append('items[]', item));
+        updateChange(wholesaleContainer);
+    };
+    wholesaleAmountPaid.addEventListener('input', amountPaidHandler);
+    eventListeners.push({ element: wholesaleAmountPaid, type: 'input', handler: amountPaidHandler });
+}
 
-    fetch(this.action, {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => {
-        if (response.ok) {
-            wholesaleModal.classList.add('hidden');
-            cleanupEventListeners();
-            window.location.reload();
-        } else {
-            response.text().then(text => showModalError('wholesale', 'Error submitting wholesale order: ' + text));
+const wholesaleForm = document.getElementById('wholesale-form');
+if (wholesaleForm) {
+    wholesaleForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        if (!wholesaleModal || wholesaleModal.classList.contains('hidden')) {
+            console.warn('Skipping form submission: modal is hidden');
+            return;
+        }
+        const submitBtn = this.querySelector('.submit-btn');
+        submitBtn.classList.add('processing');
+        submitBtn.disabled = true;
+
+        const formData = new FormData(this);
+        const itemRows = wholesaleContainer.querySelectorAll('.item-row');
+        const items = [];
+        itemRows.forEach(row => {
+            const select = row.querySelector('.product-select');
+            const qtyInput = row.querySelector('.qty-input');
+            const priceInput = row.querySelector('.price-display');
+            if (select.value && qtyInput.value) {
+                const values = select.value.split('|');
+                values[5] = parseFloat(priceInput.value) || parseFloat(values[5]);
+                items.push(values.join('|'));
+                items.push(qtyInput.value);
+            }
+        });
+        formData.delete('items[]');
+        items.forEach(item => formData.append('items[]', item));
+
+        fetch(this.action, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (response.ok) {
+                wholesaleModal.classList.add('hidden');
+                cleanupEventListeners();
+                window.location.reload();
+            } else {
+                response.text().then(text => showModalError('wholesale', 'Error submitting wholesale order: ' + text));
+                submitBtn.classList.remove('processing');
+                submitBtn.disabled = false;
+            }
+        })
+        .catch(error => {
+            console.error('Form submission error:', error);
+            showModalError('wholesale', 'An error occurred while submitting the wholesale order.');
             submitBtn.classList.remove('processing');
             submitBtn.disabled = false;
-        }
-    })
-    .catch(error => {
-        showModalError('wholesale', 'An error occurred while submitting the wholesale order.');
-        submitBtn.classList.remove('processing');
-        submitBtn.disabled = false;
+        });
     });
-});
+}
 
 export { openWholesaleModal, addItem, resetModal, attachPriceListener };
