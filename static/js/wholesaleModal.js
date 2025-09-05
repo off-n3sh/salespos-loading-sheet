@@ -7,6 +7,7 @@ const wholesaleAmountPaid = document.getElementById('wholesale-amount-paid');
 let currentContainer = wholesaleContainer;
 
 function openWholesaleModal() {
+    console.log('Opening wholesale modal, userRole:', window.userRole); // Debug role
     document.querySelectorAll('.modal').forEach(modal => modal.classList.add('hidden'));
     resetModal(wholesaleContainer);
     wholesaleModal.classList.remove('hidden');
@@ -44,10 +45,10 @@ function handleAddItemClick(event) {
 }
 
 async function addItem(container) {
+    const isManager = window.userRole === 'manager';
+    console.log('Adding item, isManager:', isManager); // Debug manager check
     const div = document.createElement('div');
     div.className = 'grid grid-cols-6 gap-2 item-row';
-    // Remove readonly for managers
-    const isManager = window.userRole === 'manager';
     div.innerHTML = `
         <select name="items[]" class="col-span-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-select w-full">
             <option value="">Search or select a product</option>
@@ -139,8 +140,8 @@ function attachPriceListener(row) {
         updateSubtotal(row.closest('.space-y-4'));
     });
 
-    // Allow managers to edit price
     if (window.userRole === 'manager') {
+        console.log('Attaching price edit listener for manager'); // Debug price edit
         priceDisplay.addEventListener('input', () => {
             const qty = parseFloat(qtyInput.value) || 0;
             const newPrice = parseFloat(priceDisplay.value) || 0;
@@ -163,7 +164,6 @@ document.getElementById('wholesale-form').addEventListener('submit', function(e)
     submitBtn.classList.add('processing');
     submitBtn.disabled = true;
 
-    // Modify form data to use edited prices
     const formData = new FormData(this);
     const itemRows = wholesaleContainer.querySelectorAll('.item-row');
     const items = [];
@@ -173,7 +173,7 @@ document.getElementById('wholesale-form').addEventListener('submit', function(e)
         const priceInput = row.querySelector('.price-display');
         if (select.value && qtyInput.value) {
             const values = select.value.split('|');
-            values[5] = parseFloat(priceInput.value) || parseFloat(values[5]); // Use edited price
+            values[5] = parseFloat(priceInput.value) || parseFloat(values[5]);
             items.push(values.join('|'));
             items.push(qtyInput.value);
         }

@@ -15,7 +15,7 @@
             </button>
             {% if session['user']['role'] == 'manager' %}
             <button type="button" id="open-expense-modal" class="btn bg-purple-500 text-white hover:bg-purple-600 px-4 py-2 rounded-lg">
-            Add Expense
+                Add Expense
             </button>
             {% endif %}
         </div>
@@ -33,64 +33,64 @@
         </div>
     </div>
 
-<!-- Orders Table -->
-<div class="overflow-x-auto">
-    <table id="orders-table" class="min-w-full bg-white dark:bg-gray-800 rounded-lg shadow-md">
-        <thead>
-            <tr class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 uppercase text-sm leading-normal">
-                <th class="py-3 px-6 text-left">Order #</th>
-                <th class="py-3 px-6 text-left">Client</th>
-                <th class="py-3 px-6 text-center">Total Items</th>
-                <th class="py-3 px-6 text-center">Date</th>
-                <th class="py-3 px-6 text-center">Payment (KSh)</th>
-                <th class="py-3 px-6 text-center">Balance (KSh)</th>
-                <th class="py-3 px-6 text-center">Actions</th>
-            </tr>
-        </thead>
-        <tbody id="orders-tbody" class="text-gray-600 dark:text-gray-300 text-sm font-light">
-            {% for order in orders %}
-            <tr class="order-row border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 
-                {{ 'border-l-4 border-yellow-500' if order.balance > 0 else 'border-l-4 border-green-500' }}"
-                data-order-type="{{ order.order_type }}"
-                data-receipt-id="{{ order.receipt_id }}"
-                data-balance="{{ order.balance }}"
-                data-date="{{ order.date.strftime('%Y-%m-%d') }}"
-                data-search="{{ order.receipt_id ~ ' ' ~ (order.shop_name or 'Retail Sale') ~ ' ' ~ order.order_type }}">
-                <td class="py-3 px-6 text-left whitespace-nowrap">{{ order.receipt_id }}</td>
-                <td class="py-3 px-6 text-left">
-                    {{ order.shop_name or 'Retail Sale' }}
-                    <br>
-                    <span class="text-xs font-medium {{ 'text-blue-500' if order.order_type == 'retail' else 'text-green-500' }}">
-                        {{ order.order_type|capitalize }}
-                    </span>
-                </td>
-                <td class="py-3 px-6 text-center">{{ order.total_items }}</td>
-                <td class="py-3 px-6 text-center">{{ order.date.strftime('%d/%m/%Y') }}</td>
-                <td class="py-3 px-6 text-center">{{ order.payment | round(2) }}</td>
-                <td class="py-3 px-6 text-center {{ 'text-red-600' if order.balance > 0 else 'text-green-600' }}">{{ order.balance | round(2) }}</td>
-                <td class="py-3 px-6 text-center relative">
-                    <button class="order-actions-btn p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700" aria-label="Order actions">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600 dark:text-gray-300" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                        </svg>
-                    </button>
-                    <div class="order-actions-menu hidden absolute right-6 top-12 w-48 bg-white dark:bg-gray-700 rounded-lg shadow-lg z-20 py-1">
-                        <a href="{{ url_for('receipt', order_id=order.receipt_id) }}" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600">View Receipt</a>
-                        {% if session.get('user', {}).get('role') == 'manager' or session.get('user', {}).get('firstName', '') + ' ' + session.get('user', {}).get('lastName', '') == order.salesperson_name %}
-                        <button class="edit-order-btn w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600" data-receipt-id="{{ order.receipt_id }}" data-order-type="{{ order.order_type }}" data-shop-name="{{ order.shop_name }}" data-items='{{ order.items_list|tojson|safe }}'>Edit Order</button>
-                        <button class="delete-order-btn w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-600" data-receipt-id="{{ order.receipt_id }}">Delete Order</button>
-                        {% if order.balance > 0 %}
-                        <button class="mark-paid-btn w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-gray-100 dark:hover:bg-gray-600" data-receipt-id="{{ order.receipt_id }}" data-balance="{{ order.balance }}">Mark as Paid</button>
-                        <button class="return-stock-btn w-full text-left px-4 py-2 text-sm text-yellow-600 hover:bg-gray-100 dark:hover:bg-gray-600" data-receipt-id="{{ order.receipt_id }}" data-items='{{ order.items_list|tojson|safe }}'>Return Stock</button>
-                        {% endif %}
-                        {% endif %}
-                    </div>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
+    <!-- Orders Table -->
+    <div class="overflow-x-auto">
+        <table id="orders-table" class="min-w-full bg-white dark:bg-gray-800 rounded-lg shadow-md">
+            <thead>
+                <tr class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 uppercase text-sm leading-normal">
+                    <th class="py-3 px-6 text-left">Order #</th>
+                    <th class="py-3 px-6 text-left">Client</th>
+                    <th class="py-3 px-6 text-center">Total Items</th>
+                    <th class="py-3 px-6 text-center">Date</th>
+                    <th class="py-3 px-6 text-center">Payment (KSh)</th>
+                    <th class="py-3 px-6 text-center">Balance (KSh)</th>
+                    <th class="py-3 px-6 text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="orders-tbody" class="text-gray-600 dark:text-gray-300 text-sm font-light">
+                {% for order in orders %}
+                <tr class="order-row border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 
+                    {{ 'border-l-4 border-yellow-500' if order.balance > 0 else 'border-l-4 border-green-500' }}"
+                    data-order-type="{{ order.order_type }}"
+                    data-receipt-id="{{ order.receipt_id }}"
+                    data-balance="{{ order.balance }}"
+                    data-date="{{ order.date.strftime('%Y-%m-%d') }}"
+                    data-search="{{ order.receipt_id ~ ' ' ~ (order.shop_name or 'Retail Sale') ~ ' ' ~ order.order_type }}">
+                    <td class="py-3 px-6 text-left whitespace-nowrap">{{ order.receipt_id }}</td>
+                    <td class="py-3 px-6 text-left">
+                        {{ order.shop_name or 'Retail Sale' }}
+                        <br>
+                        <span class="text-xs font-medium {{ 'text-blue-500' if order.order_type == 'retail' else 'text-green-500' }}">
+                            {{ order.order_type|capitalize }}
+                        </span>
+                    </td>
+                    <td class="py-3 px-6 text-center">{{ order.total_items }}</td>
+                    <td class="py-3 px-6 text-center">{{ order.date.strftime('%d/%m/%Y') }}</td>
+                    <td class="py-3 px-6 text-center">{{ order.payment | round(2) }}</td>
+                    <td class="py-3 px-6 text-center {{ 'text-red-600' if order.balance > 0 else 'text-green-600' }}">{{ order.balance | round(2) }}</td>
+                    <td class="py-3 px-6 text-center relative">
+                        <button class="order-actions-btn p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700" aria-label="Order actions">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600 dark:text-gray-300" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                            </svg>
+                        </button>
+                        <div class="order-actions-menu hidden absolute right-6 top-12 w-48 bg-white dark:bg-gray-700 rounded-lg shadow-lg z-20 py-1">
+                            <a href="{{ url_for('receipt', order_id=order.receipt_id) }}" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600">View Receipt</a>
+                            {% if session.get('user', {}).get('role') == 'manager' or session.get('user', {}).get('firstName', '') + ' ' + session.get('user', {}).get('lastName', '') == order.salesperson_name %}
+                            <button class="edit-order-btn w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600" data-receipt-id="{{ order.receipt_id }}" data-order-type="{{ order.order_type }}" data-shop-name="{{ order.shop_name }}" data-items='{{ order.items_list|tojson|safe }}'>Edit Order</button>
+                            <button class="delete-order-btn w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-600" data-receipt-id="{{ order.receipt_id }}">Delete Order</button>
+                            {% if order.balance > 0 %}
+                            <button class="mark-paid-btn w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-gray-100 dark:hover:bg-gray-600" data-receipt-id="{{ order.receipt_id }}" data-balance="{{ order.balance }}">Mark as Paid</button>
+                            <button class="return-stock-btn w-full text-left px-4 py-2 text-sm text-yellow-600 hover:bg-gray-100 dark:hover:bg-gray-600" data-receipt-id="{{ order.receipt_id }}" data-items='{{ order.items_list|tojson|safe }}'>Return Stock</button>
+                            {% endif %}
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
     <!-- Pagination -->
     <div class="mt-4 flex justify-between items-center">
         <button id="prev-page" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50" disabled>Previous</button>
@@ -297,6 +297,9 @@
 </div>
 
 <!-- External CSS and JavaScript -->
+<script>
+    window.userRole = '{{ session["user"]["role"] }}';
+</script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
 <link rel="stylesheet" href="/static/css/styles.css" />
 <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
