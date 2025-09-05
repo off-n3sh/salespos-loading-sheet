@@ -86,19 +86,11 @@
             </div>
             <div class="flex justify-between mb-1">
                 <div><strong>VAT (16%):</strong></div>
-                <div style="font-weight: bold;">
-                    {% set subtotal = 0 %}
-                    {% if order.items_list is iterable and order.items_list is not string %}
-                        {% for item in order.items_list %}
-                            {% set subtotal = subtotal + (item.quantity | default(0) * item.price | default(0)) %}
-                        {% endfor %}
-                    {% endif %}
-                    {{ ((subtotal * 0.16) / 1.16) | round(2) if subtotal else 0 }}
-                </div>
+                <div style="font-weight: bold;">{{ ((order.subtotal * 0.16) / 1.16) | round(2) if order.subtotal else 0 }}</div>
             </div>
             <div class="flex justify-between mb-2" style="font-size: 14px;">
                 <div><strong>Subtotal:</strong></div>
-                <div style="font-weight: bold;">{{ subtotal | round(2) }}</div>
+                <div style="font-weight: bold;">{{ order.subtotal | round(2) }}</div>
             </div>
         </div>
 
@@ -121,7 +113,7 @@
             {% endif %}
             <div class="flex justify-between font-bold">
                 <div>Change:</div>
-                <div>0</div>
+                <div>{{ (order.payment - order.subtotal) | round(2) if order.payment > order.subtotal else 0 }}</div>
             </div>
         </div>
 
