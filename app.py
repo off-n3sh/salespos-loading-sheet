@@ -2388,7 +2388,7 @@ def receipt(receipt_id):
         order_data = order.to_dict()
         return render_template('receipt.html', order=order_data)
     except Exception as e:
-        logger.error(f"Error fetching receipt {receipt_id}: {str(e)}")
+        logger.error(f"Error fetching receipts {receipt_id}: {str(e)}")
         return render_template('error.html', error=str(e)), 500
 @app.route('/delete_order/<receipt_id>', methods=['POST'])
 @login_required
