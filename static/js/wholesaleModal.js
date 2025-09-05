@@ -5,11 +5,11 @@ const closeWholesale = document.getElementById('close-wholesale-modal');
 const wholesaleContainer = document.getElementById('wholesale-items-container');
 const wholesaleAmountPaid = document.getElementById('wholesale-amount-paid');
 let currentContainer = wholesaleContainer;
-let eventListeners = []; // Store listeners for cleanup
+let eventListeners = [];
 
 function openWholesaleModal() {
     console.log('Opening wholesale modal, userRole:', window.userRole);
-    if (!wholesaleModal) return; // Guard against null modal
+    if (!wholesaleModal) return;
     document.querySelectorAll('.modal').forEach(modal => modal.classList.add('hidden'));
     resetModal(wholesaleContainer);
     wholesaleModal.classList.remove('hidden');
@@ -19,7 +19,7 @@ function openWholesaleModal() {
 }
 
 function resetModal(container) {
-    if (!container) return; // Guard against null container
+    if (!container) return;
     const header = container.querySelector('.item-row-header');
     const initialAddBtn = container.querySelector('.add-item-btn');
     container.innerHTML = '';
@@ -37,7 +37,7 @@ function resetModal(container) {
 }
 
 function attachAddItemListeners(container) {
-    if (!container) return; // Guard against null container
+    if (!container) return;
     container.removeEventListener('click', handleAddItemClick);
     container.addEventListener('click', handleAddItemClick);
     eventListeners.push({ element: container, type: 'click', handler: handleAddItemClick });
@@ -50,7 +50,7 @@ function handleAddItemClick(event) {
 }
 
 async function addItem(container) {
-    if (!container || !wholesaleModal || wholesaleModal.classList.contains('hidden')) return; // Skip if modal is hidden
+    if (!container || !wholesaleModal || wholesaleModal.classList.contains('hidden')) return;
     const isManager = window.userRole === 'manager';
     console.log('Adding item, isManager:', isManager);
     const div = document.createElement('div');
@@ -103,40 +103,32 @@ async function addItem(container) {
 }
 
 function attachPriceListener(row) {
-    if (!row || !wholesaleModal || wholesaleModal.classList.contains('hidden')) return; // Skip if modal is hidden
+    if (!row || !wholesaleModal || wholesaleModal.classList.contains('hidden')) return;
     const select = row.querySelector('.product-select');
     const priceDisplay = row.querySelector('.price-display');
     const stockDisplay = row.querySelector('.stock-display');
     const totalDisplay = row.querySelector('.total-display');
     const qtyInput = row.querySelector('.qty-input');
     let basePrice = 0;
-    let maxStock = 0;
 
     const selectHandler = () => {
-        if (!wholesaleModal || wholesaleModal.classList.contains('hidden')) return; // Skip if modal is hidden
+        if (!wholesaleModal || wholesaleModal.classList.contains('hidden')) return;
         const selectedOption = select.options[select.selectedIndex];
         if (selectedOption.value) {
             const values = selectedOption.value.split('|');
             basePrice = parseFloat(values[5]) || 0;
-            maxStock = parseFloat(values[7]) || 0;
+            const stock = parseFloat(values[7]) || 0;
             priceDisplay.value = basePrice.toFixed(2);
-            stockDisplay.value = maxStock.toFixed(2);
-            qtyInput.max = maxStock;
+            stockDisplay.value = stock.toFixed(2);
             qtyInput.disabled = false;
             const qty = parseFloat(qtyInput.value) || 0;
-            if (qty > maxStock) {
-                qtyInput.value = maxStock;
-                showModalError(row.closest('.modal').id.split('-')[0], `Cannot order more than ${maxStock} units of ${values[1]}.`);
-            }
             totalDisplay.value = (basePrice * qty).toFixed(2);
             updateSubtotal(row.closest('.space-y-4'));
         } else {
             basePrice = 0;
-            maxStock = 0;
             priceDisplay.value = '';
             stockDisplay.value = '';
             totalDisplay.value = '';
-            qtyInput.max = '';
             qtyInput.disabled = true;
             qtyInput.value = '';
             updateSubtotal(row.closest('.space-y-4'));
@@ -146,12 +138,8 @@ function attachPriceListener(row) {
     eventListeners.push({ element: select, type: 'change', handler: selectHandler });
 
     const qtyHandler = () => {
-        if (!wholesaleModal || wholesaleModal.classList.contains('hidden')) return; // Skip if modal is hidden
+        if (!wholesaleModal || wholesaleModal.classList.contains('hidden')) return;
         const qty = parseFloat(qtyInput.value) || 0;
-        if (maxStock !== undefined && qty > maxStock) {
-            qtyInput.value = maxStock;
-            showModalError(row.closest('.modal').id.split('-')[0], `Cannot order more than ${maxStock} units.`);
-        }
         const currentPrice = window.userRole === 'manager' ? parseFloat(priceDisplay.value) || basePrice : basePrice;
         totalDisplay.value = (currentPrice * qty).toFixed(2);
         updateSubtotal(row.closest('.space-y-4'));
@@ -162,7 +150,7 @@ function attachPriceListener(row) {
     if (window.userRole === 'manager') {
         console.log('Attaching price edit listener for manager');
         const priceHandler = () => {
-            if (!wholesaleModal || wholesaleModal.classList.contains('hidden')) return; // Skip if modal is hidden
+            if (!wholesaleModal || wholesaleModal.classList.contains('hidden')) return;
             const qty = parseFloat(qtyInput.value) || 0;
             const newPrice = parseFloat(priceDisplay.value) || 0;
             totalDisplay.value = (newPrice * qty).toFixed(2);
@@ -192,7 +180,7 @@ eventListeners.push({ element: closeWholesale, type: 'click', handler: () => {
 } });
 
 wholesaleAmountPaid.addEventListener('input', () => {
-    if (!wholesaleModal || wholesaleModal.classList.contains('hidden')) return; // Skip if modal is hidden
+    if (!wholesaleModal || wholesaleModal.classList.contains('hidden')) return;
     updateChange(wholesaleContainer);
 });
 eventListeners.push({ element: wholesaleAmountPaid, type: 'input', handler: () => {
@@ -202,7 +190,7 @@ eventListeners.push({ element: wholesaleAmountPaid, type: 'input', handler: () =
 
 document.getElementById('wholesale-form').addEventListener('submit', function(e) {
     e.preventDefault();
-    if (!wholesaleModal || wholesaleModal.classList.contains('hidden')) return; // Skip if modal is hidden
+    if (!wholesaleModal || wholesaleModal.classList.contains('hidden')) return;
     const submitBtn = this.querySelector('.submit-btn');
     submitBtn.classList.add('processing');
     submitBtn.disabled = true;
