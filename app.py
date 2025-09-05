@@ -1545,135 +1545,64 @@ def receipts():
         return f"Error loading receipts: {str(e)}", 500
         
 
-from flask import render_template, url_for
-import firestore
-import logging
-from functools import wraps
-from flask_login import login_required
-
-logger = logging.getLogger(__name__)
-
-def no_cache(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        response = f(*args, **kwargs)
-        if isinstance(response, tuple):
-            response = response[0]
-        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-        response.headers["Pragma"] = "no-cache"
-        response.headers["Expires"] = "0"
-        return response
-    return decorated_function
-
-def process_date(date):
-    if date:
-        try:
-            return date.to_pydatetime()
-        except AttributeError:
-            return date
-    return None
-
 @app.route('/receipt/<order_id>')
 @no_cache
 @login_required
 def receipt(order_id):
     """Display a specific receipt."""
     try:
-        logger.info(f"Starting receipt route for order_id: {order_id}")
         db = firestore.Client()
-        logger.info("Connected to Firestore")
-
-        # Fetch order
-        logger.info(f"Querying orders collection for receipt_id: {order_id}")
         orders_ref = db.collection('orders').where('receipt_id', '==', order_id).limit(1).stream()
         order_doc = next(orders_ref, None)
         if not order_doc:
-            logger.error(f"Order not found for receipt_id: {order_id}")
             return "Order not found", 404
-        
         order_dict = order_doc.to_dict()
-        logger.info(f"Order found: {order_dict}")
         items_raw = order_dict.get('items', [])
         items_list = []
-        subtotal_amount = 0.0
-        logger.info(f"Items raw: {items_raw}, Type: {type(items_raw)}")
+        subtotal_amount = 0  # This will be our subtotal
 
-        # Process items based on order_type
+        # Process items_raw based on order_type
         if order_dict.get('order_type') == 'app' and isinstance(items_raw, list) and items_raw and isinstance(items_raw[0], dict):
-            logger.info("Processing app order items (list of dicts)")
-            for i, item in enumerate(items_raw):
-                try:
-                    logger.info(f"Processing app item {i}: {item}")
-                    quantity = float(item.get('quantity', 0))
-                    price = float(item.get('price', 0.0))
+            # App order: items is a list of maps
+            for item in items_raw:
+                quantity = int(item.get('quantity', '0'))
+                price = float(item.get('price', '0.0'))
+                amount = quantity * price
+                subtotal_amount += amount  # Accumulate subtotal
+                items_list.append({
+                    'name': item.get('product', 'Unknown'),
+                    'quantity': quantity,
+                    'price': price,
+                    'amount': amount
+                })
+        else:
+            # Web order: flat array
+            i = 0
+            while i < len(items_raw):
+                if items_raw[i] == 'product':
+                    product_name = items_raw[i + 1]
+                    quantity_str = str(items_raw[i + 3]) if i + 2 < len(items_raw) and items_raw[i + 2] == 'quantity' else '0'
+                    price_str = str(items_raw[i + 5]) if i + 4 < len(items_raw) and items_raw[i + 4] == 'price' else '0'
+                    quantity = int(quantity_str) if quantity_str.isdigit() else 0
+                    price = float(price_str) if price_str.replace('.', '').replace('-', '').isdigit() else 0.0
                     amount = quantity * price
-                    subtotal_amount += amount
+                    subtotal_amount += amount  # Accumulate subtotal
                     items_list.append({
-                        'name': item.get('product', 'Unknown'),
+                        'name': product_name,
                         'quantity': quantity,
                         'price': price,
                         'amount': amount
                     })
-                    logger.info(f"App item {i} processed: Qty={quantity}, Price={price}, Amount={amount}")
-                except (ValueError, TypeError) as e:
-                    logger.error(f"Error processing app item {i}: {str(e)}")
-                    continue
-        else:
-            logger.info("Processing web order items (flat array)")
-            i = 0
-            while i < len(items_raw):
-                try:
-                    if items_raw[i] == 'product':
-                        product_name = items_raw[i + 1] if i + 1 < len(items_raw) else 'Unknown'
-                        quantity = 0
-                        if i + 2 < len(items_raw) and items_raw[i + 2] == 'quantity':
-                            try:
-                                quantity = float(items_raw[i + 3]) if i + 3 < len(items_raw) else 0
-                            except (ValueError, TypeError):
-                                quantity = 0
-                        price = 0.0
-                        if i + 4 < len(items_raw) and items_raw[i + 4] == 'price':
-                            try:
-                                price = float(items_raw[i + 5]) if i + 5 < len(items_raw) else 0.0
-                            except (ValueError, TypeError):
-                                price = 0.0
-                        amount = quantity * price
-                        subtotal_amount += amount
-                        items_list.append({
-                            'name': product_name,
-                            'quantity': quantity,
-                            'price': price,
-                            'amount': amount
-                        })
-                        logger.info(f"Web item processed: {product_name}, Qty={quantity}, Price={price}, Amount={amount}")
-                        i += 6
-                    else:
-                        logger.warning(f"Skipping invalid item at index {i}: {items_raw[i]}")
-                        i += 1
-                except Exception as e:
-                    logger.error(f"Error processing web item at index {i}: {str(e)}")
+                    i += 6
+                else:
                     i += 1
 
-        logger.info(f"Subtotal calculated: {subtotal_amount}")
-        logger.info(f"Items processed: {len(items_list)}, Items list: {items_list}")
-
-        # Fetch shop address
         shop_name = order_dict.get('shop_name', 'Unknown Shop')
-        logger.info(f"Fetching shop address for shop_name: {shop_name}")
         try:
             shop_address = next((doc.to_dict().get('address', 'No address') for doc in db.collection('shops').where('name', '==', shop_name).limit(1).stream()), 'No address')
-            logger.info(f"Shop address: {shop_address}")
         except Exception as e:
             logger.error(f"Error fetching shop address: {str(e)}")
             shop_address = 'No address available'
-
-        # Calculate payment and balance
-        payment_amount = float(order_dict.get('payment', 0))
-        balance_amount = float(order_dict.get('balance', 0))
-        logger.info(f"Payment: {payment_amount}, Balance: {balance_amount}")
-        if balance_amount == 0 and subtotal_amount > 0:
-            balance_amount = max(0, subtotal_amount - payment_amount)
-            logger.info(f"Calculated balance: {balance_amount}")
 
         order = {
             'receipt_id': order_dict.get('receipt_id', order_doc.id),
@@ -1681,35 +1610,22 @@ def receipt(order_id):
             'shop_name': shop_name,
             'shop_address': shop_address,
             'items_list': items_list,
-            'total_items': len(items_list),
-            'subtotal': round(subtotal_amount, 2),
-            'total_amount': round(subtotal_amount, 2),
-            'payment': round(payment_amount, 2),
-            'balance': round(balance_amount, 2),
+            'total_items': process_items(order_dict.get('items')),
+            'subtotal': subtotal_amount,  # Pass the calculated subtotal
+            'total_amount': subtotal_amount,  # Keep this for compatibility
+            'payment': order_dict.get('payment', 0),
+            'balance': order_dict.get('balance', 0),
             'date': process_date(order_dict.get('date')),
             'order_type': order_dict.get('order_type', 'wholesale')
         }
-        logger.info(f"Order data prepared: {order}")
-
-        # Fetch recent activity
-        logger.info("Fetching recent activity")
-        recent_activity = [
-            {
-                'receipt_id': doc.to_dict().get('receipt_id', doc.id),
-                'salesperson_name': doc.to_dict().get('salesperson_name', 'N/A'),
-                'shop_name': doc.to_dict().get('shop_name', 'Unknown Shop'),
-                'date': process_date(doc.to_dict().get('date'))
-            } 
-            for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).limit(3).get()
-        ]
-        logger.info(f"Recent activity: {recent_activity}")
-
-        logger.info(f"Rendering receipt.html for order_id: {order_id}")
+        recent_activity = [{'receipt_id': doc.to_dict().get('receipt_id', doc.id), 'salesperson_name': doc.to_dict().get('salesperson_name', 'N/A'), 
+                           'shop_name': doc.to_dict().get('shop_name', 'Unknown Shop'), 'date': process_date(doc.to_dict().get('date'))} 
+                          for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).limit(3).get()]
+        logger.info(f"Order data for {order_id}: {order}")
         return render_template('receipt.html', order=order, recent_activity=recent_activity)
-        
     except Exception as e:
-        logger.error(f"Error in receipt route for order_id {order_id}: {str(e)}", exc_info=True)
-        return render_template('error.html', message=f"Internal Server Error receipt route: {str(e)}"), 500
+        logger.error(f"Error in receipt route for {order_id}: {str(e)}")
+        return render_template('error.html', message=f"Internal Server Error: {str(e)}"), 500
 @app.route('/reports')
 @no_cache
 @login_required
