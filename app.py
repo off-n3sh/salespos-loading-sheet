@@ -1532,18 +1532,6 @@ def stock():
 
     return render_template('stock.html', stock_items=stock_items, recent_activity=recent_activity)
     
-@app.route('/receipts')
-@no_cache
-@login_required
-def receipts():
-    try:
-        orders = [doc.to_dict() for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).get()]
-        for order in orders:
-            order['date'] = process_date(order.get('date'))
-        return render_template('receipts.html', orders=orders)
-    except Exception as e:
-        return f"Error loading receipts: {str(e)}", 500
-
 @app.route('/receipt/<order_id>')
 @no_cache
 @login_required
@@ -1558,7 +1546,7 @@ def receipt(order_id):
         order_dict = order_doc.to_dict()
         items_raw = order_dict.get('items', [])
         items_list = []
-        total_amount = 0  # Initialize total_amount here
+        subtotal_amount = 0  # This will be our subtotal
 
         # Process items_raw based on order_type
         if order_dict.get('order_type') == 'app' and isinstance(items_raw, list) and items_raw and isinstance(items_raw[0], dict):
@@ -1567,7 +1555,7 @@ def receipt(order_id):
                 quantity = int(item.get('quantity', '0'))
                 price = float(item.get('price', '0.0'))
                 amount = quantity * price
-                total_amount += amount  # Accumulate total_amount
+                subtotal_amount += amount  # Accumulate subtotal
                 items_list.append({
                     'name': item.get('product', 'Unknown'),
                     'quantity': quantity,
@@ -1585,7 +1573,7 @@ def receipt(order_id):
                     quantity = int(quantity_str) if quantity_str.isdigit() else 0
                     price = float(price_str) if price_str.replace('.', '').replace('-', '').isdigit() else 0.0
                     amount = quantity * price
-                    total_amount += amount  # Accumulate total_amount
+                    subtotal_amount += amount  # Accumulate subtotal
                     items_list.append({
                         'name': product_name,
                         'quantity': quantity,
@@ -1610,7 +1598,8 @@ def receipt(order_id):
             'shop_address': shop_address,
             'items_list': items_list,
             'total_items': process_items(order_dict.get('items')),
-            'total_amount': total_amount,
+            'subtotal': subtotal_amount,  # Pass the calculated subtotal
+            'total_amount': subtotal_amount,  # Keep this for compatibility
             'payment': order_dict.get('payment', 0),
             'balance': order_dict.get('balance', 0),
             'date': process_date(order_dict.get('date')),
@@ -1624,7 +1613,6 @@ def receipt(order_id):
     except Exception as e:
         logger.error(f"Error in receipt route for {order_id}: {str(e)}")
         return render_template('error.html', message=f"Internal Server Error: {str(e)}"), 500
-
 @app.route('/reports')
 @no_cache
 @login_required

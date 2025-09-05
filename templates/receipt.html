@@ -29,11 +29,17 @@
         <div class="mb-3">
             <div class="flex justify-between mb-1">
                 <div><strong>Receipt #:</strong> {{ order.receipt_id }}</div>
-                <div>Till: 123456</div>
+                <div><strong>Sale Type:</strong> 
+                    {% if order.balance and order.balance > 0 %}
+                        Debt Sale
+                    {% else %}
+                        Cash Sale
+                    {% endif %}
+                </div>
             </div>
             <div class="flex justify-between mb-1">
-                <div>Date: {{ order.date.strftime('%d/%m/%Y') if order.date else 'N/A' }}</div>
-                <div>Time: {{ order.date.strftime('%H:%M:%S') if order.date else 'N/A' }}</div>
+                <div><strong>Date:</strong> {{ order.date.strftime('%d/%m/%Y') if order.date else 'N/A' }}</div>
+                <div><strong>Time:</strong> {{ order.date.strftime('%H:%M:%S') if order.date else 'N/A' }}</div>
             </div>
             <div><strong>Customer:</strong> 
                 {% if order.order_type == 'app' %}
@@ -48,64 +54,71 @@
         <div class="mb-3">
             <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
                 <thead>
-                    <tr style="border-top: 1px solid #000; border-bottom: 1px solid #000;">
-                        <th style="text-align: left; padding: 4px 2px; width: 40%;">Item</th>
-                        <th style="text-align: center; padding: 4px 2px; width: 15%;">Qty</th>
-                        <th style="text-align: right; padding: 4px 2px; width: 20%;">Price</th>
-                        <th style="text-align: right; padding: 4px 2px; width: 25%;">Amount</th>
+                    <tr style="border-top: 2px solid #000; border-bottom: 2px solid #000;">
+                        <th style="text-align: left; padding: 6px 2px; width: 40%; font-weight: bold;">Item</th>
+                        <th style="text-align: center; padding: 6px 2px; width: 15%; font-weight: bold;">Qty</th>
+                        <th style="text-align: right; padding: 6px 2px; width: 20%; font-weight: bold;">Price</th>
+                        <th style="text-align: right; padding: 6px 2px; width: 25%; font-weight: bold;">Amount</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% if order.items_list is iterable and order.items_list is not string %}
                         {% for item in order.items_list | sort(attribute='name') %}
-                            <tr style="border-bottom: 1px dotted #ccc;">
-                                <td style="text-align: left; padding: 4px 2px;">{{ item.name | default('Unknown') }}</td>
-                                <td style="text-align: center; padding: 4px 2px;">{{ item.quantity | default(0) }}</td>
-                                <td style="text-align: right; padding: 4px 2px;">{{ item.price | default(0) }}</td>
-                                <td style="text-align: right; padding: 4px 2px;">{{ (item.quantity | default(0) * item.price | default(0)) | round(2) }}</td>
+                            <tr style="border-bottom: 1px solid #333;">
+                                <td style="text-align: left; padding: 5px 2px; color: #000;">{{ item.name | default('Unknown') }}</td>
+                                <td style="text-align: center; padding: 5px 2px; color: #000; font-weight: bold;">{{ item.quantity | default(0) }}</td>
+                                <td style="text-align: right; padding: 5px 2px; color: #000; font-weight: bold;">{{ item.price | default(0) }}</td>
+                                <td style="text-align: right; padding: 5px 2px; color: #000; font-weight: bold;">{{ (item.quantity | default(0) * item.price | default(0)) | round(2) }}</td>
                             </tr>
                         {% endfor %}
                     {% else %}
-                        <tr><td colspan="4" style="text-align: center; padding: 4px 2px;">No items available</td></tr>
+                        <tr><td colspan="4" style="text-align: center; padding: 5px 2px; color: #000;">No items available</td></tr>
                     {% endif %}
                 </tbody>
             </table>
         </div>
 
         <!-- Summary -->
-        <div class="mb-3">
+        <div class="mb-3" style="border-top: 2px solid #000; padding-top: 6px;">
             <div class="flex justify-between mb-1">
-                <div>Subtotal:</div>
-                <div>
+                <div><strong>Total Items:</strong></div>
+                <div style="font-weight: bold;">{{ order.items_list | length if order.items_list is iterable and order.items_list is not string else 0 }}</div>
+            </div>
+            <div class="flex justify-between mb-1">
+                <div><strong>VAT (16%):</strong></div>
+                <div style="font-weight: bold;">
                     {% set subtotal = 0 %}
                     {% if order.items_list is iterable and order.items_list is not string %}
                         {% for item in order.items_list %}
                             {% set subtotal = subtotal + (item.quantity | default(0) * item.price | default(0)) %}
                         {% endfor %}
                     {% endif %}
-                    {{ subtotal | round(2) }}
+                    {{ ((subtotal * 0.16) / 1.16) | round(2) if subtotal else 0 }}
                 </div>
             </div>
-            <div class="flex justify-between mb-1">
-                <div>Tax (16% VAT):</div>
-                <div>{{ ((subtotal * 0.16) / 1.16) | round(2) if subtotal else 0 }}</div>
-            </div>
-            <div class="flex justify-between font-bold" style="border-top: 1px solid #000; padding-top: 4px;">
-                <div>Total Items:</div>
-                <div>{{ order.items_list | length if order.items_list is iterable and order.items_list is not string else 0 }}</div>
+            <div class="flex justify-between mb-2" style="font-size: 14px;">
+                <div><strong>Subtotal:</strong></div>
+                <div style="font-weight: bold;">{{ subtotal | round(2) }}</div>
             </div>
         </div>
 
         <!-- Payment Info -->
-        <div class="mb-3" style="border-top: 1px dashed #ccc; border-bottom: 1px dashed #ccc; padding: 6px 0;">
-            <div class="flex justify-between font-bold mb-1">
+        <div class="mb-3" style="border-top: 1px dashed #ccc; border-bottom: 1px dashed #ccc; padding: 8px 0;">
+            <div class="flex justify-between font-bold mb-1" style="font-size: 14px;">
                 <div>Paid Amount:</div>
                 <div>{{ order.payment | default(0) }}</div>
             </div>
-            <div class="flex justify-between font-bold mb-1">
+            {% if order.balance and order.balance > 0 %}
+            <div class="flex justify-between font-bold mb-1" style="font-size: 14px; border: 2px solid #000; padding: 4px; background-color: #f5f5f5;">
+                <div>*** Balance Due ***</div>
+                <div>{{ order.balance | default(0) }}</div>
+            </div>
+            {% else %}
+            <div class="flex justify-between font-bold mb-1" style="font-size: 14px;">
                 <div>Balance:</div>
                 <div>{{ order.balance | default(0) }}</div>
             </div>
+            {% endif %}
             <div class="flex justify-between font-bold">
                 <div>Change:</div>
                 <div>0</div>
@@ -117,7 +130,7 @@
             <div>You were served by: {{ order.salesperson_name | default('Unknown') }}</div>
             <div>Prices inclusive of VAT where applicable</div>
             <div>Once goods sold, no return</div>
-            <div class="mt-2 font-bold">Thank you for your business!</div>
+            <div class="mt-2 font-bold">Thank you for shopping with us!</div>
         </div>
     </div>
 </div>
@@ -143,6 +156,7 @@
     .text-center { text-align: center; }
     .font-bold { font-weight: bold; }
     .mb-1 { margin-bottom: 0.25rem; }
+    .mb-2 { margin-bottom: 0.5rem; }
     .mb-3 { margin-bottom: 0.75rem; }
     .mt-2 { margin-top: 0.5rem; }
     .p-0 { padding: 0; }
