@@ -1544,6 +1544,7 @@ def receipts():
     except Exception as e:
         return f"Error loading receipts: {str(e)}", 500
         
+
 @app.route('/receipt/<order_id>')
 @no_cache
 @login_required
@@ -1679,65 +1680,6 @@ def receipt(order_id):
         return render_template('error.html', message=f"Internal Server Error: {str(e)}"), 500
 
 
-# Alternative simple calculation method if the above doesn't work
-@app.route('/receipt/<order_id>/debug')
-@login_required
-def receipt_debug(order_id):
-    """Debug route to show raw order data."""
-    try:
-        db = firestore.Client()
-        orders_ref = db.collection('orders').where('receipt_id', '==', order_id).limit(1).stream()
-        order_doc = next(orders_ref, None)
-        if not order_doc:
-            return "Order not found", 404
-        
-        order_dict = order_doc.to_dict()
-        
-        # Return raw data for debugging
-        debug_info = {
-            'order_id': order_id,
-            'raw_order_data': order_dict,
-            'items_raw': order_dict.get('items', []),
-            'items_type': str(type(order_dict.get('items', []))),
-            'order_type': order_dict.get('order_type'),
-            'payment': order_dict.get('payment'),
-            'balance': order_dict.get('balance')
-        }
-        
-        return f"<pre>{json.dumps(debug_info, indent=2, default=str)}</pre>"
-        
-    except Exception as e:
-        return f"Debug error: {str(e)}", 500
-
-# Alternative simple calculation method if the above doesn't work
-@app.route('/receipt/<order_id>/debug')
-@login_required
-def receipt_debug(order_id):
-    """Debug route to show raw order data."""
-    try:
-        db = firestore.Client()
-        orders_ref = db.collection('orders').where('receipt_id', '==', order_id).limit(1).stream()
-        order_doc = next(orders_ref, None)
-        if not order_doc:
-            return "Order not found", 404
-        
-        order_dict = order_doc.to_dict()
-        
-        # Return raw data for debugging
-        debug_info = {
-            'order_id': order_id,
-            'raw_order_data': order_dict,
-            'items_raw': order_dict.get('items', []),
-            'items_type': str(type(order_dict.get('items', []))),
-            'order_type': order_dict.get('order_type'),
-            'payment': order_dict.get('payment'),
-            'balance': order_dict.get('balance')
-        }
-        
-        return f"<pre>{json.dumps(debug_info, indent=2, default=str)}</pre>"
-        
-    except Exception as e:
-        return f"Debug error: {str(e)}", 500
 @app.route('/reports')
 @no_cache
 @login_required
