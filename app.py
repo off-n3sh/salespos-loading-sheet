@@ -2232,6 +2232,16 @@ def get_loading_sheet(sheet_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+from flask import Flask, jsonify, render_template, session, request
+from flask_login import login_required
+from google.cloud import firestore
+from datetime import datetime
+import logging
+
+app = Flask(__name__)
+logger = logging.getLogger(__name__)
+NAIROBI_TZ = ... # Your timezone configuration
+
 @app.route('/order/<order_id>', methods=['GET'])
 @login_required
 def get_order(order_id):
@@ -2308,7 +2318,7 @@ def edit_order(order_id):
                 logger.error(f"Error processing item: {e}")
                 continue
 
-        # Combine items (replace existing items with new ones, keep unchanged old items)
+        # Combine items (replace existing with new, keep unchanged old items)
         combined_items_list = []
         for new_item in new_items_list:
             combined_items_list.append({'name': new_item['name'], 'quantity': new_item['quantity'], 'price': new_item['price']})
@@ -2372,9 +2382,9 @@ def edit_order(order_id):
         logger.error(f"Failed to update order {order_id}: {str(e)}")
         return jsonify({"error": f"Failed to update order: {str(e)}"}), 500
 
-@app.route('/receipt/<receipt_id>')
+@app.route('/receipt/<receipt_id>', methods=['GET'])
 @login_required
-def receipt(receipt_id):
+def view_receipt(receipt_id):  # Renamed to avoid conflict
     try:
         db = firestore.Client()
         order_ref = db.collection('orders').document(receipt_id)
@@ -2388,8 +2398,9 @@ def receipt(receipt_id):
         order_data = order.to_dict()
         return render_template('receipt.html', order=order_data)
     except Exception as e:
-        logger.error(f"Error fetching receipts {receipt_id}: {str(e)}")
+        logger.error(f"Error fetching receipt {receipt_id}: {str(e)}")
         return render_template('error.html', error=str(e)), 500
+
 @app.route('/delete_order/<receipt_id>', methods=['POST'])
 @login_required
 def delete_order(receipt_id):
