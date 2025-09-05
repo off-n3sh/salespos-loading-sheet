@@ -1555,46 +1555,87 @@ def receipt(order_id):
         order_doc = next(orders_ref, None)
         if not order_doc:
             return "Order not found", 404
+        
         order_dict = order_doc.to_dict()
         items_raw = order_dict.get('items', [])
         items_list = []
-        subtotal_amount = 0  # This will be our subtotal
+        subtotal_amount = 0.0  # Ensure it's a float
+        
+        # Debug logging
+        logger.info(f"Processing order {order_id}")
+        logger.info(f"Order type: {order_dict.get('order_type')}")
+        logger.info(f"Raw items data: {items_raw}")
+        logger.info(f"Items type: {type(items_raw)}")
 
         # Process items_raw based on order_type
         if order_dict.get('order_type') == 'app' and isinstance(items_raw, list) and items_raw and isinstance(items_raw[0], dict):
             # App order: items is a list of maps
-            for item in items_raw:
-                quantity = int(item.get('quantity', '0'))
-                price = float(item.get('price', '0.0'))
-                amount = quantity * price
-                subtotal_amount += amount  # Accumulate subtotal
-                items_list.append({
-                    'name': item.get('product', 'Unknown'),
-                    'quantity': quantity,
-                    'price': price,
-                    'amount': amount
-                })
-        else:
-            # Web order: flat array
-            i = 0
-            while i < len(items_raw):
-                if items_raw[i] == 'product':
-                    product_name = items_raw[i + 1]
-                    quantity_str = str(items_raw[i + 3]) if i + 2 < len(items_raw) and items_raw[i + 2] == 'quantity' else '0'
-                    price_str = str(items_raw[i + 5]) if i + 4 < len(items_raw) and items_raw[i + 4] == 'price' else '0'
-                    quantity = int(quantity_str) if quantity_str.isdigit() else 0
-                    price = float(price_str) if price_str.replace('.', '').replace('-', '').isdigit() else 0.0
+            logger.info("Processing as app order (list of dicts)")
+            for i, item in enumerate(items_raw):
+                try:
+                    quantity = float(item.get('quantity', 0))
+                    price = float(item.get('price', 0.0))
                     amount = quantity * price
-                    subtotal_amount += amount  # Accumulate subtotal
+                    subtotal_amount += amount
+                    
+                    logger.info(f"Item {i}: {item.get('product', 'Unknown')} - Qty: {quantity}, Price: {price}, Amount: {amount}")
+                    
                     items_list.append({
-                        'name': product_name,
+                        'name': item.get('product', 'Unknown'),
                         'quantity': quantity,
                         'price': price,
                         'amount': amount
                     })
-                    i += 6
-                else:
+                except (ValueError, TypeError) as e:
+                    logger.error(f"Error processing app order item {i}: {e}")
+                    continue
+        else:
+            # Web order: flat array
+            logger.info("Processing as web order (flat array)")
+            i = 0
+            while i < len(items_raw):
+                try:
+                    if items_raw[i] == 'product':
+                        product_name = items_raw[i + 1] if i + 1 < len(items_raw) else 'Unknown'
+                        
+                        # Get quantity
+                        quantity = 0
+                        if i + 2 < len(items_raw) and items_raw[i + 2] == 'quantity':
+                            try:
+                                quantity = float(items_raw[i + 3]) if i + 3 < len(items_raw) else 0
+                            except (ValueError, TypeError):
+                                quantity = 0
+                        
+                        # Get price
+                        price = 0.0
+                        if i + 4 < len(items_raw) and items_raw[i + 4] == 'price':
+                            try:
+                                price = float(items_raw[i + 5]) if i + 5 < len(items_raw) else 0.0
+                            except (ValueError, TypeError):
+                                price = 0.0
+                        
+                        amount = quantity * price
+                        subtotal_amount += amount
+                        
+                        logger.info(f"Web item: {product_name} - Qty: {quantity}, Price: {price}, Amount: {amount}")
+                        
+                        items_list.append({
+                            'name': product_name,
+                            'quantity': quantity,
+                            'price': price,
+                            'amount': amount
+                        })
+                        i += 6
+                    else:
+                        i += 1
+                except Exception as e:
+                    logger.error(f"Error processing web order item at index {i}: {e}")
                     i += 1
+
+        # Final debug info
+        logger.info(f"Final subtotal: {subtotal_amount}")
+        logger.info(f"Items processed: {len(items_list)}")
+        logger.info(f"Items list: {items_list}")
 
         shop_name = order_dict.get('shop_name', 'Unknown Shop')
         try:
@@ -1603,28 +1644,70 @@ def receipt(order_id):
             logger.error(f"Error fetching shop address: {str(e)}")
             shop_address = 'No address available'
 
+        # Calculate payment and balance
+        payment_amount = float(order_dict.get('payment', 0))
+        balance_amount = float(order_dict.get('balance', 0))
+        
+        # If balance is 0, calculate it from subtotal - payment
+        if balance_amount == 0 and subtotal_amount > 0:
+            balance_amount = max(0, subtotal_amount - payment_amount)
+
         order = {
             'receipt_id': order_dict.get('receipt_id', order_doc.id),
             'salesperson_name': order_dict.get('salesperson_name', 'N/A'),
             'shop_name': shop_name,
             'shop_address': shop_address,
             'items_list': items_list,
-            'total_items': process_items(order_dict.get('items')),
-            'subtotal': subtotal_amount,  # Pass the calculated subtotal
-            'total_amount': subtotal_amount,  # Keep this for compatibility
-            'payment': order_dict.get('payment', 0),
-            'balance': order_dict.get('balance', 0),
+            'total_items': len(items_list),  # Simple count of items
+            'subtotal': round(subtotal_amount, 2),  # Rounded subtotal
+            'total_amount': round(subtotal_amount, 2),  # Keep for compatibility
+            'payment': round(payment_amount, 2),
+            'balance': round(balance_amount, 2),
             'date': process_date(order_dict.get('date')),
             'order_type': order_dict.get('order_type', 'wholesale')
         }
+        
         recent_activity = [{'receipt_id': doc.to_dict().get('receipt_id', doc.id), 'salesperson_name': doc.to_dict().get('salesperson_name', 'N/A'), 
                            'shop_name': doc.to_dict().get('shop_name', 'Unknown Shop'), 'date': process_date(doc.to_dict().get('date'))} 
                           for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).limit(3).get()]
-        logger.info(f"Order data for {order_id}: {order}")
+        
+        logger.info(f"Final order data for {order_id}: subtotal={order['subtotal']}, payment={order['payment']}, balance={order['balance']}")
         return render_template('receipt.html', order=order, recent_activity=recent_activity)
+        
     except Exception as e:
         logger.error(f"Error in receipt route for {order_id}: {str(e)}")
         return render_template('error.html', message=f"Internal Server Error: {str(e)}"), 500
+
+
+# Alternative simple calculation method if the above doesn't work
+@app.route('/receipt/<order_id>/debug')
+@login_required
+def receipt_debug(order_id):
+    """Debug route to show raw order data."""
+    try:
+        db = firestore.Client()
+        orders_ref = db.collection('orders').where('receipt_id', '==', order_id).limit(1).stream()
+        order_doc = next(orders_ref, None)
+        if not order_doc:
+            return "Order not found", 404
+        
+        order_dict = order_doc.to_dict()
+        
+        # Return raw data for debugging
+        debug_info = {
+            'order_id': order_id,
+            'raw_order_data': order_dict,
+            'items_raw': order_dict.get('items', []),
+            'items_type': str(type(order_dict.get('items', []))),
+            'order_type': order_dict.get('order_type'),
+            'payment': order_dict.get('payment'),
+            'balance': order_dict.get('balance')
+        }
+        
+        return f"<pre>{json.dumps(debug_info, indent=2, default=str)}</pre>"
+        
+    except Exception as e:
+        return f"Debug error: {str(e)}", 500
 @app.route('/reports')
 @no_cache
 @login_required
