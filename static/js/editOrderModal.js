@@ -37,7 +37,7 @@ async function editOrder(receiptId) {
     const orderData = await fetchOrderData(receiptId);
     if (!orderData) return;
 
-    const { items, balance, order_type, shop_name } = orderData;
+    const { items, balance, order_type, shop_name, subtotal, payment } = orderData;
     document.querySelectorAll('.modal').forEach(modal => modal.classList.add('hidden'));
     editModal.classList.remove('hidden');
     document.getElementById('edit-order-id').textContent = receiptId;

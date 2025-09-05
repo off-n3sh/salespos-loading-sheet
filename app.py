@@ -2251,7 +2251,10 @@ def get_order(order_id):
             "balance": order_data.get('balance', 0),
             "order_type": order_data.get('order_type', 'wholesale'),
             "shop_name": order_data.get('shop_name', ''),
-            "subtotal": order_data.get('subtotal', 0)
+            "subtotal": order_data.get('subtotal', 0),
+            "payment": order_data.get('payment', 0),
+            "items_list": order_data.get('items_list', []),
+            "receipt_id": order_data.get('receipt_id', order_id)
         }), 200
     except Exception as e:
         logger.error(f"Error fetching order {order_id}: {str(e)}")
@@ -2305,13 +2308,10 @@ def edit_order(order_id):
                 logger.error(f"Error processing item: {e}")
                 continue
 
+        # Combine items (replace existing items with new ones, keep unchanged old items)
         combined_items_list = []
         for new_item in new_items_list:
-            existing_item = next((oi for oi in old_items_list if oi['name'] == new_item['name']), None)
-            if existing_item:
-                combined_items_list.append({'name': new_item['name'], 'quantity': new_item['quantity'], 'price': new_item['price']})
-            else:
-                combined_items_list.append(new_item)
+            combined_items_list.append({'name': new_item['name'], 'quantity': new_item['quantity'], 'price': new_item['price']})
         for old_item in old_items_list:
             if not any(item['name'] == old_item['name'] for item in new_items_list):
                 combined_items_list.append(old_item)
@@ -2371,6 +2371,25 @@ def edit_order(order_id):
     except Exception as e:
         logger.error(f"Failed to update order {order_id}: {str(e)}")
         return jsonify({"error": f"Failed to update order: {str(e)}"}), 500
+
+@app.route('/receipt/<receipt_id>')
+@login_required
+def receipt(receipt_id):
+    try:
+        db = firestore.Client()
+        order_ref = db.collection('orders').document(receipt_id)
+        order = order_ref.get()
+        if not order.exists:
+            order_query = db.collection('orders').where('receipt_id', '==', receipt_id).limit(1).stream()
+            order_doc = next(order_query, None)
+            if not order_doc:
+                return render_template('404.html'), 404
+            order = order_doc
+        order_data = order.to_dict()
+        return render_template('receipt.html', order=order_data)
+    except Exception as e:
+        logger.error(f"Error fetching receipt {receipt_id}: {str(e)}")
+        return render_template('error.html', error=str(e)), 500
 @app.route('/delete_order/<receipt_id>', methods=['POST'])
 @login_required
 def delete_order(receipt_id):
