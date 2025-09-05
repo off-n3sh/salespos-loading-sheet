@@ -9,18 +9,14 @@ let eventListeners = [];
 
 async function fetchOrderData(receiptId) {
     try {
-        const response = await fetch(`/orders/${receiptId}`);
-        const text = await response.text();
-        let data;
-        try {
-            data = JSON.parse(text);
-        } catch (e) {
-            console.error('JSON parse error:', text);
-            showModalError('edit-order', 'Invalid order data.');
-            return null;
+        const response = await fetch(`/order/${receiptId}`, { headers: { 'Accept': 'application/json' } });
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
+        const data = await response.json();
         return data;
     } catch (error) {
+        console.error('Fetch order error:', error);
         showModalError('edit-order', `Failed to fetch order: ${error.message}`);
         return null;
     }
@@ -37,54 +33,49 @@ function resetModal(container) {
     editOrderChange.textContent = '0.00';
 }
 
-async function editOrder(receiptId, orderType, shopName, itemsJson, existingBalance) {
-    // Fetch order data if missing
-    let orderData = { items: itemsJson, balance: existingBalance };
-    if (!itemsJson || !existingBalance) {
-        orderData = await fetchOrderData(receiptId);
-        if (!orderData) return;
-    }
-    itemsJson = orderData.items || [];
-    existingBalance = parseFloat(orderData.balance) || 0;
+async function editOrder(receiptId) {
+    const orderData = await fetchOrderData(receiptId);
+    if (!orderData) return;
 
+    const { items, balance, order_type, shop_name } = orderData;
     document.querySelectorAll('.modal').forEach(modal => modal.classList.add('hidden'));
     editModal.classList.remove('hidden');
     document.getElementById('edit-order-id').textContent = receiptId;
-    document.getElementById('edit-order-type').value = orderType || orderData.order_type || 'wholesale';
+    document.getElementById('edit-order-type').value = order_type || 'wholesale';
     const form = document.getElementById('edit-order-form');
     form.action = `/edit_order/${receiptId}`;
     resetModal(editContainer);
 
     // Display existing balance
-    const balance = parseFloat(existingBalance) || 0;
+    const existingBalance = parseFloat(balance) || 0;
     const balanceDiv = document.createElement('div');
     balanceDiv.className = 'text-sm text-gray-600 dark:text-gray-400 mb-2';
-    balanceDiv.textContent = `Existing Balance: ${balance.toFixed(2)}`;
+    balanceDiv.textContent = `Existing Balance: ${existingBalance.toFixed(2)}`;
     form.prepend(balanceDiv);
 
-    // Parse itemsJson safely
-    let items = [];
+    // Parse and preload items
+    let itemsList = [];
     try {
-        if (Array.isArray(itemsJson)) {
-            for (let i = 0; i < itemsJson.length; i += 6) {
-                if (itemsJson[i] === 'product' && itemsJson[i+2] === 'quantity' && itemsJson[i+4] === 'price') {
-                    items.push({
-                        name: itemsJson[i+1],
-                        quantity: parseFloat(itemsJson[i+3]) || 0,
-                        price: parseFloat(itemsJson[i+5]) || 0
+        if (Array.isArray(items)) {
+            for (let i = 0; i < items.length; i += 6) {
+                if (items[i] === 'product' && items[i+2] === 'quantity' && items[i+4] === 'price') {
+                    itemsList.push({
+                        name: items[i+1],
+                        quantity: parseFloat(items[i+3]) || 0,
+                        price: parseFloat(items[i+5]) || 0
                     });
                 }
             }
         }
     } catch (e) {
-        console.error('Error parsing itemsJson:', e);
+        console.error('Error parsing items:', e);
         showModalError('edit-order', 'Invalid order items data.');
         return;
     }
 
     // Populate existing items
     const stockItems = await fetchStockData();
-    items.forEach(item => {
+    itemsList.forEach(item => {
         const div = document.createElement('div');
         div.className = 'grid grid-cols-6 gap-2 item-row';
         const price = parseFloat(item.price) || 0;
@@ -117,7 +108,7 @@ async function editOrder(receiptId, orderType, shopName, itemsJson, existingBala
         });
     });
 
-    // Add new item with dropdown
+    // Add new item
     const addItemBtn = editContainer.querySelector('.add-item-btn');
     addItemBtn.addEventListener('click', async () => {
         const div = document.createElement('div');
@@ -161,7 +152,7 @@ async function editOrder(receiptId, orderType, shopName, itemsJson, existingBala
         updateSubtotal(editContainer);
     });
 
-    // Manual item button
+    // Manual item
     const addManualBtn = document.getElementById('add-edit-manual');
     addManualBtn.addEventListener('click', () => {
         const div = document.createElement('div');
@@ -184,21 +175,21 @@ async function editOrder(receiptId, orderType, shopName, itemsJson, existingBala
         updateSubtotal(editContainer);
     });
 
-    // Update change and new balance
+    // Update change and balance
     editAmountPaid.addEventListener('input', () => {
         const subtotal = parseFloat(document.getElementById('edit-order-total').textContent) || 0;
         const amountPaid = parseFloat(editAmountPaid.value) || 0;
-        const newBalance = balance + subtotal - amountPaid;
+        const newBalance = existingBalance + subtotal - amountPaid;
         const change = amountPaid > subtotal ? amountPaid - subtotal : 0;
         editOrderChange.textContent = change.toFixed(2);
         form.querySelector('input[name=new_balance]').value = newBalance.toFixed(2);
     });
 
-    // Add hidden input for new balance
+    // Hidden balance input
     const balanceInput = document.createElement('input');
     balanceInput.type = 'hidden';
     balanceInput.name = 'new_balance';
-    balanceInput.value = balance.toFixed(2);
+    balanceInput.value = existingBalance.toFixed(2);
     form.appendChild(balanceInput);
 
     form.onsubmit = async function(e) {
@@ -280,7 +271,7 @@ async function editOrder(receiptId, orderType, shopName, itemsJson, existingBala
             submitBtn.disabled = false;
         }
     };
-    updateSubtotal(editContainer); // Ensure initial subtotal
+    updateSubtotal(editContainer);
 }
 
 function showSuccessMessage(message) {

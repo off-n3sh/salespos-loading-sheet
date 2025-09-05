@@ -2232,6 +2232,31 @@ def get_loading_sheet(sheet_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/order/<order_id>', methods=['GET'])
+@login_required
+def get_order(order_id):
+    try:
+        db = firestore.Client()
+        order_ref = db.collection('orders').document(order_id)
+        order = order_ref.get()
+        if not order.exists:
+            order_query = db.collection('orders').where('receipt_id', '==', order_id).limit(1).stream()
+            order_doc = next(order_query, None)
+            if not order_doc:
+                return jsonify({"error": "Order not found"}), 404
+            order = order_doc
+        order_data = order.to_dict()
+        return jsonify({
+            "items": order_data.get('items', []),
+            "balance": order_data.get('balance', 0),
+            "order_type": order_data.get('order_type', 'wholesale'),
+            "shop_name": order_data.get('shop_name', ''),
+            "subtotal": order_data.get('subtotal', 0)
+        }), 200
+    except Exception as e:
+        logger.error(f"Error fetching order {order_id}: {str(e)}")
+        return jsonify({"error": f"Failed to fetch order: {str(e)}"}), 500
+
 @app.route('/edit_order/<order_id>', methods=['POST'])
 @login_required
 def edit_order(order_id):
@@ -2264,16 +2289,16 @@ def edit_order(order_id):
         items_raw = request.form.getlist('items[]')
         quantities = request.form.getlist('quantities[]')
         unit_prices = request.form.getlist('unit_prices[]')
-        amount_paid = float(request.form.get('amount_paid', 0))
-        new_balance = float(request.form.get('new_balance', order_data.get('balance', 0)))
+        amount_paid = float(request.form.get('amount_paid') or 0)
+        new_balance = float(request.form.get('new_balance') or order_data.get('balance', 0))
 
         new_items_list = []
         for i in range(len(items_raw)):
             try:
                 product_data = items_raw[i].split('|')
                 product_name = product_data[1] if len(product_data) > 1 else items_raw[i]
-                quantity = int(quantities[i]) if i < len(quantities) else 0
-                price = float(unit_prices[i]) if i < len(unit_prices) else float(product_data[5]) if len(product_data) > 5 else 0.0
+                quantity = int(quantities[i]) if i < len(quantities) and quantities[i] else 0
+                price = float(unit_prices[i]) if i < len(unit_prices) and unit_prices[i] else float(product_data[5]) if len(product_data) > 5 else 0.0
                 if quantity > 0:
                     new_items_list.append({'name': product_name, 'quantity': quantity, 'price': price})
             except (IndexError, ValueError) as e:
@@ -2282,7 +2307,7 @@ def edit_order(order_id):
 
         combined_items_list = []
         for new_item in new_items_list:
-            existing_item = next((item for item in old_items_list if item['name'] == new_item['name']), None)
+            existing_item = next((oi for oi in old_items_list if oi['name'] == new_item['name']), None)
             if existing_item:
                 combined_items_list.append({'name': new_item['name'], 'quantity': new_item['quantity'], 'price': new_item['price']})
             else:
