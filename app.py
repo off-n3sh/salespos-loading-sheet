@@ -1677,7 +1677,7 @@ def receipt(order_id):
         
     except Exception as e:
         logger.error(f"Error in receipt route for {order_id}: {str(e)}")
-        return render_template('error.html', message=f"Internal Server Error: {str(e)}"), 500
+        return render_template('error.html', message=f"Internal Server Error receipt route: {str(e)}"), 500
 
 
 @app.route('/reports')
