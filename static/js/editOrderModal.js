@@ -27,24 +27,30 @@ async function editOrder(receiptId, orderType, shopName, itemsJson, existingBala
     form.action = `/edit_order/${receiptId}`;
     resetModal(editContainer);
 
-    // Display existing balance
+    // Validate and display existing balance
+    const balance = parseFloat(existingBalance) || 0;
     const balanceDiv = document.createElement('div');
     balanceDiv.className = 'text-sm text-gray-600 dark:text-gray-400 mb-2';
-    balanceDiv.textContent = `Existing Balance: ${parseFloat(existingBalance).toFixed(2)}`;
+    balanceDiv.textContent = `Existing Balance: ${balance.toFixed(2)}`;
     form.prepend(balanceDiv);
 
-    // Convert flat items array to [{name, quantity, price}]
+    // Parse itemsJson safely
     let items = [];
-    if (Array.isArray(itemsJson)) {
-        for (let i = 0; i < itemsJson.length; i += 6) {
-            if (itemsJson[i] === 'product' && itemsJson[i+2] === 'quantity' && itemsJson[i+4] === 'price') {
-                items.push({
-                    name: itemsJson[i+1],
-                    quantity: parseFloat(itemsJson[i+3]),
-                    price: parseFloat(itemsJson[i+5])
-                });
+    try {
+        if (Array.isArray(itemsJson)) {
+            for (let i = 0; i < itemsJson.length; i += 6) {
+                if (itemsJson[i] === 'product' && itemsJson[i+2] === 'quantity' && itemsJson[i+4] === 'price') {
+                    items.push({
+                        name: itemsJson[i+1],
+                        quantity: parseFloat(itemsJson[i+3]) || 0,
+                        price: parseFloat(itemsJson[i+5]) || 0
+                    });
+                }
             }
         }
+    } catch (e) {
+        console.error('Error parsing itemsJson:', e);
+        showModalError('edit-order', 'Invalid order items data.');
     }
 
     // Populate existing items
@@ -153,7 +159,7 @@ async function editOrder(receiptId, orderType, shopName, itemsJson, existingBala
     editAmountPaid.addEventListener('input', () => {
         const subtotal = parseFloat(document.getElementById('edit-order-total').textContent) || 0;
         const amountPaid = parseFloat(editAmountPaid.value) || 0;
-        const newBalance = parseFloat(existingBalance) + subtotal - amountPaid;
+        const newBalance = balance + subtotal - amountPaid;
         const change = amountPaid > subtotal ? amountPaid - subtotal : 0;
         editOrderChange.textContent = change.toFixed(2);
         form.querySelector('input[name=new_balance]').value = newBalance.toFixed(2);
@@ -163,7 +169,7 @@ async function editOrder(receiptId, orderType, shopName, itemsJson, existingBala
     const balanceInput = document.createElement('input');
     balanceInput.type = 'hidden';
     balanceInput.name = 'new_balance';
-    balanceInput.value = existingBalance;
+    balanceInput.value = balance.toFixed(2);
     form.appendChild(balanceInput);
 
     form.onsubmit = async function(e) {
@@ -220,7 +226,17 @@ async function editOrder(receiptId, orderType, shopName, itemsJson, existingBala
                 body: formData,
                 headers: { 'X-CSRFToken': form.querySelector('[name=csrf_token]').value }
             });
-            const result = await response.json();
+            const text = await response.text();
+            let result;
+            try {
+                result = JSON.parse(text);
+            } catch (error) {
+                console.error('JSON parse error:', text);
+                showModalError('edit-order', 'Invalid server response.');
+                submitBtn.classList.remove('processing');
+                submitBtn.disabled = false;
+                return;
+            }
             if (response.ok && result.status === 'success') {
                 editModal.classList.add('hidden');
                 showSuccessMessage(result.message);
