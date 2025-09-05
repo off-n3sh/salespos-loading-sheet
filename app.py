@@ -2232,16 +2232,6 @@ def get_loading_sheet(sheet_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-from flask import Flask, jsonify, render_template, session, request
-from flask_login import login_required
-from google.cloud import firestore
-from datetime import datetime
-import logging
-
-app = Flask(__name__)
-logger = logging.getLogger(__name__)
-NAIROBI_TZ = ... # Your timezone configuration
-
 @app.route('/order/<order_id>', methods=['GET'])
 @login_required
 def get_order(order_id):
