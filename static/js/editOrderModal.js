@@ -1,10 +1,11 @@
-// static/js/editOrderModal.js
-
-import { updateSubtotal, showModalError } from './utils.js';
+import { fetchStockData, updateSubtotal, showModalError } from './utils.js';
 
 const editModal = document.getElementById('edit-order-modal');
 const closeEdit = document.getElementById('close-edit-modal');
 const editContainer = document.getElementById('edit-items-container');
+const editAmountPaid = document.getElementById('edit-amount-paid');
+const editOrderChange = document.getElementById('edit-order-change');
+let eventListeners = [];
 
 function resetModal(container) {
     const header = container.querySelector('.item-row-header');
@@ -13,9 +14,11 @@ function resetModal(container) {
     container.appendChild(header);
     container.appendChild(initialAddBtn);
     updateSubtotal(container);
+    editAmountPaid.value = '';
+    editOrderChange.textContent = '0.00';
 }
 
-function editOrder(receiptId, orderType, shopName, itemsJson) {
+async function editOrder(receiptId, orderType, shopName, itemsJson, existingBalance) {
     document.querySelectorAll('.modal').forEach(modal => modal.classList.add('hidden'));
     editModal.classList.remove('hidden');
     document.getElementById('edit-order-id').textContent = receiptId;
@@ -24,39 +27,114 @@ function editOrder(receiptId, orderType, shopName, itemsJson) {
     form.action = `/edit_order/${receiptId}`;
     resetModal(editContainer);
 
-    let items = typeof itemsJson === 'string' ? JSON.parse(itemsJson) : itemsJson;
-    if (Array.isArray(items)) {
-        items.forEach(item => {
-            const div = document.createElement('div');
-            div.className = 'grid grid-cols-6 gap-2 item-row';
-            const price = parseFloat(item.price) || 0;
-            const quantity = parseInt(item.quantity) || 0;
-            div.innerHTML = `
-                <input name="items[]" type="text" value="${item.name}" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-input w-full">
-                <input name="items[]" type="number" value="${quantity}" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="1">
-                <input name="items[]" type="number" value="${price}" class="price-display p-2 border rounded-lg text-center w-full">
-                <input type="number" value="0" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-                <input type="number" value="${price * quantity}" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-                <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
-            `;
-            const addBtn = editContainer.querySelector('.add-item-btn');
-            editContainer.insertBefore(div, addBtn);
-            attachPriceListener(div);
-            div.querySelector('.remove-item').addEventListener('click', () => {
-                div.remove();
-                updateSubtotal(editContainer);
-            });
-        });
+    // Display existing balance
+    const balanceDiv = document.createElement('div');
+    balanceDiv.className = 'text-sm text-gray-600 dark:text-gray-400 mb-2';
+    balanceDiv.textContent = `Existing Balance: ${parseFloat(existingBalance).toFixed(2)}`;
+    form.prepend(balanceDiv);
+
+    // Convert flat items array to [{name, quantity, price}]
+    let items = [];
+    if (Array.isArray(itemsJson)) {
+        for (let i = 0; i < itemsJson.length; i += 6) {
+            if (itemsJson[i] === 'product' && itemsJson[i+2] === 'quantity' && itemsJson[i+4] === 'price') {
+                items.push({
+                    name: itemsJson[i+1],
+                    quantity: parseFloat(itemsJson[i+3]),
+                    price: parseFloat(itemsJson[i+5])
+                });
+            }
+        }
     }
 
+    // Populate existing items
+    const stockItems = await fetchStockData();
+    items.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'grid grid-cols-6 gap-2 item-row';
+        const price = parseFloat(item.price) || 0;
+        const quantity = parseInt(item.quantity) || 0;
+        const stock = stockItems.find(stock => stock.stock_name === item.name)?.stock_quantity || 0;
+        div.innerHTML = `
+            <select name="items[]" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-select w-full">
+                <option value="">Select Item</option>
+            </select>
+            <input name="quantities[]" type="number" value="${quantity}" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="1">
+            <input name="unit_prices[]" type="number" value="${price.toFixed(2)}" class="price-display p-2 border rounded-lg text-center w-full" step="0.01">
+            <input type="number" value="${stock}" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+            <input type="number" value="${(price * quantity).toFixed(2)}" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+            <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
+        `;
+        const addBtn = editContainer.querySelector('.add-item-btn');
+        editContainer.insertBefore(div, addBtn);
+        const select = div.querySelector('.product-select');
+        const choices = new Choices(select, { searchEnabled: true, searchChoices: true, itemSelectText: '' });
+        const choicesData = stockItems.map(stock => ({
+            value: `product|${stock.stock_name}|quantity|0|price|${stock.wholesale}|stock|${stock.stock_quantity}|uom|${stock.uom}`,
+            label: `${stock.stock_name} (${stock.uom})`,
+            selected: stock.stock_name === item.name
+        }));
+        choices.setChoices(choicesData, 'value', 'label', true);
+        attachPriceListener(div);
+        div.querySelector('.remove-item').addEventListener('click', () => {
+            div.remove();
+            updateSubtotal(editContainer);
+        });
+    });
+
+    // Add new item with dropdown
     const addItemBtn = editContainer.querySelector('.add-item-btn');
-    addItemBtn.addEventListener('click', () => {
+    addItemBtn.addEventListener('click', async () => {
         const div = document.createElement('div');
         div.className = 'grid grid-cols-6 gap-2 item-row';
         div.innerHTML = `
-            <input name="items[]" type="text" placeholder="Item name" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-input w-full">
-            <input name="items[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="1">
-            <input name="items[]" type="number" placeholder="Price" class="price-display p-2 border rounded-lg text-center w-full">
+            <select name="items[]" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-select w-full">
+                <option value="">Select Item</option>
+            </select>
+            <input name="quantities[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="1">
+            <input name="unit_prices[]" type="number" placeholder="Price" class="price-display p-2 border rounded-lg text-center w-full" step="0.01">
+            <input type="number" value="0" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+            <input type="number" value="0" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+            <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
+        `;
+        const addBtn = editContainer.querySelector('.add-item-btn');
+        editContainer.insertBefore(div, addBtn);
+        const select = div.querySelector('.product-select');
+        const choices = new Choices(select, { searchEnabled: true, searchChoices: true, itemSelectText: '' });
+        const choicesData = stockItems.map(stock => ({
+            value: `product|${stock.stock_name}|quantity|0|price|${stock.wholesale}|stock|${stock.stock_quantity}|uom|${stock.uom}`,
+            label: `${stock.stock_name} (${stock.uom})`
+        }));
+        choices.setChoices(choicesData, 'value', 'label', true);
+        attachPriceListener(div);
+        div.querySelector('.remove-item').addEventListener('click', () => {
+            div.remove();
+            updateSubtotal(editContainer);
+        });
+        div.querySelector('.product-select').addEventListener('change', (e) => {
+            const values = e.target.value.split('|');
+            const stock = values[7] ? parseFloat(values[7]) : 0;
+            const price = values[5] ? parseFloat(values[5]) : 0;
+            div.querySelector('.stock-display').value = stock.toFixed(2);
+            div.querySelector('.price-display').value = price.toFixed(2);
+            div.querySelector('.qty-input').max = stock;
+            if (stock === 0) {
+                showModalError('edit-order', `No stock available for ${values[1]}.`);
+            }
+            updateSubtotal(editContainer);
+        });
+        updateSubtotal(editContainer);
+    });
+
+    // Manual item button
+    const addManualBtn = document.getElementById('add-edit-manual');
+    addManualBtn.addEventListener('click', () => {
+        const div = document.createElement('div');
+        div.className = 'grid grid-cols-6 gap-2 item-row';
+        div.innerHTML = `
+            <input name="items[]" type="text" placeholder="Manual Item" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-input w-full">
+            <input name="quantities[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="1">
+            <input name="unit_prices[]" type="number" placeholder="Price" class="price-display p-2 border rounded-lg text-center w-full" step="0.01">
             <input type="number" value="0" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
             <input type="number" value="0" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
             <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
@@ -71,16 +149,75 @@ function editOrder(receiptId, orderType, shopName, itemsJson) {
         updateSubtotal(editContainer);
     });
 
+    // Update change and new balance
+    editAmountPaid.addEventListener('input', () => {
+        const subtotal = parseFloat(document.getElementById('edit-order-total').textContent) || 0;
+        const amountPaid = parseFloat(editAmountPaid.value) || 0;
+        const newBalance = parseFloat(existingBalance) + subtotal - amountPaid;
+        const change = amountPaid > subtotal ? amountPaid - subtotal : 0;
+        editOrderChange.textContent = change.toFixed(2);
+        form.querySelector('input[name=new_balance]').value = newBalance.toFixed(2);
+    });
+
+    // Add hidden input for new balance
+    const balanceInput = document.createElement('input');
+    balanceInput.type = 'hidden';
+    balanceInput.name = 'new_balance';
+    balanceInput.value = existingBalance;
+    form.appendChild(balanceInput);
+
     form.onsubmit = async function(e) {
         e.preventDefault();
         const submitBtn = form.querySelector('.submit-btn');
         submitBtn.classList.add('processing');
         submitBtn.disabled = true;
 
+        const formData = new FormData(this);
+        const itemRows = editContainer.querySelectorAll('.item-row');
+        const items = [];
+        itemRows.forEach(row => {
+            const select = row.querySelector('.product-select');
+            const qtyInput = row.querySelector('.qty-input');
+            const priceInput = row.querySelector('.price-display');
+            const stockDisplay = row.querySelector('.stock-display');
+            if (select && select.value && qtyInput.value) {
+                const values = select.value.split('|');
+                const qty = parseFloat(qtyInput.value) || 0;
+                const stock = parseFloat(stockDisplay.value) || 0;
+                if (qty > stock) {
+                    showModalError('edit-order', `Cannot order more than ${stock} units of ${values[1]}.`);
+                    submitBtn.classList.remove('processing');
+                    submitBtn.disabled = false;
+                    return;
+                }
+                items.push(`product|${values[1]}|quantity|${qty}|price|${priceInput.value}`);
+                items.push(qty);
+                items.push(priceInput.value);
+            } else if (row.querySelector('.product-input')?.value && qtyInput.value) {
+                items.push(`product|${row.querySelector('.product-input').value}|quantity|0|price|${priceInput.value}`);
+                items.push(qtyInput.value);
+                items.push(priceInput.value);
+            }
+        });
+        if (!items.length) {
+            showModalError('edit-order', 'No valid items in order.');
+            submitBtn.classList.remove('processing');
+            submitBtn.disabled = false;
+            return;
+        }
+        formData.delete('items[]');
+        formData.delete('quantities[]');
+        formData.delete('unit_prices[]');
+        items.forEach((item, index) => {
+            if (index % 3 === 0) formData.append('items[]', item);
+            else if (index % 3 === 1) formData.append('quantities[]', item);
+            else formData.append('unit_prices[]', item);
+        });
+
         try {
             const response = await fetch(this.action, {
                 method: 'POST',
-                body: new FormData(this),
+                body: formData,
                 headers: { 'X-CSRFToken': form.querySelector('[name=csrf_token]').value }
             });
             const result = await response.json();
@@ -120,11 +257,15 @@ function attachPriceListener(row) {
     };
     qtyInput.addEventListener('input', updateTotal);
     priceInput.addEventListener('input', updateTotal);
+    eventListeners.push({ element: qtyInput, type: 'input', handler: updateTotal });
+    eventListeners.push({ element: priceInput, type: 'input', handler: updateTotal });
 }
 
 closeEdit.addEventListener('click', () => {
     resetModal(editContainer);
     editModal.classList.add('hidden');
+    eventListeners.forEach(({ element, type, handler }) => element.removeEventListener(type, handler));
+    eventListeners = [];
 });
 
 export { editOrder, resetModal, attachPriceListener };
