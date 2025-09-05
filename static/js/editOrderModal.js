@@ -7,6 +7,25 @@ const editAmountPaid = document.getElementById('edit-amount-paid');
 const editOrderChange = document.getElementById('edit-order-change');
 let eventListeners = [];
 
+async function fetchOrderData(receiptId) {
+    try {
+        const response = await fetch(`/orders/${receiptId}`);
+        const text = await response.text();
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            console.error('JSON parse error:', text);
+            showModalError('edit-order', 'Invalid order data.');
+            return null;
+        }
+        return data;
+    } catch (error) {
+        showModalError('edit-order', `Failed to fetch order: ${error.message}`);
+        return null;
+    }
+}
+
 function resetModal(container) {
     const header = container.querySelector('.item-row-header');
     const initialAddBtn = container.querySelector('.add-item-btn');
@@ -19,15 +38,24 @@ function resetModal(container) {
 }
 
 async function editOrder(receiptId, orderType, shopName, itemsJson, existingBalance) {
+    // Fetch order data if missing
+    let orderData = { items: itemsJson, balance: existingBalance };
+    if (!itemsJson || !existingBalance) {
+        orderData = await fetchOrderData(receiptId);
+        if (!orderData) return;
+    }
+    itemsJson = orderData.items || [];
+    existingBalance = parseFloat(orderData.balance) || 0;
+
     document.querySelectorAll('.modal').forEach(modal => modal.classList.add('hidden'));
     editModal.classList.remove('hidden');
     document.getElementById('edit-order-id').textContent = receiptId;
-    document.getElementById('edit-order-type').value = orderType;
+    document.getElementById('edit-order-type').value = orderType || orderData.order_type || 'wholesale';
     const form = document.getElementById('edit-order-form');
     form.action = `/edit_order/${receiptId}`;
     resetModal(editContainer);
 
-    // Validate and display existing balance
+    // Display existing balance
     const balance = parseFloat(existingBalance) || 0;
     const balanceDiv = document.createElement('div');
     balanceDiv.className = 'text-sm text-gray-600 dark:text-gray-400 mb-2';
@@ -51,6 +79,7 @@ async function editOrder(receiptId, orderType, shopName, itemsJson, existingBala
     } catch (e) {
         console.error('Error parsing itemsJson:', e);
         showModalError('edit-order', 'Invalid order items data.');
+        return;
     }
 
     // Populate existing items
@@ -251,6 +280,7 @@ async function editOrder(receiptId, orderType, shopName, itemsJson, existingBala
             submitBtn.disabled = false;
         }
     };
+    updateSubtotal(editContainer); // Ensure initial subtotal
 }
 
 function showSuccessMessage(message) {
