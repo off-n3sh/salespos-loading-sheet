@@ -1,5 +1,3 @@
-// static/js/wholesaleModal.js
-
 import { fetchStockData, updateSubtotal, updateChange, showModalError } from './utils.js';
 
 const wholesaleModal = document.getElementById('wholesale-modal');
@@ -48,12 +46,14 @@ function handleAddItemClick(event) {
 async function addItem(container) {
     const div = document.createElement('div');
     div.className = 'grid grid-cols-6 gap-2 item-row';
+    // Remove readonly for managers
+    const isManager = window.userRole === 'manager';
     div.innerHTML = `
         <select name="items[]" class="col-span-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-select w-full">
             <option value="">Search or select a product</option>
         </select>
         <input name="items[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="0.01">
-        <input type="number" class="price-display p-2 border rounded-lg text-center w-full" readonly>
+        <input type="number" class="price-display p-2 border rounded-lg text-center w-full" ${isManager ? '' : 'readonly'} step="0.01" min="0">
         <input type="number" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
         <input type="number" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
         <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
@@ -115,7 +115,7 @@ function attachPriceListener(row) {
                 qtyInput.value = maxStock;
                 showModalError(row.closest('.modal').id.split('-')[0], `Cannot order more than ${maxStock} units of ${values[1]}.`);
             }
-            totalDisplay.value = (basePrice * (parseFloat(qtyInput.value) || 0)).toFixed(2);
+            totalDisplay.value = (basePrice * qty).toFixed(2);
             updateSubtotal(row.closest('.space-y-4'));
         } else {
             basePrice = 0;
@@ -134,9 +134,20 @@ function attachPriceListener(row) {
             qtyInput.value = maxStock;
             showModalError(row.closest('.modal').id.split('-')[0], `Cannot order more than ${maxStock} units.`);
         }
-        totalDisplay.value = (basePrice * (parseFloat(qtyInput.value) || 0)).toFixed(2);
+        const currentPrice = window.userRole === 'manager' ? parseFloat(priceDisplay.value) || basePrice : basePrice;
+        totalDisplay.value = (currentPrice * qty).toFixed(2);
         updateSubtotal(row.closest('.space-y-4'));
     });
+
+    // Allow managers to edit price
+    if (window.userRole === 'manager') {
+        priceDisplay.addEventListener('input', () => {
+            const qty = parseFloat(qtyInput.value) || 0;
+            const newPrice = parseFloat(priceDisplay.value) || 0;
+            totalDisplay.value = (newPrice * qty).toFixed(2);
+            updateSubtotal(row.closest('.space-y-4'));
+        });
+    }
 }
 
 closeWholesale.addEventListener('click', () => {
@@ -151,7 +162,25 @@ document.getElementById('wholesale-form').addEventListener('submit', function(e)
     const submitBtn = this.querySelector('.submit-btn');
     submitBtn.classList.add('processing');
     submitBtn.disabled = true;
+
+    // Modify form data to use edited prices
     const formData = new FormData(this);
+    const itemRows = wholesaleContainer.querySelectorAll('.item-row');
+    const items = [];
+    itemRows.forEach(row => {
+        const select = row.querySelector('.product-select');
+        const qtyInput = row.querySelector('.qty-input');
+        const priceInput = row.querySelector('.price-display');
+        if (select.value && qtyInput.value) {
+            const values = select.value.split('|');
+            values[5] = parseFloat(priceInput.value) || parseFloat(values[5]); // Use edited price
+            items.push(values.join('|'));
+            items.push(qtyInput.value);
+        }
+    });
+    formData.delete('items[]');
+    items.forEach(item => formData.append('items[]', item));
+
     fetch(this.action, {
         method: 'POST',
         body: formData
