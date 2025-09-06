@@ -47,11 +47,16 @@ def format_currency(value):
 app.jinja_env.filters['format_datetime'] = format_datetime
 app.jinja_env.filters['format_currency'] = format_currency   
 
+stock_cache = {'data': None, 'version': None, 'timestamp': None, 'timeout': timedelta(minutes=5)}
 def update_stock_version():
+    """Increment the stock version in Firestore."""
     db = firestore.Client()
-    db.collection('metadata').document('stock_version').set({
-        'version': datetime.now().isoformat()
-    })
+    version_ref = db.collection('metadata').document('stock_version')
+    version_doc = version_ref.get()
+    current_version = version_doc.to_dict().get('version', 0) if version_doc.exists else 0
+    new_version = int(current_version) + 1
+    version_ref.set({'version': new_version})
+    return new_version
     
 def update_clients_counter(change, context):
     count = sum(1 for _ in db.collection('clients').stream())
@@ -498,9 +503,8 @@ def stock_data():
     """Fetch stock data from Firestore for retail/wholesale modals."""
     try:
         db = firestore.Client()
-        # Fetch current cache version
         version_doc = db.collection('metadata').document('stock_version').get()
-        current_version = version_doc.to_dict().get('version', '0') if version_doc.exists else '0'
+        current_version = str(version_doc.to_dict().get('version', '0')) if version_doc.exists else '0'
 
         # Check cache
         if (stock_cache.get('data') and
@@ -517,7 +521,12 @@ def stock_data():
                 'selling_price': float(doc.to_dict().get('selling_price', 0) or 0),
                 'wholesale': float(doc.to_dict().get('wholesale', 0) or 0),
                 'stock_quantity': float(doc.to_dict().get('stock_quantity', 0) or 0),
-                'uom': doc.to_dict().get('uom', 'Unit')
+                'uom': doc.to_dict().get('uom', 'Unit'),
+                'category': doc.to_dict().get('category', ''),
+                'id': doc.id,
+                'company_price': float(doc.to_dict().get('company_price', 0) or 0),
+                'expire_date': doc.to_dict().get('expire_date', None),
+                'reorder_quantity': int(doc.to_dict().get('reorder_quantity', 0) or 0)
             }
             for doc in db.collection('stock').order_by('stock_name').get()
         ]
@@ -546,16 +555,22 @@ def stock_data():
     except Exception as e:
         print(f"Error fetching stock data: {str(e)}")
         return jsonify({'error': f"Failed to fetch stock data: {str(e)}"}), 500
+
+
 @app.route('/clear_stock_cache', methods=['POST'])
 @login_required
 def clear_stock_cache():
     try:
         update_stock_version()
+        stock_cache['data'] = None
+        stock_cache['version'] = None
+        stock_cache['timestamp'] = None
+        print("Stock cache cleared successfully")
         return jsonify({'status': 'success'}), 200
     except Exception as e:
         print(f"Error updating stock version: {str(e)}")
         return jsonify({'error': str(e)}), 500
-        
+
 @app.route('/stock', methods=['GET', 'POST'])
 @login_required
 @no_cache
@@ -648,6 +663,9 @@ def stock():
                 log_stock_change(final_category, stock_name, 'add_stock', initial_quantity, selling_price)
                 log_stock_change(final_category, stock_name, 'wholesale_price_set', 0, wholesale_price)
                 update_stock_version()
+                stock_cache['data'] = None
+                stock_cache['version'] = None
+                stock_cache['timestamp'] = None
                 return jsonify({'status': 'success', 'message': 'Stock added successfully'}), 200
 
             elif action == 'restock':
@@ -670,6 +688,9 @@ def stock():
                     print(f"Restocked {stock_id}: {restock_qty} units")
                     log_stock_change(stock.to_dict().get('category'), stock.to_dict().get('stock_name'), 'restock', restock_qty, stock.to_dict().get('selling_price'))
                     update_stock_version()
+                    stock_cache['data'] = None
+                    stock_cache['version'] = None
+                    stock_cache['timestamp'] = None
                     return jsonify({'status': 'success', 'message': 'Stock restocked successfully'}), 200
                 except ValueError as e:
                     print(f"Invalid restock quantity: {str(e)}")
@@ -707,6 +728,9 @@ def stock():
                         log_stock_change(stock_data.get('category'), stock_data.get('stock_name'), 'wholesale_price_update', 0, new_wholesale_price)
                     print(f"Updated prices for {stock_id}: Retail={new_selling_price}, Wholesale={new_wholesale_price}")
                     update_stock_version()
+                    stock_cache['data'] = None
+                    stock_cache['version'] = None
+                    stock_cache['timestamp'] = None
                     return jsonify({'status': 'success', 'message': 'Prices updated successfully'}), 200
                 except ValueError as e:
                     print(f"Invalid price format: {str(e)}")

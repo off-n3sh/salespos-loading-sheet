@@ -32,7 +32,11 @@ async function fetchStockData(forceRefresh = false) {
             selling_price: parseFloat(item.selling_price) || 0,
             wholesale: parseFloat(item.wholesale) || 0,
             stock_quantity: parseFloat(item.stock_quantity) || 0,
-            uom: item.uom || 'Unit'
+            uom: item.uom || 'Unit',
+            category: item.category || '',
+            id: item.id || '',
+            company_price: parseFloat(item.company_price) || 0,
+            expire_date: item.expire_date || null
         }));
         const versionResponse = await fetch('/stock_version', { credentials: 'include' });
         if (versionResponse.ok) {
@@ -48,138 +52,23 @@ async function fetchStockData(forceRefresh = false) {
     }
 }
 
-function updateSubtotal(container, existingBalance = 0) {
-    if (!container) {
-        console.error('updateSubtotal: Container not found');
-        return;
-    }
-    const rows = container.querySelectorAll('.item-row:not([data-existing="true"])');
-    let additionalSubtotal = 0;
-    rows.forEach(row => {
-        const qtyInput = row.querySelector('.qty-input');
-        const priceInput = row.querySelector('.price-display');
-        const qty = qtyInput ? parseInt(qtyInput.value) || 0 : 0;
-        const price = priceInput ? parseFloat(priceInput.value) || 0 : 0;
-        additionalSubtotal += qty * price;
-    });
-    const totalSubtotal = existingBalance + additionalSubtotal;
-    const totalSpan = document.getElementById('edit-order-total') || container.parentElement.querySelector('[id$="-order-total"]');
-    if (totalSpan) {
-        totalSpan.textContent = totalSubtotal.toFixed(2);
-        updateChange(container);
+// Show notification (simplified from stock.html)
+function showNotification(title, message) {
+    const toast = document.getElementById('notification-toast');
+    const titleElement = document.getElementById('notification-title');
+    const messageElement = document.getElementById('notification-message');
+    
+    if (toast && titleElement && messageElement) {
+        titleElement.textContent = title;
+        messageElement.textContent = message;
+        toast.classList.remove('hidden', 'translate-y-10', 'opacity-0');
+        toast.classList.add('translate-y-0', 'opacity-100');
+        setTimeout(() => {
+            toast.classList.add('translate-y-10', 'opacity-0');
+            toast.classList.add('hidden');
+        }, 3000);
     } else {
-        console.error('updateSubtotal: Total span not found');
-    }
-}
-
-function updateChange(container) {
-    if (!container) {
-        console.error('updateChange: Container not found');
-        return;
-    }
-    const modalId = container.id.split('-')[0];
-    const amountPaidInput = document.getElementById(`${modalId}-amount-paid`);
-    const changeSpan = document.getElementById(`${modalId}-order-change`);
-    const totalSpan = container.parentElement.querySelector('[id$="-order-total"]');
-    if (!amountPaidInput || !changeSpan || !totalSpan) {
-        console.error('updateChange: Required elements not found');
-        return;
-    }
-    const subtotal = parseFloat(totalSpan.textContent) || 0;
-    const amountPaid = parseFloat(amountPaidInput.value) || 0;
-    const change = amountPaid - subtotal;
-    changeSpan.textContent = change >= 0 ? change.toFixed(2) : '0.00';
-    changeSpan.parentElement.classList.toggle('text-green-600', change >= 0);
-    changeSpan.parentElement.classList.toggle('text-red-600', change < 0);
-}
-
-function showModalError(modalId, message) {
-    const errorDiv = document.getElementById(`${modalId}-error`);
-    if (errorDiv) {
-        errorDiv.textContent = message;
-        errorDiv.classList.remove('hidden');
-        setTimeout(() => errorDiv.classList.add('hidden'), 5000);
-    } else {
-        console.warn(`Error div for ${modalId} not found. Message: ${message}`);
-        alert(message);
-    }
-}
-
-async function populateClients(inputElement, debtElement) {
-    if (!window.Choices) {
-        console.error('Choices.js library not loaded');
-        showModalError(inputElement.closest('form').id.replace('-form', ''), 'Client selection unavailable: Library error');
-        return;
-    }
-    try {
-        const response = await fetch('/clients_data', { credentials: 'include' });
-        if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
-        const clients = await response.json();
-        const choices = new Choices(inputElement, {
-            searchEnabled: true,
-            allowHTML: false,
-            placeholderValue: 'Search or type a client name',
-            noResultsText: 'No clients found - type to add a new client',
-            addItems: true,
-            removeItemButton: true,
-            maxItemCount: 1,
-            duplicateItemsAllowed: false,
-            choices: clients.map(client => ({
-                value: client.shop_name,
-                label: `${client.shop_name} (Debt: KSh ${client.debt.toFixed(2)})`
-            })),
-            searchFloor: 1,
-            searchResultLimit: 10,
-            shouldSort: false,
-        });
-
-        inputElement.closest('.modal').addEventListener('modal:open', () => {
-            choices.clearInput();
-            choices.removeActiveItems();
-            debtElement.textContent = '';
-            debtElement.classList.add('hidden');
-        });
-
-        inputElement.addEventListener('change', () => {
-            const value = choices.getValue(true);
-            const selectedClient = clients.find(c => c.shop_name === value);
-            if (selectedClient) {
-                debtElement.textContent = `Debt: KSh ${selectedClient.debt.toFixed(2)}`;
-                debtElement.classList.remove('hidden');
-            } else if (value) {
-                debtElement.textContent = 'Debt: KSh 0.00 (New Client)';
-                debtElement.classList.remove('hidden');
-                if (!choices.getChoiceByValue(value)) {
-                    choices.setChoices([{ value: value, label: value }], 'value', 'label', false);
-                    choices.setChoiceByValue(value);
-                }
-            } else {
-                debtElement.textContent = '';
-                debtElement.classList.add('hidden');
-            }
-        });
-
-        inputElement.addEventListener('search', (event) => {
-            const searchTerm = event.detail.value.toLowerCase();
-            const filteredClients = clients.filter(client => 
-                client.shop_name.toLowerCase().includes(searchTerm)
-            );
-            choices.setChoices(
-                filteredClients.map(client => ({
-                    value: client.shop_name,
-                    label: `${client.shop_name} (Debt: KSh ${client.debt.toFixed(2)})`
-                })),
-                'value',
-                'label',
-                true
-            );
-            if (searchTerm && !filteredClients.some(c => c.shop_name.toLowerCase() === searchTerm)) {
-                choices.setChoices([{ value: searchTerm, label: `${searchTerm} (New)` }], 'value', 'label', false);
-            }
-        });
-    } catch (error) {
-        console.error('Error loading clients:', error);
-        showModalError(inputElement.closest('form').id.replace('-form', ''), 'Failed to load clients.');
+        console.warn('Notification elements not found');
     }
 }
 
@@ -189,7 +78,9 @@ window.addEventListener('storage', async (event) => {
         console.log('Cache invalidation detected, clearing and refetching stock data');
         clearStockCache();
         await fetchStockData(true);
+        // Notify stock.html to refresh UI if needed
+        document.dispatchEvent(new Event('stockDataUpdated'));
     }
 });
 
-export { fetchStockData, clearStockCache, updateSubtotal, updateChange, showModalError, populateClients };
+export { fetchStockData, clearStockCache, showNotification };
