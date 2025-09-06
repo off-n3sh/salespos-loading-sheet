@@ -1,21 +1,24 @@
-let stockDataCache = null;
+\let stockDataCache = null;
 let stockVersionCache = null;
 
-async function fetchStockData() {
+async function fetchStockData(forceRefresh = false) {
+    if (!forceRefresh && stockDataCache && stockVersionCache) {
+        try {
+            const versionResponse = await fetch('/stock_version', { credentials: 'include' });
+            if (!versionResponse.ok) {
+                throw new Error(`HTTP error: ${versionResponse.status}`);
+            }
+            const { version } = await versionResponse.json();
+            if (stockVersionCache === version) {
+                return stockDataCache;
+            }
+        } catch (error) {
+            console.error('Error checking stock version:', error);
+            return stockDataCache || [];
+        }
+    }
+
     try {
-        // Check version first
-        const versionResponse = await fetch('/stock_version', { credentials: 'include' });
-        if (!versionResponse.ok) {
-            throw new Error(`HTTP error: ${versionResponse.status}`);
-        }
-        const { version } = await versionResponse.json();
-
-        // Return cached data if version hasn't changed
-        if (stockDataCache && stockVersionCache === version) {
-            return stockDataCache;
-        }
-
-        // Fetch fresh stock data
         const response = await fetch('/stock_data', { credentials: 'include' });
         if (!response.ok) {
             throw new Error(`HTTP error: ${response.status}`);
@@ -31,15 +34,18 @@ async function fetchStockData() {
             stock_quantity: parseFloat(item.stock_quantity) || 0,
             uom: item.uom || 'Unit'
         }));
-        stockVersionCache = version;
-
+        const versionResponse = await fetch('/stock_version', { credentials: 'include' });
+        if (versionResponse.ok) {
+            const { version } = await versionResponse.json();
+            stockVersionCache = version;
+        }
         if (!stockDataCache.length) {
             console.warn('No stock items returned from /stock_data');
         }
         return stockDataCache;
     } catch (error) {
         console.error('Error fetching stock data:', error);
-        return stockDataCache || []; // Fallback to cache or empty array
+        return stockDataCache || [];
     }
 }
 

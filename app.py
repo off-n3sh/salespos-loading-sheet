@@ -1450,6 +1450,7 @@ def stock():
             db.collection('stock').document(doc_id).set(stock_data)
             log_stock_change(final_category, stock_name, 'add_stock', initial_quantity, selling_price)
             log_stock_change(final_category, stock_name, 'wholesale_price_set', 0, wholesale_price)
+            update_stock_version()  # Update version after adding stock
 
         elif action == 'restock':
             stock_id = request.form.get('stock_id')
@@ -1464,6 +1465,7 @@ def stock():
                         current_qty = stock.to_dict().get('stock_quantity', 0)
                         stock_ref.update({'stock_quantity': current_qty + restock_qty})
                         log_stock_change(stock.to_dict().get('category'), stock.to_dict().get('stock_name'), 'restock', restock_qty, stock.to_dict().get('selling_price'))
+                        update_stock_version()  # Update version after restocking
                     except ValueError:
                         return "Invalid restock quantity", 400
 
@@ -1490,13 +1492,12 @@ def stock():
                                 log_stock_change(stock_data.get('category'), stock_data.get('stock_name'), 'price_update', 0, new_selling_price)
                             if new_wholesale_price > 0:
                                 log_stock_change(stock_data.get('category'), stock_data.get('stock_name'), 'wholesale_price_update', 0, new_wholesale_price)
+                            update_stock_version()  # Update version after price update
                     except ValueError:
                         return "Invalid price format", 400
 
-    # GET: Render stock page
     stock_items = [doc.to_dict() | {'id': doc.id} for doc in db.collection('stock').order_by('stock_name').get()]
     
-    # Remove duplicates by stock_name (based on screenshot observation)
     seen = set()
     unique_stock_items = []
     for item in stock_items:
@@ -1506,7 +1507,6 @@ def stock():
             unique_stock_items.append(item)
     stock_items = unique_stock_items
 
-    # Expiry notifications
     for item in stock_items:
         expire_date = item.get('expire_date')
         if expire_date and expire_date != "0000-00-00 00:00:00":
