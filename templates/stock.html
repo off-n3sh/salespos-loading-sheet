@@ -235,7 +235,9 @@
     const toggleButton = document.getElementById('toggle-add-stock-form');
     const addStockForm = document.getElementById('add-stock-form');
     if (toggleButton && addStockForm) {
-        toggleButton.addEventListener('click', () => addStockForm.classList.toggle('hidden'));
+        toggleButton.addEventListener('click', () => {
+            addStockForm.classList.toggle('hidden');
+        });
     }
 
     // Category Selection Logic
@@ -243,9 +245,14 @@
     const newCategoryInput = document.getElementById('new_category');
     if (categorySelect && newCategoryInput) {
         categorySelect.addEventListener('change', () => {
-            newCategoryInput.classList.toggle('hidden', categorySelect.value !== 'new');
-            newCategoryInput.required = categorySelect.value === 'new';
-            newCategoryInput.value = '';
+            if (categorySelect.value === 'new') {
+                newCategoryInput.classList.remove('hidden');
+                newCategoryInput.required = true;
+            } else {
+                newCategoryInput.classList.add('hidden');
+                newCategoryInput.required = false;
+                newCategoryInput.value = '';
+            }
         });
     }
 
@@ -258,129 +265,120 @@
     function filterStock() {
         const searchText = searchInput.value.toLowerCase();
         const category = categoryFilter.value;
+
         cards.forEach(card => {
             const name = card.querySelector('h3').textContent.toLowerCase();
             const categorySpan = card.querySelector('span.inline-flex').textContent.trim();
-            card.style.display = (name.includes(searchText) && (!category || categorySpan === category)) ? 'block' : 'none';
+            const matchesSearch = name.includes(searchText);
+            const matchesCategory = !category || categorySpan === category;
+            card.style.display = (matchesSearch && matchesCategory) ? 'block' : 'none';
         });
     }
 
     searchInput.addEventListener('input', filterStock);
     categoryFilter.addEventListener('change', filterStock);
 
-    // Form Submission Logic
-    document.querySelectorAll('form').forEach(form => {
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const formData = new FormData(form);
-            // Log FormData for debugging
-            for (const [key, value] of formData.entries()) {
-                console.log(`FormData: ${key}=${value}`);
-            }
-            try {
-                const response = await fetch('/stock', {
-                    method: 'POST',
-                    body: formData
-                });
-                const result = await response.json();
-                if (response.ok && result.status === 'success') {
-                    localStorage.setItem('stockCacheInvalidated', Date.now().toString());
-                    await fetch('/clear_stock_cache', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ csrf_token: formData.get('csrf_token') })
-                    });
-                    showNotification('Success', result.message);
-                    window.location.reload();
-                } else {
-                    console.error('Server error:', result.error);
-                    showNotification('Error', result.error || 'Failed to update stock.');
-                }
-            } catch (error) {
-                console.error('Fetch error:', error);
-                showNotification('Error', 'Network error: Failed to update stock.');
-            }
-        });
-    });
-
-    // Cache Invalidation Listener
-    window.addEventListener('storage', async (event) => {
-        if (event.key === 'stockCacheInvalidated') {
-            try {
-                await fetch('/clear_stock_cache', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ csrf_token: document.querySelector('input[name="csrf_token"]').value })
-                });
-            } catch (error) {
-                console.error('Cache clear error:', error);
-            }
-        }
-    });
-
     // Expiry Notification System
     function showNotification(title, message) {
         const toast = document.getElementById('notification-toast');
         const titleElement = document.getElementById('notification-title');
         const messageElement = document.getElementById('notification-message');
+        
         titleElement.textContent = title;
         messageElement.textContent = message;
+        
         toast.classList.remove('hidden', 'translate-y-10', 'opacity-0');
         toast.classList.add('translate-y-0', 'opacity-100');
+        
         setTimeout(() => {
             toast.classList.add('translate-y-10', 'opacity-0');
-            setTimeout(() => toast.classList.add('hidden'), 300);
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 300);
         }, 5000);
     }
-
+    
     document.getElementById('close-notification').addEventListener('click', () => {
         const toast = document.getElementById('notification-toast');
         toast.classList.add('translate-y-10', 'opacity-0');
-        setTimeout(() => toast.classList.add('hidden'), 300);
+        setTimeout(() => {
+            toast.classList.add('hidden');
+        }, 300);
     });
 
+    // Check expiry dates and send notifications
     function checkExpiryDates() {
         const stockItems = Array.from(document.querySelectorAll('.stock-card'));
         const expiringItems = [];
         const expiredItems = [];
+        
         stockItems.forEach(item => {
             const daysLeft = parseInt(item.dataset.daysLeft);
             const name = item.dataset.name;
             const expiry = item.dataset.expiry;
+            
             if (daysLeft !== undefined && !isNaN(daysLeft)) {
-                if (daysLeft === 0) expiredItems.push({ name, expiry });
-                else if (daysLeft <= 7) expiringItems.push({ name, expiry, daysLeft });
+                if (daysLeft === 0) {
+                    expiredItems.push({name, expiry});
+                } else if (daysLeft <= 7) {
+                    expiringItems.push({name, expiry, daysLeft});
+                }
             }
         });
+        
+        // Send notifications for expired items
         if (expiredItems.length > 0) {
-            const message = expiredItems.length === 1
-                ? `${expiredItems[0].name} has expired!`
+            const message = expiredItems.length === 1 
+                ? `${expiredItems[0].name} has expired!` 
                 : `${expiredItems.length} items have expired!`;
+            
             showNotification('Expired Items Alert', message);
             sendNotificationToServer('expired', expiredItems);
         }
+        
+        // Send notifications for soon-to-expire items
         if (expiringItems.length > 0) {
-            const message = expiringItems.length === 1
-                ? `${expiringItems[0].name} will expire in ${expiringItems[0].daysLeft} day(s)!`
+            const message = expiringItems.length === 1 
+                ? `${expiringItems[0].name} will expire in ${expiringItems[0].daysLeft} day(s)!` 
                 : `${expiringItems.length} items will expire soon!`;
+            
             showNotification('Expiry Warning', message);
             sendNotificationToServer('expiring', expiringItems);
         }
     }
-
+    
     function sendNotificationToServer(type, items) {
-        fetch('/api/notifications', {
+        // Placeholder for your notification endpoint
+        const notificationEndpoint = '/api/notifications';
+        
+        fetch(notificationEndpoint, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type, items, csrf_token: document.querySelector('input[name="csrf_token"]').value })
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('input[name="csrf_token"]').value
+            },
+            body: JSON.stringify({
+                type: type,
+                items: items
+            })
         })
         .then(response => {
-            if (!response.ok) console.error('Failed to send notification to server');
+            if (!response.ok) {
+                console.error('Failed to send notification to server');
+            }
         })
-        .catch(error => console.error('Error sending notification:', error));
+        .catch(error => {
+            console.error('Error sending notification:', error);
+        });
     }
 
-    document.addEventListener('DOMContentLoaded', checkExpiryDates);
+    // Check for expiring items when page loads
+    document.addEventListener('DOMContentLoaded', () => {
+        checkExpiryDates();
+    });
+    
+    // For demo purposes, check periodically (in a real app, this might be handled by server-side scheduler)
+    // This check is every 30 minutes (1800000 ms)
     setInterval(checkExpiryDates, 1800000);
 </script>
 {% endblock %}
