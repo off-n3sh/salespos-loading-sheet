@@ -1375,7 +1375,6 @@ def mark_paid(receipt_id):
 @no_cache
 @login_required
 def stock():
-    """Handle stock management."""
     if request.method == 'POST':
         if session['user']['role'] != 'manager':
             return "Unauthorized: Only managers can modify stock", 403
@@ -1450,7 +1449,7 @@ def stock():
             db.collection('stock').document(doc_id).set(stock_data)
             log_stock_change(final_category, stock_name, 'add_stock', initial_quantity, selling_price)
             log_stock_change(final_category, stock_name, 'wholesale_price_set', 0, wholesale_price)
-            update_stock_version()  # Update version after adding stock
+            update_stock_version()
 
         elif action == 'restock':
             stock_id = request.form.get('stock_id')
@@ -1465,7 +1464,7 @@ def stock():
                         current_qty = stock.to_dict().get('stock_quantity', 0)
                         stock_ref.update({'stock_quantity': current_qty + restock_qty})
                         log_stock_change(stock.to_dict().get('category'), stock.to_dict().get('stock_name'), 'restock', restock_qty, stock.to_dict().get('selling_price'))
-                        update_stock_version()  # Update version after restocking
+                        update_stock_version()
                     except ValueError:
                         return "Invalid restock quantity", 400
 
@@ -1492,12 +1491,11 @@ def stock():
                                 log_stock_change(stock_data.get('category'), stock_data.get('stock_name'), 'price_update', 0, new_selling_price)
                             if new_wholesale_price > 0:
                                 log_stock_change(stock_data.get('category'), stock_data.get('stock_name'), 'wholesale_price_update', 0, new_wholesale_price)
-                            update_stock_version()  # Update version after price update
+                            update_stock_version()
                     except ValueError:
                         return "Invalid price format", 400
 
     stock_items = [doc.to_dict() | {'id': doc.id} for doc in db.collection('stock').order_by('stock_name').get()]
-    
     seen = set()
     unique_stock_items = []
     for item in stock_items:
@@ -1550,7 +1548,15 @@ def receipts():
     except Exception as e:
         return f"Error loading receipts: {str(e)}", 500
         
-
+@app.route('/clear_stock_cache', methods=['POST'])
+@login_required
+def clear_stock_cache():
+    try:
+        update_stock_version()
+        return jsonify({'status': 'success'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+        
 @app.route('/receipt/<order_id>')
 @no_cache
 @login_required

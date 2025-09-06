@@ -1,17 +1,18 @@
 let stockDataCache = null;
 let stockVersionCache = null;
 
+function clearStockCache() {
+    stockDataCache = null;
+    stockVersionCache = null;
+}
+
 async function fetchStockData(forceRefresh = false) {
     if (!forceRefresh && stockDataCache && stockVersionCache) {
         try {
             const versionResponse = await fetch('/stock_version', { credentials: 'include' });
-            if (!versionResponse.ok) {
-                throw new Error(`HTTP error: ${versionResponse.status}`);
-            }
+            if (!versionResponse.ok) throw new Error(`HTTP error: ${versionResponse.status}`);
             const { version } = await versionResponse.json();
-            if (stockVersionCache === version) {
-                return stockDataCache;
-            }
+            if (stockVersionCache === version) return stockDataCache;
         } catch (error) {
             console.error('Error checking stock version:', error);
             return stockDataCache || [];
@@ -20,13 +21,9 @@ async function fetchStockData(forceRefresh = false) {
 
     try {
         const response = await fetch('/stock_data', { credentials: 'include' });
-        if (!response.ok) {
-            throw new Error(`HTTP error: ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
         const data = await response.json();
-        if (!Array.isArray(data)) {
-            throw new Error('Invalid response format: Expected an array');
-        }
+        if (!Array.isArray(data)) throw new Error('Invalid response format: Expected an array');
         stockDataCache = data.map(item => ({
             stock_name: item.stock_name,
             selling_price: parseFloat(item.selling_price) || 0,
@@ -39,9 +36,7 @@ async function fetchStockData(forceRefresh = false) {
             const { version } = await versionResponse.json();
             stockVersionCache = version;
         }
-        if (!stockDataCache.length) {
-            console.warn('No stock items returned from /stock_data');
-        }
+        if (!stockDataCache.length) console.warn('No stock items returned from /stock_data');
         return stockDataCache;
     } catch (error) {
         console.error('Error fetching stock data:', error);
@@ -160,4 +155,4 @@ async function populateClients(inputElement, debtElement) {
     }
 }
 
-export { fetchStockData, updateSubtotal, updateChange, showModalError, populateClients };
+export { fetchStockData, clearStockCache, updateSubtotal, updateChange, showModalError, populateClients };
