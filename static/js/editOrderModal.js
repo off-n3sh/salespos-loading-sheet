@@ -46,12 +46,13 @@ async function editOrder(receiptId) {
     form.action = `/edit_order/${receiptId}`;
     resetModal(editContainer);
 
-    // Display existing balance
+    // Display existing balance and set subtotal to it
     const existingBalance = parseFloat(balance) || 0;
     const balanceDiv = document.createElement('div');
     balanceDiv.className = 'text-sm text-gray-600 dark:text-gray-400 mb-2';
     balanceDiv.textContent = `Existing Balance: ${existingBalance.toFixed(2)}`;
     form.prepend(balanceDiv);
+    document.getElementById('edit-order-total').textContent = existingBalance.toFixed(2);
 
     // Parse and preload items
     let itemsList = [];
@@ -104,7 +105,7 @@ async function editOrder(receiptId) {
         attachPriceListener(div);
         div.querySelector('.remove-item').addEventListener('click', () => {
             div.remove();
-            updateSubtotal(editContainer);
+            updateSubtotal(editContainer, existingBalance);
         });
     });
 
@@ -135,7 +136,7 @@ async function editOrder(receiptId) {
         attachPriceListener(div);
         div.querySelector('.remove-item').addEventListener('click', () => {
             div.remove();
-            updateSubtotal(editContainer);
+            updateSubtotal(editContainer, existingBalance);
         });
         div.querySelector('.product-select').addEventListener('change', (e) => {
             const values = e.target.value.split('|');
@@ -147,9 +148,9 @@ async function editOrder(receiptId) {
             if (stock === 0) {
                 showModalError('edit-order', `No stock available for ${values[1]}.`);
             }
-            updateSubtotal(editContainer);
+            updateSubtotal(editContainer, existingBalance);
         });
-        updateSubtotal(editContainer);
+        updateSubtotal(editContainer, existingBalance);
     });
 
     // Manual item
@@ -170,27 +171,18 @@ async function editOrder(receiptId) {
         attachPriceListener(div);
         div.querySelector('.remove-item').addEventListener('click', () => {
             div.remove();
-            updateSubtotal(editContainer);
+            updateSubtotal(editContainer, existingBalance);
         });
-        updateSubtotal(editContainer);
+        updateSubtotal(editContainer, existingBalance);
     });
 
-    // Update change and balance
+    // Update change
     editAmountPaid.addEventListener('input', () => {
         const subtotal = parseFloat(document.getElementById('edit-order-total').textContent) || 0;
         const amountPaid = parseFloat(editAmountPaid.value) || 0;
-        const newBalance = existingBalance + subtotal - amountPaid;
         const change = amountPaid > subtotal ? amountPaid - subtotal : 0;
         editOrderChange.textContent = change.toFixed(2);
-        form.querySelector('input[name=new_balance]').value = newBalance.toFixed(2);
     });
-
-    // Hidden balance input
-    const balanceInput = document.createElement('input');
-    balanceInput.type = 'hidden';
-    balanceInput.name = 'new_balance';
-    balanceInput.value = existingBalance.toFixed(2);
-    form.appendChild(balanceInput);
 
     form.onsubmit = async function(e) {
         e.preventDefault();
@@ -271,7 +263,7 @@ async function editOrder(receiptId) {
             submitBtn.disabled = false;
         }
     };
-    updateSubtotal(editContainer);
+    updateSubtotal(editContainer, existingBalance);
 }
 
 function showSuccessMessage(message) {
@@ -290,7 +282,7 @@ function attachPriceListener(row) {
         const price = parseFloat(priceInput.value) || 0;
         const total = qty * price;
         row.querySelector('.total-display').value = total.toFixed(2);
-        updateSubtotal(row.closest('#edit-items-container'));
+        updateSubtotal(row.closest('#edit-items-container'), parseFloat(document.getElementById('edit-order-total').textContent) || 0);
     };
     qtyInput.addEventListener('input', updateTotal);
     priceInput.addEventListener('input', updateTotal);
