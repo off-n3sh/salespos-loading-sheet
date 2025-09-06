@@ -2293,7 +2293,6 @@ def edit_order(order_id):
         quantities = request.form.getlist('quantities[]')
         unit_prices = request.form.getlist('unit_prices[]')
         amount_paid = float(request.form.get('amount_paid') or 0)
-        new_balance = float(request.form.get('new_balance') or order_data.get('balance', 0))
 
         new_items_list = []
         for i in range(len(items_raw)):
@@ -2343,6 +2342,9 @@ def edit_order(order_id):
         payment_history = order_data.get('payment_history', [])
         if amount_paid > 0:
             payment_history.append({'amount': amount_paid, 'date': datetime.now(NAIROBI_TZ)})
+
+        # Calculate new balance: subtotal minus any new payment
+        new_balance = subtotal - amount_paid
 
         updated_order = {
             'items': combined_items,
