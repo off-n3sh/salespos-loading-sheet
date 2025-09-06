@@ -88,40 +88,40 @@ async function editOrder(receiptId) {
     }
 
     // Populate existing items
-    const stockItems = await fetchStockData();
+    const stockItems = await fetchStockData(true); // Force refresh
     itemsList.forEach(item => {
-        const div = document.createElement('div');
-        div.className = 'grid grid-cols-6 gap-2 item-row';
-        const price = parseFloat(item.price) || 0;
-        const quantity = parseInt(item.quantity) || 0;
-        const stock = stockItems.find(stock => stock.stock_name === item.name)?.stock_quantity || 0;
-        div.innerHTML = `
-            <select name="items[]" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-select w-full">
-                <option value="">Select Item</option>
-            </select>
-            <input name="quantities[]" type="number" value="${quantity}" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="1">
-            <input name="unit_prices[]" type="number" value="${price.toFixed(2)}" class="price-display p-2 border rounded-lg text-center w-full" step="0.01">
-            <input type="number" value="${stock}" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-            <input type="number" value="${(price * quantity).toFixed(2)}" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-            <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
-        `;
-        div.dataset.existing = 'true';
-        const addBtn = editContainer.querySelector('.add-item-btn');
-        editContainer.insertBefore(div, addBtn);
-        const select = div.querySelector('.product-select');
-        const choices = new Choices(select, { searchEnabled: true, searchChoices: true, itemSelectText: '' });
-        const choicesData = stockItems.map(stock => ({
-            value: `product|${stock.stock_name}|quantity|0|price|${stock.wholesale}|stock|${stock.stock_quantity}|uom|${stock.uom}`,
-            label: `${stock.stock_name} (${stock.uom})`,
-            selected: stock.stock_name === item.name
-        }));
-        choices.setChoices(choicesData, 'value', 'label', true);
-        attachPriceListener(div, existingBalance);
-        div.querySelector('.remove-item').addEventListener('click', () => {
-            div.remove();
-            updateSubtotal(editContainer, existingBalance);
-        });
+    const div = document.createElement('div');
+    div.className = 'grid grid-cols-6 gap-2 item-row';
+    const price = parseFloat(item.price) || 0;
+    const quantity = parseInt(item.quantity) || 0;
+    const stock = stockItems.find(stock => stock.stock_name === item.name)?.stock_quantity || 0;
+    div.innerHTML = `
+        <select name="items[]" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-select w-full">
+            <option value="">Select Item</option>
+        </select>
+        <input name="quantities[]" type="number" value="${quantity}" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="1">
+        <input name="unit_prices[]" type="number" value="${price.toFixed(2)}" class="price-display p-2 border rounded-lg text-center w-full" step="0.01">
+        <input type="number" value="${stock}" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+        <input type="number" value="${(price * quantity).toFixed(2)}" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+        <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
+    `;
+    div.dataset.existing = 'true';
+    const addBtn = editContainer.querySelector('.add-item-btn');
+    editContainer.insertBefore(div, addBtn);
+    const select = div.querySelector('.product-select');
+    const choices = new Choices(select, { searchEnabled: true, searchChoices: true, itemSelectText: '' });
+    const choicesData = stockItems.map(stock => ({
+        value: `product|${stock.stock_name}|quantity|0|price|${stock.wholesale}|stock|${stock.stock_quantity}|uom|${stock.uom}`,
+        label: `${stock.stock_name} (${stock.uom})`,
+        selected: stock.stock_name === item.name
+    }));
+    choices.setChoices(choicesData, 'value', 'label', true);
+    attachPriceListener(div, existingBalance);
+    div.querySelector('.remove-item').addEventListener('click', () => {
+        div.remove();
+        updateSubtotal(editContainer, existingBalance);
     });
+});
 
     // Add new item
     const addItemBtn = editContainer.querySelector('.add-item-btn');

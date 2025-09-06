@@ -1,4 +1,4 @@
-\let stockDataCache = null;
+let stockDataCache = null;
 let stockVersionCache = null;
 
 async function fetchStockData(forceRefresh = false) {
