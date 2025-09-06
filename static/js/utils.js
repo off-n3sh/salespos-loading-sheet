@@ -12,7 +12,10 @@ async function fetchStockData(forceRefresh = false) {
             const versionResponse = await fetch('/stock_version', { credentials: 'include' });
             if (!versionResponse.ok) throw new Error(`HTTP error: ${versionResponse.status}`);
             const { version } = await versionResponse.json();
-            if (stockVersionCache === version) return stockDataCache;
+            if (stockVersionCache === version) {
+                console.log('Returning cached stock data:', stockDataCache.length, 'items');
+                return stockDataCache;
+            }
         } catch (error) {
             console.error('Error checking stock version:', error);
             return stockDataCache || [];
@@ -25,7 +28,7 @@ async function fetchStockData(forceRefresh = false) {
         const data = await response.json();
         if (!Array.isArray(data)) throw new Error('Invalid response format: Expected an array');
         stockDataCache = data.map(item => ({
-            stock_name: item.stock_name,
+            stock_name: item.stock_name || '',
             selling_price: parseFloat(item.selling_price) || 0,
             wholesale: parseFloat(item.wholesale) || 0,
             stock_quantity: parseFloat(item.stock_quantity) || 0,
@@ -37,6 +40,7 @@ async function fetchStockData(forceRefresh = false) {
             stockVersionCache = version;
         }
         if (!stockDataCache.length) console.warn('No stock items returned from /stock_data');
+        console.log('Fetched fresh stock data:', stockDataCache.length, 'items');
         return stockDataCache;
     } catch (error) {
         console.error('Error fetching stock data:', error);
@@ -45,24 +49,42 @@ async function fetchStockData(forceRefresh = false) {
 }
 
 function updateSubtotal(container, existingBalance = 0) {
+    if (!container) {
+        console.error('updateSubtotal: Container not found');
+        return;
+    }
     const rows = container.querySelectorAll('.item-row:not([data-existing="true"])');
     let additionalSubtotal = 0;
     rows.forEach(row => {
-        const qty = parseInt(row.querySelector('.qty-input')?.value) || 0;
-        const price = parseFloat(row.querySelector('.price-display')?.value) || 0;
+        const qtyInput = row.querySelector('.qty-input');
+        const priceInput = row.querySelector('.price-display');
+        const qty = qtyInput ? parseInt(qtyInput.value) || 0 : 0;
+        const price = priceInput ? parseFloat(priceInput.value) || 0 : 0;
         additionalSubtotal += qty * price;
     });
     const totalSubtotal = existingBalance + additionalSubtotal;
     const totalSpan = document.getElementById('edit-order-total') || container.parentElement.querySelector('[id$="-order-total"]');
-    if (totalSpan) totalSpan.textContent = totalSubtotal.toFixed(2);
-    updateChange(container);
+    if (totalSpan) {
+        totalSpan.textContent = totalSubtotal.toFixed(2);
+        updateChange(container);
+    } else {
+        console.error('updateSubtotal: Total span not found');
+    }
 }
 
 function updateChange(container) {
+    if (!container) {
+        console.error('updateChange: Container not found');
+        return;
+    }
     const modalId = container.id.split('-')[0];
     const amountPaidInput = document.getElementById(`${modalId}-amount-paid`);
     const changeSpan = document.getElementById(`${modalId}-order-change`);
     const totalSpan = container.parentElement.querySelector('[id$="-order-total"]');
+    if (!amountPaidInput || !changeSpan || !totalSpan) {
+        console.error('updateChange: Required elements not found');
+        return;
+    }
     const subtotal = parseFloat(totalSpan.textContent) || 0;
     const amountPaid = parseFloat(amountPaidInput.value) || 0;
     const change = amountPaid - subtotal;
@@ -84,8 +106,14 @@ function showModalError(modalId, message) {
 }
 
 async function populateClients(inputElement, debtElement) {
+    if (!window.Choices) {
+        console.error('Choices.js library not loaded');
+        showModalError(inputElement.closest('form').id.replace('-form', ''), 'Client selection unavailable: Library error');
+        return;
+    }
     try {
-        const response = await fetch('/clients_data');
+        const response = await fetch('/clients_data', { credentials: 'include' });
+        if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
         const clients = await response.json();
         const choices = new Choices(inputElement, {
             searchEnabled: true,
@@ -154,5 +182,14 @@ async function populateClients(inputElement, debtElement) {
         showModalError(inputElement.closest('form').id.replace('-form', ''), 'Failed to load clients.');
     }
 }
+
+// Listen for cache invalidation across tabs
+window.addEventListener('storage', async (event) => {
+    if (event.key === 'stockCacheInvalidated') {
+        console.log('Cache invalidation detected, clearing and refetching stock data');
+        clearStockCache();
+        await fetchStockData(true);
+    }
+});
 
 export { fetchStockData, clearStockCache, updateSubtotal, updateChange, showModalError, populateClients };
