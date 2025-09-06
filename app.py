@@ -1381,7 +1381,14 @@ def stock():
             print("Unauthorized access attempt by non-manager")
             return jsonify({'error': 'Unauthorized: Only managers can modify stock'}), 403
 
+        # Log received form data for debugging
+        form_data = dict(request.form)
+        print(f"Received FormData: {form_data}")
         action = request.form.get('action')
+        if not action:
+            print("No action provided in FormData")
+            return jsonify({'error': 'No action specified'}), 400
+
         try:
             if action == 'add_stock':
                 stock_name = request.form.get('stock_name')
@@ -1524,7 +1531,7 @@ def stock():
                     return jsonify({'error': 'Invalid price format'}), 400
 
             else:
-                print(f"Invalid action: {action}")
+                print(f"Invalid action received: {action}")
                 return jsonify({'error': f"Invalid action: {action}"}), 400
         except Exception as e:
             print(f"Error processing stock action: {str(e)}")

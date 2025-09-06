@@ -235,9 +235,7 @@
     const toggleButton = document.getElementById('toggle-add-stock-form');
     const addStockForm = document.getElementById('add-stock-form');
     if (toggleButton && addStockForm) {
-        toggleButton.addEventListener('click', () => {
-            addStockForm.classList.toggle('hidden');
-        });
+        toggleButton.addEventListener('click', () => addStockForm.classList.toggle('hidden'));
     }
 
     // Category Selection Logic
@@ -245,14 +243,9 @@
     const newCategoryInput = document.getElementById('new_category');
     if (categorySelect && newCategoryInput) {
         categorySelect.addEventListener('change', () => {
-            if (categorySelect.value === 'new') {
-                newCategoryInput.classList.remove('hidden');
-                newCategoryInput.required = true;
-            } else {
-                newCategoryInput.classList.add('hidden');
-                newCategoryInput.required = false;
-                newCategoryInput.value = '';
-            }
+            newCategoryInput.classList.toggle('hidden', categorySelect.value !== 'new');
+            newCategoryInput.required = categorySelect.value === 'new';
+            newCategoryInput.value = '';
         });
     }
 
@@ -268,9 +261,7 @@
         cards.forEach(card => {
             const name = card.querySelector('h3').textContent.toLowerCase();
             const categorySpan = card.querySelector('span.inline-flex').textContent.trim();
-            const matchesSearch = name.includes(searchText);
-            const matchesCategory = !category || categorySpan === category;
-            card.style.display = (matchesSearch && matchesCategory) ? 'block' : 'none';
+            card.style.display = (name.includes(searchText) && (!category || categorySpan === category)) ? 'block' : 'none';
         });
     }
 
@@ -282,44 +273,48 @@
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = new FormData(form);
+            // Log FormData for debugging
+            for (const [key, value] of formData.entries()) {
+                console.log(`FormData: ${key}=${value}`);
+            }
             try {
                 const response = await fetch('/stock', {
                     method: 'POST',
-                    body: formData,
-                    headers: { 'X-CSRF-TOKEN': formData.get('csrf_token') }
+                    body: formData
                 });
                 const result = await response.json();
                 if (response.ok && result.status === 'success') {
                     localStorage.setItem('stockCacheInvalidated', Date.now().toString());
                     await fetch('/clear_stock_cache', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': formData.get('csrf_token')
-                        }
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ csrf_token: formData.get('csrf_token') })
                     });
                     showNotification('Success', result.message);
                     window.location.reload();
                 } else {
+                    console.error('Server error:', result.error);
                     showNotification('Error', result.error || 'Failed to update stock.');
                 }
             } catch (error) {
-                console.error('Error submitting form:', error);
-                showNotification('Error', 'An error occurred while updating stock.');
+                console.error('Fetch error:', error);
+                showNotification('Error', 'Network error: Failed to update stock.');
             }
         });
     });
 
     // Cache Invalidation Listener
-    window.addEventListener('storage', (event) => {
+    window.addEventListener('storage', async (event) => {
         if (event.key === 'stockCacheInvalidated') {
-            fetch('/clear_stock_cache', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('input[name="csrf_token"]').value
-                }
-            });
+            try {
+                await fetch('/clear_stock_cache', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ csrf_token: document.querySelector('input[name="csrf_token"]').value })
+                });
+            } catch (error) {
+                console.error('Cache clear error:', error);
+            }
         }
     });
 
@@ -353,11 +348,8 @@
             const name = item.dataset.name;
             const expiry = item.dataset.expiry;
             if (daysLeft !== undefined && !isNaN(daysLeft)) {
-                if (daysLeft === 0) {
-                    expiredItems.push({ name, expiry });
-                } else if (daysLeft <= 7) {
-                    expiringItems.push({ name, expiry, daysLeft });
-                }
+                if (daysLeft === 0) expiredItems.push({ name, expiry });
+                else if (daysLeft <= 7) expiringItems.push({ name, expiry, daysLeft });
             }
         });
         if (expiredItems.length > 0) {
@@ -377,14 +369,10 @@
     }
 
     function sendNotificationToServer(type, items) {
-        const notificationEndpoint = '/api/notifications';
-        fetch(notificationEndpoint, {
+        fetch('/api/notifications', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('input[name="csrf_token"]').value
-            },
-            body: JSON.stringify({ type, items })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type, items, csrf_token: document.querySelector('input[name="csrf_token"]').value })
         })
         .then(response => {
             if (!response.ok) console.error('Failed to send notification to server');
@@ -392,9 +380,7 @@
         .catch(error => console.error('Error sending notification:', error));
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
-        checkExpiryDates();
-    });
+    document.addEventListener('DOMContentLoaded', checkExpiryDates);
     setInterval(checkExpiryDates, 1800000);
 </script>
 {% endblock %}
