@@ -1,13 +1,22 @@
-// static/js/utils.js
-
 let stockDataCache = null;
+let stockVersionCache = null;
 
 async function fetchStockData() {
-    if (stockDataCache) return stockDataCache;
     try {
-        const response = await fetch('/stock_data', {
-            credentials: 'include'
-        });
+        // Check version first
+        const versionResponse = await fetch('/stock_version', { credentials: 'include' });
+        if (!versionResponse.ok) {
+            throw new Error(`HTTP error: ${versionResponse.status}`);
+        }
+        const { version } = await versionResponse.json();
+
+        // Return cached data if version hasn't changed
+        if (stockDataCache && stockVersionCache === version) {
+            return stockDataCache;
+        }
+
+        // Fetch fresh stock data
+        const response = await fetch('/stock_data', { credentials: 'include' });
         if (!response.ok) {
             throw new Error(`HTTP error: ${response.status}`);
         }
@@ -22,25 +31,29 @@ async function fetchStockData() {
             stock_quantity: parseFloat(item.stock_quantity) || 0,
             uom: item.uom || 'Unit'
         }));
+        stockVersionCache = version;
+
         if (!stockDataCache.length) {
             console.warn('No stock items returned from /stock_data');
         }
         return stockDataCache;
     } catch (error) {
-        console.error('Error fetching stock data from /stock_data:', error);
-        return [];
+        console.error('Error fetching stock data:', error);
+        return stockDataCache || []; // Fallback to cache or empty array
     }
 }
 
-function updateSubtotal(container) {
-    let subtotal = 0;
-    const rows = container.querySelectorAll('.item-row');
+function updateSubtotal(container, existingBalance = 0) {
+    const rows = container.querySelectorAll('.item-row:not([data-existing="true"])');
+    let additionalSubtotal = 0;
     rows.forEach(row => {
-        const totalDisplay = row.querySelector('.total-display');
-        if (totalDisplay && totalDisplay.value) subtotal += parseFloat(totalDisplay.value) || 0;
+        const qty = parseInt(row.querySelector('.qty-input')?.value) || 0;
+        const price = parseFloat(row.querySelector('.price-display')?.value) || 0;
+        additionalSubtotal += qty * price;
     });
-    const totalSpan = container.parentElement.querySelector('[id$="-order-total"]');
-    if (totalSpan) totalSpan.textContent = subtotal.toFixed(2);
+    const totalSubtotal = existingBalance + additionalSubtotal;
+    const totalSpan = document.getElementById('edit-order-total') || container.parentElement.querySelector('[id$="-order-total"]');
+    if (totalSpan) totalSpan.textContent = totalSubtotal.toFixed(2);
     updateChange(container);
 }
 

@@ -46,6 +46,12 @@ def format_currency(value):
         return value  # Return as-is if conversion fails
 app.jinja_env.filters['format_datetime'] = format_datetime
 app.jinja_env.filters['format_currency'] = format_currency   
+
+def update_stock_version():
+    db = firestore.Client()
+    db.collection('metadata').document('stock_version').set({
+        'version': datetime.now().isoformat()
+    })
     
 def update_clients_counter(change, context):
     count = sum(1 for _ in db.collection('clients').stream())
@@ -2373,6 +2379,17 @@ def edit_order(order_id):
     except Exception as e:
         logger.error(f"Failed to update order {order_id}: {str(e)}")
         return jsonify({"error": f"Failed to update order: {str(e)}"}), 500
+       
+        
+@app.route('/stock_version', methods=['GET'])
+def stock_version():
+    try:
+        db = firestore.Client()
+        version_doc = db.collection('metadata').document('stock_version').get()
+        version = version_doc.to_dict().get('version', '0') if version_doc.exists else '0'
+        return jsonify({'version': version}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/receipt/<receipt_id>', methods=['GET'])
 @login_required
