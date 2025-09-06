@@ -277,7 +277,7 @@
     searchInput.addEventListener('input', filterStock);
     categoryFilter.addEventListener('change', filterStock);
 
-    // Handle form submissions to invalidate cache
+    // Form Submission Logic
     document.querySelectorAll('form').forEach(form => {
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -288,8 +288,9 @@
                     body: formData,
                     headers: { 'X-CSRF-TOKEN': formData.get('csrf_token') }
                 });
-                if (response.ok) {
-                    // Invalidate cache after successful stock update
+                const result = await response.json();
+                if (response.ok && result.status === 'success') {
+                    localStorage.setItem('stockCacheInvalidated', Date.now().toString());
                     await fetch('/clear_stock_cache', {
                         method: 'POST',
                         headers: {
@@ -297,18 +298,29 @@
                             'X-CSRF-TOKEN': formData.get('csrf_token')
                         }
                     });
-                    showNotification('Success', 'Stock updated successfully!');
-                    // Refresh stock grid
+                    showNotification('Success', result.message);
                     window.location.reload();
                 } else {
-                    const error = await response.text();
-                    showNotification('Error', error || 'Failed to update stock.');
+                    showNotification('Error', result.error || 'Failed to update stock.');
                 }
             } catch (error) {
                 console.error('Error submitting form:', error);
                 showNotification('Error', 'An error occurred while updating stock.');
             }
         });
+    });
+
+    // Cache Invalidation Listener
+    window.addEventListener('storage', (event) => {
+        if (event.key === 'stockCacheInvalidated') {
+            fetch('/clear_stock_cache', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('input[name="csrf_token"]').value
+                }
+            });
+        }
     });
 
     // Expiry Notification System

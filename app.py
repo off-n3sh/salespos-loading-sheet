@@ -1378,8 +1378,8 @@ def stock():
     db = firestore.Client()
     if request.method == 'POST':
         if session['user']['role'] != 'manager':
-            print("Unauthorized access attempt by non-manager")  # Log unauthorized attempt
-            return "Unauthorized: Only managers can modify stock", 403
+            print("Unauthorized access attempt by non-manager")
+            return jsonify({'error': 'Unauthorized: Only managers can modify stock'}), 403
 
         action = request.form.get('action')
         try:
@@ -1395,8 +1395,8 @@ def stock():
                 expire_date = request.form.get('expire_date')
 
                 if not all([stock_name, category or new_category, initial_quantity, reorder_quantity, selling_price, wholesale_price, company_price, expire_date]):
-                    print("Missing required fields")  # Log missing fields
-                    return "All fields are required", 400
+                    print("Missing required fields")
+                    return jsonify({'error': 'All fields are required'}), 400
 
                 try:
                     initial_quantity = int(initial_quantity)
@@ -1405,12 +1405,12 @@ def stock():
                     wholesale_price = float(wholesale_price)
                     company_price = float(company_price)
                     if any(x < 0 for x in [initial_quantity, reorder_quantity, selling_price, wholesale_price, company_price]):
-                        print("Negative values detected")  # Log invalid values
-                        return "Numeric fields cannot be negative", 400
+                        print("Negative values detected")
+                        return jsonify({'error': 'Numeric fields cannot be negative'}), 400
                     datetime.strptime(expire_date, '%Y-%m-%d')
                 except ValueError as e:
-                    print(f"Invalid format: {str(e)}")  # Log format error
-                    return "Invalid numeric or date format", 400
+                    print(f"Invalid format: {str(e)}")
+                    return jsonify({'error': 'Invalid numeric or date format'}), 400
 
                 final_category = new_category.strip() if new_category else category
                 category_prefix = ''.join(c for c in final_category[:3] if c.isalnum()).upper()
@@ -1427,12 +1427,12 @@ def stock():
 
                 existing_stock = db.collection('stock').where('stock_name', '==', stock_name).get()
                 if existing_stock:
-                    print(f"Stock item '{stock_name}' already exists")  # Log duplicate
-                    return f"Stock item '{stock_name}' already exists", 400
+                    print(f"Stock item '{stock_name}' already exists")
+                    return jsonify({'error': f"Stock item '{stock_name}' already exists"}), 400
                 existing_id = db.collection('stock').where('stock_id', '==', stock_id).get()
                 if existing_id:
-                    print(f"Stock ID '{stock_id}' already exists")  # Log duplicate ID
-                    return f"Stock ID '{stock_id}' already exists", 400
+                    print(f"Stock ID '{stock_id}' already exists")
+                    return jsonify({'error': f"Stock ID '{stock_id}' already exists"}), 400
 
                 stock_data = {
                     'id': new_counter,
@@ -1455,7 +1455,7 @@ def stock():
 
                 doc_id = stock_id.replace('/', '-')
                 db.collection('stock').document(doc_id).set(stock_data)
-                print(f"Added stock: {stock_name}, ID: {stock_id}")  # Log success
+                print(f"Added stock: {stock_name}, ID: {stock_id}")
                 log_stock_change(final_category, stock_name, 'add_stock', initial_quantity, selling_price)
                 log_stock_change(final_category, stock_name, 'wholesale_price_set', 0, wholesale_price)
                 update_stock_version()
@@ -1464,71 +1464,71 @@ def stock():
             elif action == 'restock':
                 stock_id = request.form.get('stock_id')
                 if not stock_id:
-                    print("Missing stock_id for restock")  # Log missing ID
-                    return "Stock ID is required", 400
+                    print("Missing stock_id for restock")
+                    return jsonify({'error': 'Stock ID is required'}), 400
                 stock_ref = db.collection('stock').document(stock_id)
                 stock = stock_ref.get()
                 if not stock.exists:
-                    print(f"Stock ID '{stock_id}' not found")  # Log not found
-                    return f"Stock ID '{stock_id}' not found", 404
+                    print(f"Stock ID '{stock_id}' not found")
+                    return jsonify({'error': f"Stock ID '{stock_id}' not found"}), 404
                 try:
                     restock_qty = int(request.form.get('restock_quantity', 0))
                     if restock_qty <= 0:
-                        print("Invalid restock quantity")  # Log invalid quantity
-                        return "Restock quantity must be positive", 400
+                        print("Invalid restock quantity")
+                        return jsonify({'error': 'Restock quantity must be positive'}), 400
                     current_qty = stock.to_dict().get('stock_quantity', 0)
                     stock_ref.update({'stock_quantity': current_qty + restock_qty})
-                    print(f"Restocked {stock_id}: {restock_qty} units")  # Log success
+                    print(f"Restocked {stock_id}: {restock_qty} units")
                     log_stock_change(stock.to_dict().get('category'), stock.to_dict().get('stock_name'), 'restock', restock_qty, stock.to_dict().get('selling_price'))
                     update_stock_version()
                     return jsonify({'status': 'success', 'message': 'Stock restocked successfully'}), 200
                 except ValueError as e:
-                    print(f"Invalid restock quantity: {str(e)}")  # Log error
-                    return "Invalid restock quantity", 400
+                    print(f"Invalid restock quantity: {str(e)}")
+                    return jsonify({'error': 'Invalid restock quantity'}), 400
 
             elif action == 'update_price':
                 stock_id = request.form.get('stock_id')
                 if not stock_id:
-                    print("Missing stock_id for price update")  # Log missing ID
-                    return "Stock ID is required", 400
+                    print("Missing stock_id for price update")
+                    return jsonify({'error': 'Stock ID is required'}), 400
                 stock_ref = db.collection('stock').document(stock_id)
                 stock = stock_ref.get()
                 if not stock.exists:
-                    print(f"Stock ID '{stock_id}' not found")  # Log not found
-                    return f"Stock ID '{stock_id}' not found", 404
+                    print(f"Stock ID '{stock_id}' not found")
+                    return jsonify({'error': f"Stock ID '{stock_id}' not found"}), 404
                 try:
                     new_selling_price = float(request.form.get('new_selling_price', 0))
                     new_wholesale_price = float(request.form.get('new_wholesale_price', 0))
                     if new_selling_price < 0 or new_wholesale_price < 0:
-                        print("Negative prices detected")  # Log invalid prices
-                        return "Prices cannot be negative", 400
+                        print("Negative prices detected")
+                        return jsonify({'error': 'Prices cannot be negative'}), 400
                     updates = {}
                     if new_selling_price > 0:
                         updates['selling_price'] = new_selling_price
                     if new_wholesale_price > 0:
                         updates['wholesale'] = new_wholesale_price
                     if not updates:
-                        print("No price updates provided")  # Log no updates
-                        return "No valid price updates provided", 400
+                        print("No price updates provided")
+                        return jsonify({'error': 'No valid price updates provided'}), 400
                     stock_ref.update(updates)
                     stock_data = stock.to_dict()
                     if new_selling_price > 0:
                         log_stock_change(stock_data.get('category'), stock_data.get('stock_name'), 'price_update', 0, new_selling_price)
                     if new_wholesale_price > 0:
                         log_stock_change(stock_data.get('category'), stock_data.get('stock_name'), 'wholesale_price_update', 0, new_wholesale_price)
-                    print(f"Updated prices for {stock_id}: Retail={new_selling_price}, Wholesale={new_wholesale_price}")  # Log success
+                    print(f"Updated prices for {stock_id}: Retail={new_selling_price}, Wholesale={new_wholesale_price}")
                     update_stock_version()
                     return jsonify({'status': 'success', 'message': 'Prices updated successfully'}), 200
                 except ValueError as e:
-                    print(f"Invalid price format: {str(e)}")  # Log error
-                    return "Invalid price format", 400
+                    print(f"Invalid price format: {str(e)}")
+                    return jsonify({'error': 'Invalid price format'}), 400
 
             else:
-                print(f"Invalid action: {action}")  # Log invalid action
-                return "Invalid action", 400
+                print(f"Invalid action: {action}")
+                return jsonify({'error': f"Invalid action: {action}"}), 400
         except Exception as e:
-            print(f"Error processing stock action: {str(e)}")  # Log general error
-            return f"Server error: {str(e)}", 500
+            print(f"Error processing stock action: {str(e)}")
+            return jsonify({'error': f"Server error: {str(e)}"}), 500
 
     try:
         stock_items = [doc.to_dict() | {'id': doc.id} for doc in db.collection('stock').order_by('stock_name').get()]
@@ -1565,15 +1565,36 @@ def stock():
                 'receipt_id': doc.to_dict().get('receipt_id', doc.id),
                 'salesperson_name': doc.to_dict().get('salesperson_name', 'N/A'),
                 'shop_name': doc.to_dict().get('shop_name', 'Unknown Shop'),
-                'date': process_date(doc.to_dict().get('date'))
+                'date': doc.to_dict().get('date')
             }
             for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).limit(3).get()
         ]
 
         return render_template('stock.html', stock_items=stock_items, recent_activity=recent_activity)
     except Exception as e:
-        print(f"Error rendering stock page: {str(e)}")  # Log render error
-        return f"Error loading stock: {str(e)}", 500
+        print(f"Error rendering stock page: {str(e)}")
+        return jsonify({'error': f"Error loading stock: {str(e)}"}), 500
+        
+@app.route('/clear_stock_cache', methods=['POST'])
+@login_required
+def clear_stock_cache():
+    try:
+        update_stock_version()
+        return jsonify({'status': 'success'}), 200
+    except Exception as e:
+        print(f"Error updating stock version: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/stock_version', methods=['GET'])
+def stock_version():
+    try:
+        db = firestore.Client()
+        version_doc = db.collection('metadata').document('stock_version').get()
+        version = version_doc.to_dict().get('version', '0') if version_doc.exists else '0'
+        return jsonify({'version': version}), 200
+    except Exception as e:
+        print(f"Error fetching stock version: {str(e)}")
+        return jsonify({'error': str(e)}), 500
     
 @app.route('/receipts')
 @no_cache
@@ -1587,14 +1608,7 @@ def receipts():
     except Exception as e:
         return f"Error loading receipts: {str(e)}", 500
         
-@app.route('/clear_stock_cache', methods=['POST'])
-@login_required
-def clear_stock_cache():
-    try:
-        update_stock_version()
-        return jsonify({'status': 'success'}), 200
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+
         
 @app.route('/receipt/<order_id>')
 @no_cache
@@ -2426,15 +2440,7 @@ def edit_order(order_id):
         return jsonify({"error": f"Failed to update order: {str(e)}"}), 500
        
         
-@app.route('/stock_version', methods=['GET'])
-def stock_version():
-    try:
-        db = firestore.Client()
-        version_doc = db.collection('metadata').document('stock_version').get()
-        version = version_doc.to_dict().get('version', '0') if version_doc.exists else '0'
-        return jsonify({'version': version}), 200
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+
 
 @app.route('/receipt/<receipt_id>', methods=['GET'])
 @login_required
