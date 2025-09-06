@@ -1,4 +1,4 @@
-import { fetchStockData, updateSubtotal, showModalError } from './utils.js';
+import { fetchStockData, showModalError } from './utils.js';
 
 const editModal = document.getElementById('edit-order-modal');
 const closeEdit = document.getElementById('close-edit-modal');
@@ -33,6 +33,19 @@ function resetModal(container) {
     editOrderChange.textContent = '0.00';
 }
 
+function updateSubtotal(container, existingBalance = 0) {
+    const rows = container.querySelectorAll('.item-row:not([data-existing="true"])');
+    let additionalSubtotal = 0;
+    rows.forEach(row => {
+        const qty = parseInt(row.querySelector('.qty-input')?.value) || 0;
+        const price = parseFloat(row.querySelector('.price-display')?.value) || 0;
+        additionalSubtotal += qty * price;
+    });
+    const totalSubtotal = existingBalance + additionalSubtotal;
+    const totalSpan = document.getElementById('edit-order-total');
+    if (totalSpan) totalSpan.textContent = totalSubtotal.toFixed(2);
+}
+
 async function editOrder(receiptId) {
     const orderData = await fetchOrderData(receiptId);
     if (!orderData) return;
@@ -54,7 +67,7 @@ async function editOrder(receiptId) {
     form.prepend(balanceDiv);
     document.getElementById('edit-order-total').textContent = existingBalance.toFixed(2);
 
-    // Parse and preload items (for display only, not subtotal)
+    // Parse and preload items
     let itemsList = [];
     try {
         if (Array.isArray(items)) {
@@ -92,7 +105,7 @@ async function editOrder(receiptId) {
             <input type="number" value="${(price * quantity).toFixed(2)}" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
             <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
         `;
-        div.dataset.existing = 'true'; // Mark as existing item
+        div.dataset.existing = 'true';
         const addBtn = editContainer.querySelector('.add-item-btn');
         editContainer.insertBefore(div, addBtn);
         const select = div.querySelector('.product-select');
