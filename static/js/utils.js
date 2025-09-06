@@ -32,16 +32,16 @@ async function fetchStockData() {
     }
 }
 
-function updateSubtotal(container) {
-    let subtotal = 0;
-    const rows = container.querySelectorAll('.item-row');
-    rows.forEach(row => {
-        const totalDisplay = row.querySelector('.total-display');
-        if (totalDisplay && totalDisplay.value) subtotal += parseFloat(totalDisplay.value) || 0;
+export function updateSubtotal(container, existingBalance = 0) {
+    const itemRows = container.querySelectorAll('.item-row:not([data-existing="true"])'); // Only new items
+    let additionalSubtotal = 0;
+    itemRows.forEach(row => {
+        const qty = parseInt(row.querySelector('.qty-input')?.value) || 0;
+        const price = parseFloat(row.querySelector('.price-display')?.value) || 0;
+        additionalSubtotal += qty * price;
     });
-    const totalSpan = container.parentElement.querySelector('[id$="-order-total"]');
-    if (totalSpan) totalSpan.textContent = subtotal.toFixed(2);
-    updateChange(container);
+    const totalSubtotal = existingBalance + additionalSubtotal;
+    container.closest('.modal').querySelector('#edit-order-total').textContent = totalSubtotal.toFixed(2);
 }
 
 function updateChange(container) {

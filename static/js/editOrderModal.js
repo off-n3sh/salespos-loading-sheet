@@ -54,7 +54,7 @@ async function editOrder(receiptId) {
     form.prepend(balanceDiv);
     document.getElementById('edit-order-total').textContent = existingBalance.toFixed(2);
 
-    // Parse and preload items
+    // Parse and preload items (for display only, not subtotal)
     let itemsList = [];
     try {
         if (Array.isArray(items)) {
@@ -92,6 +92,7 @@ async function editOrder(receiptId) {
             <input type="number" value="${(price * quantity).toFixed(2)}" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
             <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
         `;
+        div.dataset.existing = 'true'; // Mark as existing item
         const addBtn = editContainer.querySelector('.add-item-btn');
         editContainer.insertBefore(div, addBtn);
         const select = div.querySelector('.product-select');
@@ -102,7 +103,7 @@ async function editOrder(receiptId) {
             selected: stock.stock_name === item.name
         }));
         choices.setChoices(choicesData, 'value', 'label', true);
-        attachPriceListener(div);
+        attachPriceListener(div, existingBalance);
         div.querySelector('.remove-item').addEventListener('click', () => {
             div.remove();
             updateSubtotal(editContainer, existingBalance);
@@ -133,7 +134,7 @@ async function editOrder(receiptId) {
             label: `${stock.stock_name} (${stock.uom})`
         }));
         choices.setChoices(choicesData, 'value', 'label', true);
-        attachPriceListener(div);
+        attachPriceListener(div, existingBalance);
         div.querySelector('.remove-item').addEventListener('click', () => {
             div.remove();
             updateSubtotal(editContainer, existingBalance);
@@ -168,7 +169,7 @@ async function editOrder(receiptId) {
         `;
         const addBtn = editContainer.querySelector('.add-item-btn');
         editContainer.insertBefore(div, addBtn);
-        attachPriceListener(div);
+        attachPriceListener(div, existingBalance);
         div.querySelector('.remove-item').addEventListener('click', () => {
             div.remove();
             updateSubtotal(editContainer, existingBalance);
@@ -274,7 +275,7 @@ function showSuccessMessage(message) {
     setTimeout(() => div.remove(), 3000);
 }
 
-function attachPriceListener(row) {
+function attachPriceListener(row, existingBalance) {
     const qtyInput = row.querySelector('.qty-input');
     const priceInput = row.querySelector('.price-display');
     const updateTotal = () => {
@@ -282,7 +283,7 @@ function attachPriceListener(row) {
         const price = parseFloat(priceInput.value) || 0;
         const total = qty * price;
         row.querySelector('.total-display').value = total.toFixed(2);
-        updateSubtotal(row.closest('#edit-items-container'), parseFloat(document.getElementById('edit-order-total').textContent) || 0);
+        updateSubtotal(row.closest('#edit-items-container'), existingBalance);
     };
     qtyInput.addEventListener('input', updateTotal);
     priceInput.addEventListener('input', updateTotal);
