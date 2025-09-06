@@ -506,7 +506,6 @@ def stock_data():
         version_doc = db.collection('metadata').document('stock_version').get()
         current_version = str(version_doc.to_dict().get('version', '0')) if version_doc.exists else '0'
 
-        # Check cache
         if (stock_cache.get('data') and
                 stock_cache.get('version') == current_version and
                 stock_cache.get('timestamp') and
@@ -514,7 +513,6 @@ def stock_data():
             print(f"Serving {len(stock_cache['data'])} stock items from cache (version: {current_version})")
             return jsonify(stock_cache['data']), 200
 
-        # Fetch stock items from Firestore
         stock_items = [
             {
                 'stock_name': doc.to_dict().get('stock_name', ''),
@@ -531,7 +529,6 @@ def stock_data():
             for doc in db.collection('stock').order_by('stock_name').get()
         ]
 
-        # Remove duplicates by stock_name
         seen = set()
         unique_stock_items = []
         for item in stock_items:
@@ -544,7 +541,6 @@ def stock_data():
             print("No valid stock items found in Firestore")
             return jsonify([]), 200
 
-        # Update cache
         stock_cache['data'] = unique_stock_items
         stock_cache['version'] = current_version
         stock_cache['timestamp'] = datetime.now()
@@ -677,7 +673,7 @@ def stock():
                 stock = stock_ref.get()
                 if not stock.exists:
                     print(f"Stock ID '{stock_id}' not found")
-                    return jsonify({'error': f"Stock ID '{stock_id}' not found'}), 404
+                    return jsonify({'error': f"Stock ID '{stock_id}' not found"}), 404
                 try:
                     restock_qty = int(request.form.get('restock_quantity', 0))
                     if restock_qty <= 0:
@@ -705,7 +701,7 @@ def stock():
                 stock = stock_ref.get()
                 if not stock.exists:
                     print(f"Stock ID '{stock_id}' not found")
-                    return jsonify({'error': f"Stock ID '{stock_id}' not found'}), 404
+                    return jsonify({'error': f"Stock ID '{stock_id}' not found"}), 404
                 try:
                     new_selling_price = float(request.form.get('new_selling_price', 0))
                     new_wholesale_price = float(request.form.get('new_wholesale_price', 0))
