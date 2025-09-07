@@ -57,13 +57,6 @@ def update_stock_version():
     new_version = int(current_version) + 1
     version_ref.set({'version': new_version})
     return new_version
-# In-memory cache
-stock_cache = {
-    'data': None,
-    'timestamp': None,
-    'timeout': timedelta(hours=1)  # 1 hour cache duration
-}
-
     
 def update_clients_counter(change, context):
     count = sum(1 for _ in db.collection('clients').stream())
@@ -502,11 +495,16 @@ def group_orders(filtered_orders, time_filter, today_start, today_end, now):
 def stock_data():
     """Fetch stock data from Firestore for retail/wholesale modals."""
     try:
-        # Check cache
+        db = firestore.Client()
+        # Check cache with version comparison
+        version_doc = db.collection('metadata').document('stock_version').get()
+        current_version = str(version_doc.to_dict().get('version', '0')) if version_doc.exists else '0'
+
         if (stock_cache['data'] is not None and
+                stock_cache['version'] == current_version and
                 stock_cache['timestamp'] is not None and
                 datetime.now() < stock_cache['timestamp'] + stock_cache['timeout']):
-            print("Serving stock data from cache")  # Debug log
+            print(f"Serving {len(stock_cache['data'])} stock items from cache (version: {current_version})")
             return jsonify(stock_cache['data']), 200
 
         # Fetch stock items from Firestore
@@ -516,7 +514,12 @@ def stock_data():
                 'selling_price': float(doc.to_dict()['selling_price'] or 0),
                 'wholesale': float(doc.to_dict()['wholesale'] or 0),
                 'stock_quantity': float(doc.to_dict()['stock_quantity'] or 0),
-                'uom': doc.to_dict().get('uom', 'Unit')  # Default to 'Unit' if null
+                'uom': doc.to_dict().get('uom', 'Unit'),  # Default to 'Unit' if null
+                'category': doc.to_dict().get('category', ''),
+                'id': doc.id,
+                'company_price': float(doc.to_dict()['company_price'] or 0),
+                'expire_date': doc.to_dict().get('expire_date', None),
+                'reorder_quantity': int(doc.to_dict()['reorder_quantity'] or 0)
             }
             for doc in db.collection('stock').order_by('stock_name').get()
         ]
@@ -533,18 +536,19 @@ def stock_data():
                 unique_stock_items.append(item)
         
         if not unique_stock_items:
-            print("No stock items found in Firestore")  # Debug log
+            print("No stock items found in Firestore")
             return jsonify([]), 200
 
         # Update cache
         stock_cache['data'] = unique_stock_items
+        stock_cache['version'] = current_version
         stock_cache['timestamp'] = datetime.now()
         
-        print(f"Returning {len(unique_stock_items)} stock items")  # Debug log
+        print(f"Returning {len(unique_stock_items)} stock items from Firestore (version: {current_version})")
         return jsonify(unique_stock_items), 200
 
     except Exception as e:
-        print(f"Error fetching stock data: {str(e)}")  # Debug log
+        print(f"Error fetching stock data: {str(e)}")
         return jsonify({'error': 'Failed to fetch stock data'}), 500
 
 
