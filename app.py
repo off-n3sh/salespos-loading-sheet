@@ -493,16 +493,20 @@ def group_orders(filtered_orders, time_filter, today_start, today_end, now):
 @app.route('/clear_stock_cache', methods=['POST'])
 @login_required
 def clear_stock_cache():
+    """Clear stock cache with detailed logging."""
+    print(f"[CLEAR_STOCK_CACHE] Request received: user={session['user']['email']}")
     try:
+        print("[CLEAR_STOCK_CACHE] Calling update_stock_version")
         update_stock_version()
+        print("[CLEAR_STOCK_CACHE] Clearing stock_cache")
         stock_cache['data'] = None
         stock_cache['version'] = None
         stock_cache['timestamp'] = None
-        print("Stock cache cleared successfully")
-        return jsonify({'status': 'success'}), 200
+        print("[CLEAR_STOCK_CACHE] Stock cache cleared successfully")
+        return jsonify({'status': 'success', 'message': 'Cache cleared'}), 200
     except Exception as e:
-        print(f"Error updating stock version: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        print(f"[CLEAR_STOCK_CACHE] Error: {str(e)}\n{traceback.format_exc()}")
+        return jsonify({'error': f'Failed to clear cache: {str(e)}'}), 500
 
 @app.route('/stock_data', methods=['GET'])
 @no_cache
@@ -569,19 +573,24 @@ def stock_data():
 @no_cache
 @login_required
 def stock():
-    """Handle stock management."""
+    """Handle stock management with detailed logging."""
+    print(f"[STOCK] Request received: method={request.method}, user={session['user']['email']}")
     db = firestore.Client()
     
     if request.method == 'POST':
+        print(f"[STOCK] POST request, role={session['user']['role']}, form={request.form.to_dict()}")
         if session['user']['role'] != 'manager':
+            print("[STOCK] Unauthorized: User is not a manager")
             return jsonify({'error': 'Unauthorized: Only managers can modify stock'}), 403
 
         try:
+            print("[STOCK] Validating CSRF token")
             validate_csrf(request.headers.get('X-CSRF-TOKEN'), secret_key=app.secret_key)
             action = request.form.get('action')
-            print(f"Processing action: {action}")  # Debug log
+            print(f"[STOCK] Action: {action}")
 
             if action == 'add_stock':
+                print("[STOCK] Processing add_stock")
                 stock_name = request.form.get('stock_name')
                 category = request.form.get('category')
                 new_category = request.form.get('new_category')
@@ -591,11 +600,17 @@ def stock():
                 wholesale_price = request.form.get('wholesale_price')
                 company_price = request.form.get('company_price')
                 expire_date = request.form.get('expire_date')
+                print(f"[STOCK] Form data: stock_name={stock_name}, category={category}, new_category={new_category}, "
+                      f"initial_quantity={initial_quantity}, reorder_quantity={reorder_quantity}, "
+                      f"selling_price={selling_price}, wholesale_price={wholesale_price}, "
+                      f"company_price={company_price}, expire_date={expire_date}")
 
                 if not all([stock_name, category or new_category, initial_quantity, reorder_quantity, selling_price, wholesale_price, company_price, expire_date]):
+                    print("[STOCK] Error: Missing required fields")
                     return jsonify({'error': 'All fields are required'}), 400
 
                 try:
+                    print("[STOCK] Validating numeric and date fields")
                     initial_quantity = int(initial_quantity)
                     reorder_quantity = int(reorder_quantity)
                     selling_price = float(selling_price)
@@ -603,22 +618,29 @@ def stock():
                     company_price = float(company_price)
                     datetime.strptime(expire_date, '%Y-%m-%d')
                     if any(x < 0 for x in [initial_quantity, reorder_quantity, selling_price, wholesale_price, company_price]):
+                        print("[STOCK] Error: Negative values detected")
                         return jsonify({'error': 'Numeric fields cannot be negative'}), 400
                 except ValueError as e:
-                    print(f"Validation error: {str(e)}")
+                    print(f"[STOCK] Validation error: {str(e)}")
                     return jsonify({'error': 'Invalid numeric or date format'}), 400
 
+                print("[STOCK] Generating stock ID")
                 final_category = new_category.strip() if new_category else category
                 category_prefix = ''.join(c for c in final_category[:3] if c.isalnum()).upper()
                 counter_ref = db.collection('metadata').document('stock_counter')
                 counter = counter_ref.get()
                 new_counter = 1 if not counter.exists else counter.to_dict().get('last_id', 0) + 1
+                print(f"[STOCK] Counter: new_counter={new_counter}")
                 counter_ref.set({'last_id': new_counter}, merge=True)
                 stock_id = f"{category_prefix}{new_counter:03d}"
 
+                print(f"[STOCK] Checking for existing stock_name={stock_name}")
                 if db.collection('stock').where('stock_name', '==', stock_name).get():
+                    print(f"[STOCK] Error: Stock item '{stock_name}' already exists")
                     return jsonify({'error': f"Stock item '{stock_name}' already exists"}), 400
+                print(f"[STOCK] Checking for existing stock_id={stock_id}")
                 if db.collection('stock').where('stock_id', '==', stock_id).get():
+                    print(f"[STOCK] Error: Stock ID '{stock_id}' already exists")
                     return jsonify({'error': f"Stock ID '{stock_id}' already exists"}), 400
 
                 stock_data = {
@@ -639,54 +661,76 @@ def stock():
                     'code': stock_id,
                     'date2': None
                 }
-
+                print(f"[STOCK] Saving stock data: {stock_data}")
                 doc_id = stock_id.replace('/', '-')
                 db.collection('stock').document(doc_id).set(stock_data)
+                print("[STOCK] Stock data saved successfully")
+
                 try:
+                    print("[STOCK] Logging stock changes")
                     log_stock_change(final_category, stock_name, 'add_stock', initial_quantity, selling_price)
                     log_stock_change(final_category, stock_name, 'wholesale_price_set', 0, wholesale_price)
+                    print("[STOCK] Updating stock version")
                     update_stock_version()
                 except Exception as e:
-                    print(f"Error in log_stock_change/update_stock_version: {str(e)}")
+                    print(f"[STOCK] Error in log_stock_change/update_stock_version: {str(e)}\n{traceback.format_exc()}")
                     return jsonify({'error': 'Stock added but failed to log changes'}), 500
+                print("[STOCK] add_stock completed successfully")
                 return jsonify({'status': 'success', 'message': f'Added stock: {stock_name}'}), 200
 
             elif action == 'restock':
+                print("[STOCK] Processing restock")
                 stock_id = request.form.get('stock_id')
                 if not stock_id:
+                    print("[STOCK] Error: Stock ID missing")
                     return jsonify({'error': 'Stock ID required'}), 400
+                print(f"[STOCK] Fetching stock: stock_id={stock_id}")
                 stock_ref = db.collection('stock').document(stock_id)
                 stock = stock_ref.get()
                 if not stock.exists:
+                    print(f"[STOCK] Error: Stock item not found for stock_id={stock_id}")
                     return jsonify({'error': 'Stock item not found'}), 404
                 try:
                     restock_qty = int(request.form.get('restock_quantity', 0))
+                    print(f"[STOCK] Restock quantity: {restock_qty}")
                     if restock_qty <= 0:
+                        print("[STOCK] Error: Invalid restock quantity")
                         return jsonify({'error': 'Restock quantity must be positive'}), 400
                     current_qty = stock.to_dict().get('stock_quantity', 0)
+                    print(f"[STOCK] Updating stock quantity: current={current_qty}, new={current_qty + restock_qty}")
                     stock_ref.update({'stock_quantity': current_qty + restock_qty})
                     try:
+                        print("[STOCK] Logging restock change")
                         log_stock_change(stock.to_dict().get('category'), stock.to_dict().get('stock_name'), 'restock', restock_qty, stock.to_dict().get('selling_price'))
+                        print("[STOCK] Updating stock version")
                         update_stock_version()
                     except Exception as e:
-                        print(f"Error in log_stock_change/update_stock_version: {str(e)}")
+                        print(f"[STOCK] Error in log_stock_change/update_stock_version: {str(e)}\n{traceback.format_exc()}")
                         return jsonify({'error': 'Stock restocked but failed to log changes'}), 500
+                    print("[STOCK] restock completed successfully")
                     return jsonify({'status': 'success', 'message': f'Restocked {restock_qty} units'}), 200
                 except ValueError:
+                    print("[STOCK] Error: Invalid restock quantity format")
                     return jsonify({'error': 'Invalid restock quantity'}), 400
 
             elif action == 'update_price':
+                print("[STOCK] Processing update_price")
                 stock_id = request.form.get('stock_id')
                 if not stock_id:
+                    print("[STOCK] Error: Stock ID missing")
                     return jsonify({'error': 'Stock ID required'}), 400
+                print(f"[STOCK] Fetching stock: stock_id={stock_id}")
                 stock_ref = db.collection('stock').document(stock_id)
                 stock = stock_ref.get()
                 if not stock.exists:
+                    print(f"[STOCK] Error: Stock item not found for stock_id={stock_id}")
                     return jsonify({'error': 'Stock item not found'}), 404
                 try:
                     new_selling_price = float(request.form.get('new_selling_price', 0))
                     new_wholesale_price = float(request.form.get('new_wholesale_price', 0))
+                    print(f"[STOCK] New prices: selling={new_selling_price}, wholesale={new_wholesale_price}")
                     if new_selling_price < 0 or new_wholesale_price < 0:
+                        print("[STOCK] Error: Negative prices detected")
                         return jsonify({'error': 'Prices cannot be negative'}), 400
                     updates = {}
                     if new_selling_price > 0:
@@ -694,49 +738,61 @@ def stock():
                     if new_wholesale_price > 0:
                         updates['wholesale'] = new_wholesale_price
                     if not updates:
+                        print("[STOCK] Error: No valid price updates provided")
                         return jsonify({'error': 'No valid price updates provided'}), 400
+                    print(f"[STOCK] Updating stock with: {updates}")
                     stock_ref.update(updates)
                     try:
+                        print("[STOCK] Logging price updates")
                         stock_data = stock.to_dict()
                         if new_selling_price > 0:
                             log_stock_change(stock_data.get('category'), stock_data.get('stock_name'), 'price_update', 0, new_selling_price)
                         if new_wholesale_price > 0:
                             log_stock_change(stock_data.get('category'), stock_data.get('stock_name'), 'wholesale_price_update', 0, new_wholesale_price)
+                        print("[STOCK] Updating stock version")
                         update_stock_version()
                     except Exception as e:
-                        print(f"Error in log_stock_change/update_stock_version: {str(e)}")
+                        print(f"[STOCK] Error in log_stock_change/update_stock_version: {str(e)}\n{traceback.format_exc()}")
                         return jsonify({'error': 'Prices updated but failed to log changes'}), 500
+                    print("[STOCK] update_price completed successfully")
                     return jsonify({'status': 'success', 'message': 'Prices updated successfully'}), 200
                 except ValueError:
+                    print("[STOCK] Error: Invalid price format")
                     return jsonify({'error': 'Invalid price format'}), 400
 
+            print(f"[STOCK] Error: Invalid action={action}")
             return jsonify({'error': 'Invalid action'}), 400
 
-        except CSRFError:
-            print("CSRF validation failed")
+        except CSRFError as e:
+            print(f"[STOCK] CSRF validation failed: {str(e)}")
             return jsonify({'error': 'Invalid CSRF token'}), 403
         except Exception as e:
-            print(f"Unexpected error in /stock: {str(e)}\n{traceback.format_exc()}")
+            print(f"[STOCK] Unexpected error: {str(e)}\n{traceback.format_exc()}")
             return jsonify({'error': 'Internal server error'}), 500
 
     # GET: Render stock page
+    print("[STOCK] Fetching stock items for GET request")
     stock_items = [
         doc.to_dict() | {'id': doc.id} 
         for doc in db.collection('stock').order_by('stock_name').get()
     ]
+    print(f"[STOCK] Retrieved {len(stock_items)} stock items")
     seen = set()
     unique_stock_items = [
         item for item in stock_items 
         if not (item['stock_name'] in seen or seen.add(item['stock_name']))
     ]
+    print(f"[STOCK] Filtered to {len(unique_stock_items)} unique stock items")
 
     for item in unique_stock_items:
         expire_date = item.get('expire_date')
         if expire_date and expire_date != "0000-00-00 00:00:00":
             try:
+                print(f"[STOCK] Checking expiry for {item['stock_name']}, expire_date={expire_date}")
                 days_left = expire_date_days_left(expire_date)
                 if days_left is not None and days_left <= 30:
                     notification_message = f"Stock '{item['stock_name']}' is nearing expiry ({days_left} days left) on {expire_date}"
+                    print(f"[STOCK] Creating notification: {notification_message}")
                     if not db.collection('notifications').where('message', '==', notification_message).get():
                         db.collection('notifications').add({
                             'recipient': session['user']['uid'],
@@ -745,10 +801,12 @@ def stock():
                             'order_id': None,
                             'read': False
                         })
+                        print(f"[STOCK] Notification added for {item['stock_name']}")
             except Exception as e:
-                print(f"Error processing expiry notification: {str(e)}")
+                print(f"[STOCK] Error processing expiry notification for {item['stock_name']}: {str(e)}")
                 continue
 
+    print("[STOCK] Fetching recent activity")
     recent_activity = [
         {
             'receipt_id': doc.to_dict().get('receipt_id', doc.id),
@@ -758,7 +816,9 @@ def stock():
         }
         for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).limit(3).get()
     ]
+    print(f"[STOCK] Retrieved {len(recent_activity)} recent activities")
 
+    print("[STOCK] Rendering stock.html")
     return render_template('stock.html', stock_items=unique_stock_items, recent_activity=recent_activity)
 @app.route('/logout')
 def logout():

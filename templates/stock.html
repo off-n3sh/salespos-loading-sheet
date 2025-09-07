@@ -231,20 +231,27 @@
 </div>
 
 <script>
+    let stockDataCache = null;
+    let currentStockVersion = null;
+
     // Toggle Add Stock Form
+    console.log("[STOCK_HTML] Initializing toggle button");
     const toggleButton = document.getElementById('toggle-add-stock-form');
     const addStockForm = document.getElementById('add-stock-form');
     if (toggleButton && addStockForm) {
         toggleButton.addEventListener('click', () => {
+            console.log("[STOCK_HTML] Toggling add stock form");
             addStockForm.classList.toggle('hidden');
         });
     }
 
     // Category Selection Logic
+    console.log("[STOCK_HTML] Initializing category selection");
     const categorySelect = document.getElementById('category');
     const newCategoryInput = document.getElementById('new_category');
     if (categorySelect && newCategoryInput) {
         categorySelect.addEventListener('change', () => {
+            console.log("[STOCK_HTML] Category changed: ", categorySelect.value);
             if (categorySelect.value === 'new') {
                 newCategoryInput.classList.remove('hidden');
                 newCategoryInput.required = true;
@@ -257,15 +264,16 @@
     }
 
     // Search and Filter Logic
+    console.log("[STOCK_HTML] Initializing search and filter");
     const searchInput = document.getElementById('search');
     const categoryFilter = document.getElementById('category-filter');
     const stockGrid = document.getElementById('stock-grid');
     const cards = Array.from(stockGrid.getElementsByClassName('stock-card'));
 
     function filterStock() {
+        console.log("[STOCK_HTML] Filtering stock: search=", searchInput.value, "category=", categoryFilter.value);
         const searchText = searchInput.value.toLowerCase();
         const category = categoryFilter.value;
-
         cards.forEach(card => {
             const name = card.querySelector('h3').textContent.toLowerCase();
             const categorySpan = card.querySelector('span.inline-flex').textContent.trim();
@@ -281,43 +289,78 @@
     // Form Submission Handler
     async function handleFormSubmit(event) {
         event.preventDefault();
+        console.log("[STOCK_HTML] Form submitted");
         const form = event.target;
         const formData = new FormData(form);
+        console.log("[STOCK_HTML] Form data:", Object.fromEntries(formData));
         try {
+            console.log("[STOCK_HTML] Sending POST to /stock");
             const response = await fetch('/stock', {
                 method: 'POST',
                 body: formData,
                 headers: { 'X-CSRF-TOKEN': formData.get('csrf_token') }
             });
-            const result = await response.json();
+            console.log("[STOCK_HTML] /stock response status:", response.status);
+            let result;
+            try {
+                result = await response.json();
+                console.log("[STOCK_HTML] /stock response JSON:", result);
+            } catch (e) {
+                const responseText = await response.text();
+                console.error("[STOCK_HTML] Invalid JSON from /stock:", responseText, "Status:", response.status);
+                showNotification('Error', `Server error: ${response.status}`);
+                return;
+            }
             if (response.ok && result.status === 'success') {
-                // Trigger cache invalidation
-                localStorage.setItem('stockCacheInvalidated', Date.now());
-                localStorage.removeItem('stockCacheInvalidated');
+                console.log("[STOCK_HTML] /stock success:", result.message);
                 showNotification('Success', result.message);
-                // Reset form and hide if adding stock
                 if (formData.get('action') === 'add_stock') {
+                    console.log("[STOCK_HTML] Resetting add stock form");
                     form.reset();
                     addStockForm.classList.add('hidden');
                     newCategoryInput.classList.add('hidden');
                     newCategoryInput.required = false;
                 }
-                // Trigger stock_data fetch
-                await fetch('/clear_stock_cache', {
+                console.log("[STOCK_HTML] Clearing client cache");
+                stockDataCache = null;
+                currentStockVersion = null;
+                console.log("[STOCK_HTML] Sending POST to /clear_stock_cache");
+                const cacheResponse = await fetch('/clear_stock_cache', {
                     method: 'POST',
                     headers: { 'X-CSRF-TOKEN': formData.get('csrf_token') }
                 });
+                console.log("[STOCK_HTML] /clear_stock_cache response status:", cacheResponse.status);
+                let cacheResult;
+                try {
+                    cacheResult = await cacheResponse.json();
+                    console.log("[STOCK_HTML] /clear_stock_cache response JSON:", cacheResult);
+                } catch (e) {
+                    const cacheResponseText = await cacheResponse.text();
+                    console.error("[STOCK_HTML] Invalid JSON from /clear_stock_cache:", cacheResponseText, "Status:", cacheResponse.status);
+                    showNotification('Error', `Cache clear failed: ${cacheResponse.status}`);
+                    return;
+                }
+                if (cacheResponse.ok && cacheResult.status === 'success') {
+                    console.log("[STOCK_HTML] Cache cleared successfully");
+                } else {
+                    console.error("[STOCK_HTML] /clear_stock_cache failed:", cacheResult.error);
+                    showNotification('Error', cacheResult.error || 'Failed to clear cache');
+                }
+                console.log("[STOCK_HTML] Reloading page");
+                setTimeout(() => location.reload(), 1000);
             } else {
+                console.error("[STOCK_HTML] /stock error:", result.error);
                 showNotification('Error', result.error || 'Failed to process request');
             }
         } catch (error) {
-            console.error('Error submitting form:', error);
+            console.error("[STOCK_HTML] Form submission error:", error);
             showNotification('Error', 'Failed to process request');
         }
     }
 
     // Expiry Notification System
     function showNotification(title, message) {
+        console.log("[STOCK_HTML] Showing notification:", title, message);
         const toast = document.getElementById('notification-toast');
         const titleElement = document.getElementById('notification-title');
         const messageElement = document.getElementById('notification-message');
@@ -330,22 +373,20 @@
         
         setTimeout(() => {
             toast.classList.add('translate-y-10', 'opacity-0');
-            setTimeout(() => {
-                toast.classList.add('hidden');
-            }, 300);
+            setTimeout(() => toast.classList.add('hidden'), 300);
         }, 5000);
     }
-    
+
     document.getElementById('close-notification').addEventListener('click', () => {
+        console.log("[STOCK_HTML] Closing notification");
         const toast = document.getElementById('notification-toast');
         toast.classList.add('translate-y-10', 'opacity-0');
-        setTimeout(() => {
-            toast.classList.add('hidden');
-        }, 300);
+        setTimeout(() => toast.classList.add('hidden'), 300);
     });
 
     // Check expiry dates and send notifications
     function checkExpiryDates() {
+        console.log("[STOCK_HTML] Checking expiry dates");
         const stockItems = Array.from(document.querySelectorAll('.stock-card'));
         const expiringItems = [];
         const expiredItems = [];
@@ -354,72 +395,65 @@
             const daysLeft = parseInt(item.dataset.daysLeft);
             const name = item.dataset.name;
             const expiry = item.dataset.expiry;
-            
+            console.log(`[STOCK_HTML] Stock ${name}: daysLeft=${daysLeft}, expiry=${expiry}`);
             if (daysLeft !== undefined && !isNaN(daysLeft)) {
                 if (daysLeft === 0) {
-                    expiredItems.push({name, expiry});
+                    expiredItems.push({ name, expiry });
                 } else if (daysLeft <= 7) {
-                    expiringItems.push({name, expiry, daysLeft});
+                    expiringItems.push({ name, expiry, daysLeft });
                 }
             }
         });
         
-        // Send notifications for expired items
         if (expiredItems.length > 0) {
             const message = expiredItems.length === 1 
                 ? `${expiredItems[0].name} has expired!` 
                 : `${expiredItems.length} items have expired!`;
-            
+            console.log("[STOCK_HTML] Expired items notification:", message);
             showNotification('Expired Items Alert', message);
             sendNotificationToServer('expired', expiredItems);
         }
         
-        // Send notifications for soon-to-expire items
         if (expiringItems.length > 0) {
             const message = expiringItems.length === 1 
                 ? `${expiringItems[0].name} will expire in ${expiringItems[0].daysLeft} day(s)!` 
                 : `${expiringItems.length} items will expire soon!`;
-            
+            console.log("[STOCK_HTML] Expiring items notification:", message);
             showNotification('Expiry Warning', message);
             sendNotificationToServer('expiring', expiringItems);
         }
     }
-    
+
     function sendNotificationToServer(type, items) {
-        // Placeholder for your notification endpoint
-        const notificationEndpoint = '/api/notifications';
-        
-        fetch(notificationEndpoint, {
+        console.log("[STOCK_HTML] Sending notification to server:", type, items);
+        fetch('/api/notifications', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': document.querySelector('input[name="csrf_token"]').value
             },
-            body: JSON.stringify({
-                type: type,
-                items: items
-            })
+            body: JSON.stringify({ type, items })
         })
         .then(response => {
-            if (!response.ok) {
-                console.error('Failed to send notification to server');
-            }
+            console.log("[STOCK_HTML] /api/notifications response status:", response.status);
+            if (!response.ok) console.error('[STOCK_HTML] Failed to send notification to server');
         })
-        .catch(error => {
-            console.error('Error sending notification:', error);
-        });
+        .catch(error => console.error('[STOCK_HTML] Error sending notification:', error));
     }
 
-    // Check for expiring items when page loads
+    // Initialize
     document.addEventListener('DOMContentLoaded', () => {
+        console.log("[STOCK_HTML] DOM loaded, initializing");
         checkExpiryDates();
-        document.querySelectorAll('.stock-form').forEach(form => {
+        document.querySelectorAll('form').forEach(form => {
+            console.log("[STOCK_HTML] Binding submit event to form");
             form.addEventListener('submit', handleFormSubmit);
         });
     });
-    
-    // For demo purposes, check periodically (in a real app, this might be handled by server-side scheduler)
-    // This check is every 30 minutes (1800000 ms)
-    setInterval(checkExpiryDates, 1800000);
+
+    setInterval(() => {
+        console.log("[STOCK_HTML] Periodic expiry check");
+        checkExpiryDates();
+    }, 1800000);
 </script>
 {% endblock %}
