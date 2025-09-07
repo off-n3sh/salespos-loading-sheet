@@ -7,7 +7,8 @@ const wholesaleAmountPaid = document.getElementById('wholesale-amount-paid');
 let currentContainer = wholesaleContainer;
 let eventListeners = [];
 
-async function openWholesaleModal() {
+// In your openWholesaleModal function, add this:
+function openWholesaleModal() {
     if (!wholesaleModal) {
         console.warn('Wholesale modal not found');
         return;
@@ -18,21 +19,12 @@ async function openWholesaleModal() {
     wholesaleModal.classList.remove('hidden');
     currentContainer = wholesaleContainer;
     
-    // Only refresh if version changed (no unnecessary Firestore reads)
-    try {
-        const versionResponse = await fetch('/stock_data?version_only=true', {
-            credentials: 'include'
-        });
-        if (versionResponse.ok) {
-            const { version } = await versionResponse.json();
-            if (version !== currentStockVersion) {
-                console.log('Version changed, invalidating cache');
-                invalidateStockCache(); // This just clears local cache, no Firestore read
-            }
-        }
-    } catch (error) {
-        console.error('Error checking version:', error);
-    }
+    // Force refresh stock data when opening modal
+    fetchStockData(true).then(data => {
+        console.log('Stock data refreshed for wholesale modal');
+    }).catch(error => {
+        console.error('Failed to refresh stock data:', error);
+    });
     
     attachAddItemListeners(wholesaleContainer);
     wholesaleModal.dispatchEvent(new Event('modal:open'));
