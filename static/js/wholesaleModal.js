@@ -7,8 +7,10 @@ const wholesaleAmountPaid = document.getElementById('wholesale-amount-paid');
 let currentContainer = wholesaleContainer;
 let eventListeners = [];
 
-// In your openWholesaleModal function, add this:
-function openWholesaleModal() {
+// Pre-loaded stock data for instant access
+let preloadedStockData = null;
+
+async function openWholesaleModal() {
     if (!wholesaleModal) {
         console.warn('Wholesale modal not found');
         return;
@@ -19,12 +21,10 @@ function openWholesaleModal() {
     wholesaleModal.classList.remove('hidden');
     currentContainer = wholesaleContainer;
     
-    // Force refresh stock data when opening modal
-    fetchStockData(true).then(data => {
-        console.log('Stock data refreshed for wholesale modal');
-    }).catch(error => {
-        console.error('Failed to refresh stock data:', error);
-    });
+    // Pre-load stock data immediately when opening modal
+    console.log('Pre-loading stock data...');
+    preloadedStockData = await fetchStockData();
+    console.log('Stock data pre-loaded:', preloadedStockData.length, 'items');
     
     attachAddItemListeners(wholesaleContainer);
     wholesaleModal.dispatchEvent(new Event('modal:open'));
@@ -35,6 +35,9 @@ function resetModal(container) {
         console.warn('Container not found');
         return;
     }
+    // Clear pre-loaded data when resetting
+    preloadedStockData = null;
+    
     const header = container.querySelector('.item-row-header');
     const initialAddBtn = container.querySelector('.add-item-btn');
     container.innerHTML = '';
@@ -74,6 +77,7 @@ async function addItem(container) {
     }
     const isManager = window.userRole === 'manager';
     console.log('Adding item, isManager:', isManager);
+    
     const div = document.createElement('div');
     div.className = 'grid grid-cols-6 gap-2 item-row';
     div.innerHTML = `
@@ -98,20 +102,31 @@ async function addItem(container) {
         placeholderValue: 'Search or select a product'
     });
 
-    try {
-        const stockItems = await fetchStockData();
-        if (!stockItems.length) {
-            showModalError(container.id.split('-')[0], 'No stock items available.');
+    // Use pre-loaded data if available, otherwise fetch
+    let stockItems = preloadedStockData;
+    if (!stockItems) {
+        console.log('No pre-loaded data, fetching...');
+        try {
+            stockItems = await fetchStockData();
+        } catch (error) {
+            console.error('Failed to load stock items:', error);
+            showModalError(container.id.split('-')[0], 'Failed to load stock items.');
+            return;
         }
-        const choicesData = stockItems.map(item => ({
-            value: `product|${item.stock_name}|quantity|0|price|${item.wholesale}|stock|${item.stock_quantity}|uom|${item.uom}`,
-            label: `${item.stock_name} (${item.uom})`
-        }));
-        choices.setChoices(choicesData, 'value', 'label', true);
-    } catch (error) {
-        console.error('Failed to load stock items:', error);
-        showModalError(container.id.split('-')[0], 'Failed to load stock items.');
+    } else {
+        console.log('Using pre-loaded stock data');
     }
+
+    if (!stockItems.length) {
+        showModalError(container.id.split('-')[0], 'No stock items available.');
+        return;
+    }
+
+    const choicesData = stockItems.map(item => ({
+        value: `product|${item.stock_name}|quantity|0|price|${item.wholesale}|stock|${item.stock_quantity}|uom|${item.uom}`,
+        label: `${item.stock_name} (${item.uom})`
+    }));
+    choices.setChoices(choicesData, 'value', 'label', true);
 
     const removeHandler = () => {
         div.remove();
@@ -214,6 +229,7 @@ function cleanupEventListeners() {
         }
     });
     eventListeners = [];
+    preloadedStockData = null; // Clear pre-loaded data
 }
 
 if (closeWholesale) {
