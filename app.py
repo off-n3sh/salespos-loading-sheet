@@ -570,146 +570,159 @@ def stock_data():
 @login_required
 def stock():
     """Handle stock management."""
+    db = firestore.Client()
+    
     if request.method == 'POST':
         if session['user']['role'] != 'manager':
-            return "Unauthorized: Only managers can modify stock", 403
+            return jsonify({'error': 'Unauthorized: Only managers can modify stock'}), 403
 
-        action = request.form.get('action')
-        if action == 'add_stock':
-            stock_name = request.form.get('stock_name')
-            category = request.form.get('category')
-            new_category = request.form.get('new_category')
-            initial_quantity = request.form.get('initial_quantity')
-            reorder_quantity = request.form.get('reorder_quantity')
-            selling_price = request.form.get('selling_price')
-            wholesale_price = request.form.get('wholesale_price')
-            company_price = request.form.get('company_price')
-            expire_date = request.form.get('expire_date')
+        try:
+            validate_csrf(request.headers.get('X-CSRF-TOKEN'))
+            action = request.form.get('action')
 
-            if not all([stock_name, category or new_category, initial_quantity, reorder_quantity, selling_price, wholesale_price, company_price, expire_date]):
-                return "All fields are required", 400
+            if action == 'add_stock':
+                stock_name = request.form.get('stock_name')
+                category = request.form.get('category')
+                new_category = request.form.get('new_category')
+                initial_quantity = request.form.get('initial_quantity')
+                reorder_quantity = request.form.get('reorder_quantity')
+                selling_price = request.form.get('selling_price')
+                wholesale_price = request.form.get('wholesale_price')
+                company_price = request.form.get('company_price')
+                expire_date = request.form.get('expire_date')
 
-            try:
-                initial_quantity = int(initial_quantity)
-                reorder_quantity = int(reorder_quantity)
-                selling_price = float(selling_price)
-                wholesale_price = float(wholesale_price)
-                company_price = float(company_price)
-                if any(x < 0 for x in [initial_quantity, reorder_quantity, selling_price, wholesale_price, company_price]):
-                    return "Numeric fields cannot be negative", 400
-                datetime.strptime(expire_date, '%Y-%m-%d')
-            except ValueError:
-                return "Invalid numeric or date format", 400
+                if not all([stock_name, category or new_category, initial_quantity, reorder_quantity, selling_price, wholesale_price, company_price, expire_date]):
+                    return jsonify({'error': 'All fields are required'}), 400
 
-            final_category = new_category.strip() if new_category else category
-            category_prefix = ''.join(c for c in final_category[:3] if c.isalnum()).upper()
-            counter_ref = db.collection('metadata').document('stock_counter')
-            counter = counter_ref.get()
-            if not counter.exists:
-                counter_ref.set({'last_id': 0})
-                new_counter = 1
-            else:
-                last_id = counter.to_dict().get('last_id', 0)
-                new_counter = last_id + 1
-            counter_ref.update({'last_id': new_counter})
-            stock_id = f"{category_prefix}{new_counter:03d}"
+                try:
+                    initial_quantity = int(initial_quantity)
+                    reorder_quantity = int(reorder_quantity)
+                    selling_price = float(selling_price)
+                    wholesale_price = float(wholesale_price)
+                    company_price = float(company_price)
+                    datetime.strptime(expire_date, '%Y-%m-%d')
+                    if any(x < 0 for x in [initial_quantity, reorder_quantity, selling_price, wholesale_price, company_price]):
+                        return jsonify({'error': 'Numeric fields cannot be negative'}), 400
+                except ValueError:
+                    return jsonify({'error': 'Invalid numeric or date format'}), 400
 
-            existing_stock = db.collection('stock').where('stock_name', '==', stock_name).get()
-            if existing_stock:
-                return f"Stock item '{stock_name}' already exists", 400
-            existing_id = db.collection('stock').where('stock_id', '==', stock_id).get()
-            if existing_id:
-                return f"Stock ID '{stock_id}' already exists", 400
+                final_category = new_category.strip() if new_category else category
+                category_prefix = ''.join(c for c in final_category[:3] if c.isalnum()).upper()
+                counter_ref = db.collection('metadata').document('stock_counter')
+                counter = counter_ref.get()
+                new_counter = 1 if not counter.exists else counter.to_dict().get('last_id', 0) + 1
+                counter_ref.set({'last_id': new_counter}, merge=True)
+                stock_id = f"{category_prefix}{new_counter:03d}"
 
-            stock_data = {
-                'id': new_counter,
-                'stock_id': stock_id,
-                'stock_name': stock_name,
-                'stock_quantity': initial_quantity,
-                'reorder_quantity': reorder_quantity,
-                'supplier_id': None,
-                'company_price': company_price,
-                'selling_price': selling_price,
-                'wholesale': wholesale_price,
-                'barprice': 0.0,
-                'category': final_category,
-                'date': datetime.now(NAIROBI_TZ).strftime('%Y-%m-%d %H:%M:%S'),
-                'expire_date': expire_date,
-                'uom': None,
-                'code': stock_id,
-                'date2': None
-            }
+                if db.collection('stock').where('stock_name', '==', stock_name).get():
+                    return jsonify({'error': f"Stock item '{stock_name}' already exists"}), 400
+                if db.collection('stock').where('stock_id', '==', stock_id).get():
+                    return jsonify({'error': f"Stock ID '{stock_id}' already exists"}), 400
 
-            doc_id = stock_id.replace('/', '-')
-            db.collection('stock').document(doc_id).set(stock_data)
-            log_stock_change(final_category, stock_name, 'add_stock', initial_quantity, selling_price)
-            log_stock_change(final_category, stock_name, 'wholesale_price_set', 0, wholesale_price)
+                stock_data = {
+                    'id': new_counter,
+                    'stock_id': stock_id,
+                    'stock_name': stock_name,
+                    'stock_quantity': initial_quantity,
+                    'reorder_quantity': reorder_quantity,
+                    'supplier_id': None,
+                    'company_price': company_price,
+                    'selling_price': selling_price,
+                    'wholesale': wholesale_price,
+                    'barprice': 0.0,
+                    'category': final_category,
+                    'date': datetime.now(NAIROBI_TZ).strftime('%Y-%m-%d %H:%M:%S'),
+                    'expire_date': expire_date,
+                    'uom': None,
+                    'code': stock_id,
+                    'date2': None
+                }
 
-        elif action == 'restock':
-            stock_id = request.form.get('stock_id')
-            if stock_id:
+                doc_id = stock_id.replace('/', '-')
+                db.collection('stock').document(doc_id).set(stock_data)
+                log_stock_change(final_category, stock_name, 'add_stock', initial_quantity, selling_price)
+                log_stock_change(final_category, stock_name, 'wholesale_price_set', 0, wholesale_price)
+                update_stock_version()
+                return jsonify({'status': 'success', 'message': f'Added stock: {stock_name}'}), 200
+
+            elif action == 'restock':
+                stock_id = request.form.get('stock_id')
+                if not stock_id:
+                    return jsonify({'error': 'Stock ID required'}), 400
                 stock_ref = db.collection('stock').document(stock_id)
                 stock = stock_ref.get()
-                if stock.exists:
-                    try:
-                        restock_qty = int(request.form.get('restock_quantity', 0))
-                        if restock_qty <= 0:
-                            return "Restock quantity must be positive", 400
-                        current_qty = stock.to_dict().get('stock_quantity', 0)
-                        stock_ref.update({'stock_quantity': current_qty + restock_qty})
-                        log_stock_change(stock.to_dict().get('category'), stock.to_dict().get('stock_name'), 'restock', restock_qty, stock.to_dict().get('selling_price'))
-                    except ValueError:
-                        return "Invalid restock quantity", 400
+                if not stock.exists:
+                    return jsonify({'error': 'Stock item not found'}), 404
+                try:
+                    restock_qty = int(request.form.get('restock_quantity', 0))
+                    if restock_qty <= 0:
+                        return jsonify({'error': 'Restock quantity must be positive'}), 400
+                    current_qty = stock.to_dict().get('stock_quantity', 0)
+                    stock_ref.update({'stock_quantity': current_qty + restock_qty})
+                    log_stock_change(stock.to_dict().get('category'), stock.to_dict().get('stock_name'), 'restock', restock_qty, stock.to_dict().get('selling_price'))
+                    update_stock_version()
+                    return jsonify({'status': 'success', 'message': f'Restocked {restock_qty} units'}), 200
+                except ValueError:
+                    return jsonify({'error': 'Invalid restock quantity'}), 400
 
-        elif action == 'update_price':
-            stock_id = request.form.get('stock_id')
-            if stock_id:
+            elif action == 'update_price':
+                stock_id = request.form.get('stock_id')
+                if not stock_id:
+                    return jsonify({'error': 'Stock ID required'}), 400
                 stock_ref = db.collection('stock').document(stock_id)
                 stock = stock_ref.get()
-                if stock.exists:
-                    try:
-                        new_selling_price = float(request.form.get('new_selling_price', 0))
-                        new_wholesale_price = float(request.form.get('new_wholesale_price', 0))
-                        if new_selling_price < 0 or new_wholesale_price < 0:
-                            return "Prices cannot be negative", 400
-                        updates = {}
-                        if new_selling_price > 0:
-                            updates['selling_price'] = new_selling_price
-                        if new_wholesale_price > 0:
-                            updates['wholesale'] = new_wholesale_price
-                        if updates:
-                            stock_ref.update(updates)
-                            stock_data = stock.to_dict()
-                            if new_selling_price > 0:
-                                log_stock_change(stock_data.get('category'), stock_data.get('stock_name'), 'price_update', 0, new_selling_price)
-                            if new_wholesale_price > 0:
-                                log_stock_change(stock_data.get('category'), stock_data.get('stock_name'), 'wholesale_price_update', 0, new_wholesale_price)
-                    except ValueError:
-                        return "Invalid price format", 400
+                if not stock.exists:
+                    return jsonify({'error': 'Stock item not found'}), 404
+                try:
+                    new_selling_price = float(request.form.get('new_selling_price', 0))
+                    new_wholesale_price = float(request.form.get('new_wholesale_price', 0))
+                    if new_selling_price < 0 or new_wholesale_price < 0:
+                        return jsonify({'error': 'Prices cannot be negative'}), 400
+                    updates = {}
+                    if new_selling_price > 0:
+                        updates['selling_price'] = new_selling_price
+                    if new_wholesale_price > 0:
+                        updates['wholesale'] = new_wholesale_price
+                    if not updates:
+                        return jsonify({'error': 'No valid price updates provided'}), 400
+                    stock_ref.update(updates)
+                    stock_data = stock.to_dict()
+                    if new_selling_price > 0:
+                        log_stock_change(stock_data.get('category'), stock_data.get('stock_name'), 'price_update', 0, new_selling_price)
+                    if new_wholesale_price > 0:
+                        log_stock_change(stock_data.get('category'), stock_data.get('stock_name'), 'wholesale_price_update', 0, new_wholesale_price)
+                    update_stock_version()
+                    return jsonify({'status': 'success', 'message': 'Prices updated successfully'}), 200
+                except ValueError:
+                    return jsonify({'error': 'Invalid price format'}), 400
+
+            return jsonify({'error': 'Invalid action'}), 400
+
+        except CSRFError:
+            return jsonify({'error': 'Invalid CSRF token'}), 403
+        except Exception as e:
+            print(f"Error processing stock action: {str(e)}")
+            return jsonify({'error': 'Internal server error'}), 500
 
     # GET: Render stock page
-    stock_items = [doc.to_dict() | {'id': doc.id} for doc in db.collection('stock').order_by('stock_name').get()]
-    
-    # Remove duplicates by stock_name (based on screenshot observation)
+    stock_items = [
+        doc.to_dict() | {'id': doc.id} 
+        for doc in db.collection('stock').order_by('stock_name').get()
+    ]
     seen = set()
-    unique_stock_items = []
-    for item in stock_items:
-        stock_name = item['stock_name']
-        if stock_name not in seen:
-            seen.add(stock_name)
-            unique_stock_items.append(item)
-    stock_items = unique_stock_items
+    unique_stock_items = [
+        item for item in stock_items 
+        if not (item['stock_name'] in seen or seen.add(item['stock_name']))
+    ]
 
-    # Expiry notifications
-    for item in stock_items:
+    for item in unique_stock_items:
         expire_date = item.get('expire_date')
         if expire_date and expire_date != "0000-00-00 00:00:00":
             try:
                 days_left = expire_date_days_left(expire_date)
                 if days_left is not None and days_left <= 30:
                     notification_message = f"Stock '{item['stock_name']}' is nearing expiry ({days_left} days left) on {expire_date}"
-                    existing_notif = db.collection('notifications').where('message', '==', notification_message).get()
-                    if not existing_notif:
+                    if not db.collection('notifications').where('message', '==', notification_message).get():
                         db.collection('notifications').add({
                             'recipient': session['user']['uid'],
                             'message': notification_message,
@@ -730,7 +743,7 @@ def stock():
         for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).limit(3).get()
     ]
 
-    return render_template('stock.html', stock_items=stock_items, recent_activity=recent_activity)
+    return render_template('stock.html', stock_items=unique_stock_items, recent_activity=recent_activity)
 @app.route('/logout')
 def logout():
     session.pop('user', None)
