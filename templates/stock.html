@@ -348,7 +348,6 @@
     }
     
     function sendNotificationToServer(type, items) {
-        // Placeholder for your notification endpoint
         const notificationEndpoint = '/api/notifications';
         
         fetch(notificationEndpoint, {
@@ -372,13 +371,50 @@
         });
     }
 
+    // Form Submission Handler for Cache Clearing
+    document.querySelectorAll('form').forEach(form => {
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const formData = new FormData(form);
+            const action = formData.get('action');
+            if (action === 'add_stock' || action === 'restock' || action === 'update_price') {
+                try {
+                    const response = await fetch('/stock', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    if (response.ok) {
+                        const clearCacheResponse = await fetch('/clear_stock_cache', {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRF-TOKEN': document.querySelector('input[name="csrf_token"]').value
+                            }
+                        });
+                        if (clearCacheResponse.ok) {
+                            showNotification('Success', 'Action completed and cache cleared');
+                            form.submit(); // Proceed with normal form submission
+                        } else {
+                            showNotification('Error', 'Action completed but failed to clear cache');
+                            form.submit();
+                        }
+                    } else {
+                        showNotification('Error', 'Failed to process action');
+                    }
+                } catch (error) {
+                    showNotification('Error', 'Error during submission');
+                }
+            } else {
+                form.submit(); // Normal submission for other actions
+            }
+        });
+    });
+
     // Check for expiring items when page loads
     document.addEventListener('DOMContentLoaded', () => {
         checkExpiryDates();
     });
     
     // For demo purposes, check periodically (in a real app, this might be handled by server-side scheduler)
-    // This check is every 30 minutes (1800000 ms)
     setInterval(checkExpiryDates, 1800000);
 </script>
 {% endblock %}
