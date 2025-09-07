@@ -599,11 +599,11 @@ def stock():
                     return jsonify({'error': 'All fields are required'}), 400
 
                 try:
-                    initial_quantity = int(float(initial_quantity))
-                    reorder_quantity = int(float(reorder_quantity))
-                    selling_price = float(selling_price)
-                    wholesale_price = float(wholesale_price)
-                    company_price = float(company_price)
+                    initial_quantity = int(float(initial_quantity or 0))
+                    reorder_quantity = int(float(reorder_quantity or 0))
+                    selling_price = float(selling_price or 0)
+                    wholesale_price = float(wholesale_price or 0)
+                    company_price = float(company_price or 0)
                     if any(x < 0 for x in [initial_quantity, reorder_quantity, selling_price, wholesale_price, company_price]):
                         print("Negative values detected")
                         return jsonify({'error': 'Numeric fields cannot be negative'}), 400
@@ -661,16 +661,22 @@ def stock():
 
             elif action == 'restock':
                 stock_id = request.form.get('stock_id')
+                restock_qty = request.form.get('restock_quantity', '').strip()
                 if not stock_id:
                     print("Missing stock_id for restock")
                     return jsonify({'error': 'Stock ID is required'}), 400
+                if not restock_qty:
+                    print("Missing restock quantity")
+                    return jsonify({'error': 'Restock quantity is required'}), 400
+
                 stock_ref = db.collection('stock').document(stock_id)
                 stock = stock_ref.get()
                 if not stock.exists:
                     print(f"Stock ID '{stock_id}' not found")
                     return jsonify({'error': f"Stock ID '{stock_id}' not found"}), 404
+
                 try:
-                    restock_qty = int(float(request.form.get('restock_quantity', 0)))
+                    restock_qty = int(float(restock_qty))
                     if restock_qty <= 0:
                         print("Invalid restock quantity")
                         return jsonify({'error': 'Restock quantity must be positive'}), 400
@@ -689,35 +695,46 @@ def stock():
 
             elif action == 'update_price':
                 stock_id = request.form.get('stock_id')
+                new_selling_price = request.form.get('new_selling_price', '').strip()
+                new_wholesale_price = request.form.get('new_wholesale_price', '').strip()
                 if not stock_id:
                     print("Missing stock_id for price update")
                     return jsonify({'error': 'Stock ID is required'}), 400
+                if not new_selling_price and not new_wholesale_price:
+                    print("No price updates provided")
+                    return jsonify({'error': 'At least one price must be provided'}), 400
+
                 stock_ref = db.collection('stock').document(stock_id)
                 stock = stock_ref.get()
                 if not stock.exists:
                     print(f"Stock ID '{stock_id}' not found")
                     return jsonify({'error': f"Stock ID '{stock_id}' not found"}), 404
+
+                updates = {}
                 try:
-                    new_selling_price = float(request.form.get('new_selling_price', 0))
-                    new_wholesale_price = float(request.form.get('new_wholesale_price', 0))
-                    if new_selling_price < 0 or new_wholesale_price < 0:
-                        print("Negative prices detected")
-                        return jsonify({'error': 'Prices cannot be negative'}), 400
-                    updates = {}
-                    if new_selling_price > 0:
+                    if new_selling_price:
+                        new_selling_price = float(new_selling_price)
+                        if new_selling_price < 0:
+                            print("Negative selling price detected")
+                            return jsonify({'error': 'Retail price cannot be negative'}), 400
                         updates['selling_price'] = new_selling_price
-                    if new_wholesale_price > 0:
+                    if new_wholesale_price:
+                        new_wholesale_price = float(new_wholesale_price)
+                        if new_wholesale_price < 0:
+                            print("Negative wholesale price detected")
+                            return jsonify({'error': 'Wholesale price cannot be negative'}), 400
                         updates['wholesale'] = new_wholesale_price
                     if not updates:
-                        print("No price updates provided")
+                        print("No valid price updates provided")
                         return jsonify({'error': 'No valid price updates provided'}), 400
+
                     stock_ref.update(updates)
                     stock_data = stock.to_dict()
-                    if new_selling_price > 0:
+                    if new_selling_price:
                         log_stock_change(stock_data.get('category'), stock_data.get('stock_name'), 'price_update', 0, new_selling_price)
-                    if new_wholesale_price > 0:
+                    if new_wholesale_price:
                         log_stock_change(stock_data.get('category'), stock_data.get('stock_name'), 'wholesale_price_update', 0, new_wholesale_price)
-                    print(f"Updated prices for {stock_id}: Retail={new_selling_price}, Wholesale={new_wholesale_price}")
+                    print(f"Updated prices for {stock_id}: Retail={new_selling_price or 'unchanged'}, Wholesale={new_wholesale_price or 'unchanged'}")
                     update_stock_version()
                     stock_cache['data'] = None
                     stock_cache['version'] = None

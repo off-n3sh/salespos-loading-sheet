@@ -230,8 +230,6 @@
 </div>
 
 <script>
-    import { fetchStockData, clearStockCache, showNotification } from './utils.js';
-
     // Toggle Add Stock Form
     const toggleButton = document.getElementById('toggle-add-stock-form');
     const addStockForm = document.getElementById('add-stock-form');
@@ -278,6 +276,18 @@
         event.preventDefault();
         const form = event.target;
         const formData = new FormData(form);
+        const action = formData.get('action');
+
+        // Validate inputs
+        if (action === 'restock' && !formData.get('restock_quantity')) {
+            showNotification('Error', 'Restock quantity is required');
+            return;
+        }
+        if (action === 'update_price' && !formData.get('new_selling_price') && !formData.get('new_wholesale_price')) {
+            showNotification('Error', 'At least one price must be provided');
+            return;
+        }
+
         try {
             const response = await fetch('/stock', {
                 method: 'POST',
@@ -286,17 +296,17 @@
             });
             const result = await response.json();
             if (response.ok && result.status === 'success') {
-                // Trigger cache invalidation
                 localStorage.setItem('stockCacheInvalidated', Date.now());
                 localStorage.removeItem('stockCacheInvalidated');
                 showNotification('Success', result.message);
-                // Reset form and hide if adding stock
-                if (formData.get('action') === 'add_stock') {
+                if (action === 'add_stock') {
                     form.reset();
                     addStockForm.classList.add('hidden');
                     newCategoryInput.classList.add('hidden');
                     newCategoryInput.required = false;
                 }
+                // Trigger grid refresh
+                document.dispatchEvent(new Event('stockDataUpdated'));
             } else {
                 showNotification('Error', result.error || 'Failed to process request');
             }
@@ -384,7 +394,7 @@
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <div class="flex items-center gap-2">
                                 <div class="relative flex-grow">
-                                    <input type="number" name="restock_quantity" min="1" placeholder="Qty" class="w-full p-2 pl-3 border rounded-md text-sm shadow-sm focus:ring focus:ring-orange-200 dark:focus:ring-orange-800 dark:bg-gray-700 dark:text-white">
+                                    <input type="number" name="restock_quantity" min="1" placeholder="Qty" class="w-full p-2 pl-3 border rounded-md text-sm shadow-sm focus:ring focus:ring-orange-200 dark:focus:ring-orange-800 dark:bg-gray-700 dark:text-white" required>
                                 </div>
                                 <button type="submit" name="action" value="restock" class="bg-orange-500 text-white font-medium px-4 py-2 rounded-md border border-orange-600 shadow-sm hover:bg-orange-600 focus:outline-none transition-colors duration-200 text-sm dark:bg-orange-600 dark:hover:bg-orange-700 dark:border-orange-700">
                                     Restock
