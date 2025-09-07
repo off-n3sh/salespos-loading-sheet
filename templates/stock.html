@@ -171,7 +171,7 @@
             </div>
             
             {% if session['user']['role'] == 'manager' %}
-            <form method="POST" class="mt-4 space-y-3">
+            <form method="POST" class="mt-4 space-y-3 stock-form">
                 <input type="hidden" name="stock_id" value="{{ item.id }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 
@@ -278,6 +278,44 @@
     searchInput.addEventListener('input', filterStock);
     categoryFilter.addEventListener('change', filterStock);
 
+    // Form Submission Handler
+    async function handleFormSubmit(event) {
+        event.preventDefault();
+        const form = event.target;
+        const formData = new FormData(form);
+        try {
+            const response = await fetch('/stock', {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-CSRF-TOKEN': formData.get('csrf_token') }
+            });
+            const result = await response.json();
+            if (response.ok && result.status === 'success') {
+                // Trigger cache invalidation
+                localStorage.setItem('stockCacheInvalidated', Date.now());
+                localStorage.removeItem('stockCacheInvalidated');
+                showNotification('Success', result.message);
+                // Reset form and hide if adding stock
+                if (formData.get('action') === 'add_stock') {
+                    form.reset();
+                    addStockForm.classList.add('hidden');
+                    newCategoryInput.classList.add('hidden');
+                    newCategoryInput.required = false;
+                }
+                // Trigger stock_data fetch
+                await fetch('/clear_stock_cache', {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': formData.get('csrf_token') }
+                });
+            } else {
+                showNotification('Error', result.error || 'Failed to process request');
+            }
+        } catch (error) {
+            console.error('Error submitting form:', error);
+            showNotification('Error', 'Failed to process request');
+        }
+    }
+
     // Expiry Notification System
     function showNotification(title, message) {
         const toast = document.getElementById('notification-toast');
@@ -375,6 +413,9 @@
     // Check for expiring items when page loads
     document.addEventListener('DOMContentLoaded', () => {
         checkExpiryDates();
+        document.querySelectorAll('.stock-form').forEach(form => {
+            form.addEventListener('submit', handleFormSubmit);
+        });
     });
     
     // For demo purposes, check periodically (in a real app, this might be handled by server-side scheduler)
