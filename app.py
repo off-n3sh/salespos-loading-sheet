@@ -491,18 +491,18 @@ def group_orders(filtered_orders, time_filter, today_start, today_end, now):
     return grouped_orders
     
 @app.route('/clear_stock_cache', methods=['POST'])
-    @login_required
-    def clear_stock_cache():
-        try:
-            update_stock_version()
-            stock_cache['data'] = None
-            stock_cache['version'] = None
-            stock_cache['timestamp'] = None
-            print("Stock cache cleared successfully")
-            return jsonify({'status': 'success'}), 200
-        except Exception as e:
-            print(f"Error updating stock version: {str(e)}")
-            return jsonify({'error': str(e)}), 500
+@login_required
+def clear_stock_cache():
+    try:
+        update_stock_version()
+        stock_cache['data'] = None
+        stock_cache['version'] = None
+        stock_cache['timestamp'] = None
+        print("Stock cache cleared successfully")
+        return jsonify({'status': 'success'}), 200
+    except Exception as e:
+        print(f"Error updating stock version: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/stock_data', methods=['GET'])
 @no_cache
