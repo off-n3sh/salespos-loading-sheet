@@ -569,11 +569,29 @@ def stock_data():
         print(f"Error fetching stock data: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
         
+def clear_stock_cache_logic():
+    """Clear stock cache logic without HTTP overhead."""
+    print(f"[CLEAR_STOCK_CACHE] Clearing cache: user={session['user']['email']}")
+    try:
+        print("[CLEAR_STOCK_CACHE] Calling update_stock_version")
+        update_stock_version()
+        print("[CLEAR_STOCK_CACHE] Clearing stock_cache")
+        stock_cache['data'] = None
+        stock_cache['version'] = None
+        stock_cache['timestamp'] = None
+        print("[CLEAR_STOCK_CACHE] Stock cache cleared successfully")
+        return True
+    except Exception as e:
+        print(f"[CLEAR_STOCK_CACHE] Error: {str(e)}\n{traceback.format_exc()}")
+        return False
+
 @app.route('/stock', methods=['GET', 'POST'])
 @no_cache
 @login_required
 def stock():
     """Handle stock management."""
+    cache_cleared = False
+    
     if request.method == 'POST':
         if session['user']['role'] != 'manager':
             return "Unauthorized: Only managers can modify stock", 403
@@ -648,6 +666,7 @@ def stock():
             db.collection('stock').document(doc_id).set(stock_data)
             log_stock_change(final_category, stock_name, 'add_stock', initial_quantity, selling_price)
             log_stock_change(final_category, stock_name, 'wholesale_price_set', 0, wholesale_price)
+            cache_cleared = clear_stock_cache_logic()
 
         elif action == 'restock':
             stock_id = request.form.get('stock_id')
@@ -662,6 +681,7 @@ def stock():
                         current_qty = stock.to_dict().get('stock_quantity', 0)
                         stock_ref.update({'stock_quantity': current_qty + restock_qty})
                         log_stock_change(stock.to_dict().get('category'), stock.to_dict().get('stock_name'), 'restock', restock_qty, stock.to_dict().get('selling_price'))
+                        cache_cleared = clear_stock_cache_logic()
                     except ValueError:
                         return "Invalid restock quantity", 400
 
@@ -688,8 +708,15 @@ def stock():
                                 log_stock_change(stock_data.get('category'), stock_data.get('stock_name'), 'price_update', 0, new_selling_price)
                             if new_wholesale_price > 0:
                                 log_stock_change(stock_data.get('category'), stock_data.get('stock_name'), 'wholesale_price_update', 0, new_wholesale_price)
+                            cache_cleared = clear_stock_cache_logic()
                     except ValueError:
                         return "Invalid price format", 400
+
+        # Log cache clearing result
+        if cache_cleared:
+            print(f"[STOCK_ROUTE] Cache cleared successfully after {action}")
+        else:
+            print(f"[STOCK_ROUTE] Cache clearing failed after {action}")
 
     # GET: Render stock page
     stock_items = [doc.to_dict() | {'id': doc.id} for doc in db.collection('stock').order_by('stock_name').get()]
