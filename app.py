@@ -662,8 +662,7 @@ def stock():
                     'date2': None
                 }
                 print(f"[STOCK] Saving stock data: {stock_data}")
-                doc_id = stock_id.replace('/', '-')
-                db.collection('stock').document(doc_id).set(stock_data)
+                db.collection('stock').document(stock_id.replace('/', '-')).set(stock_data)
                 print("[STOCK] Stock data saved successfully")
 
                 try:
@@ -761,7 +760,7 @@ def stock():
                     return jsonify({'error': 'Invalid price format'}), 400
 
             print(f"[STOCK] Error: Invalid action={action}")
-            return jsonify({'error': 'Invalid action'}), 400
+            return jsonify({'error': f'Invalid action: {action}'}), 400
 
         except CSRFError as e:
             print(f"[STOCK] CSRF validation failed: {str(e)}")

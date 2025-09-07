@@ -301,12 +301,14 @@
                 headers: { 'X-CSRF-TOKEN': formData.get('csrf_token') }
             });
             console.log("[STOCK_HTML] /stock response status:", response.status);
+            // Clone response to allow multiple reads
+            const responseClone = response.clone();
             let result;
             try {
                 result = await response.json();
                 console.log("[STOCK_HTML] /stock response JSON:", result);
             } catch (e) {
-                const responseText = await response.text();
+                const responseText = await responseClone.text();
                 console.error("[STOCK_HTML] Invalid JSON from /stock:", responseText, "Status:", response.status);
                 showNotification('Error', `Server error: ${response.status}`);
                 return;
