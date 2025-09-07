@@ -17,7 +17,7 @@
         </button>
         <div id="add-stock-form" class="hidden mt-6 p-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
             <h3 class="text-xl font-semibold mb-6 text-gray-900 dark:text-white border-b pb-3 dark:border-gray-700">Add New Stock Item</h3>
-            <form method="POST" action="/stock">
+            <form method="POST">
                 <input type="hidden" name="action" value="add_stock">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -171,25 +171,19 @@
             </div>
             
             {% if session['user']['role'] == 'manager' %}
-            <!-- Restock Form -->
-            <form method="POST" action="/stock" class="mt-4">
-                <input type="hidden" name="action" value="restock">
+            <form method="POST" class="mt-4 space-y-3">
                 <input type="hidden" name="stock_id" value="{{ item.id }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                
                 <div class="flex items-center gap-2">
                     <div class="relative flex-grow">
                         <input type="number" name="restock_quantity" min="1" placeholder="Qty" class="w-full p-2 pl-3 border rounded-md text-sm shadow-sm focus:ring focus:ring-orange-200 dark:focus:ring-orange-800 dark:bg-gray-700 dark:text-white">
                     </div>
-                    <button type="submit" class="bg-orange-500 text-white font-medium px-4 py-2 rounded-md border border-orange-600 shadow-sm hover:bg-orange-600 focus:outline-none transition-colors duration-200 text-sm dark:bg-orange-600 dark:hover:bg-orange-700 dark:border-orange-700">
+                    <button type="submit" name="action" value="restock" class="bg-orange-500 text-white font-medium px-4 py-2 rounded-md border border-orange-600 shadow-sm hover:bg-orange-600 focus:outline-none transition-colors duration-200 text-sm dark:bg-orange-600 dark:hover:bg-orange-700 dark:border-orange-700">
                         Restock
                     </button>
                 </div>
-            </form>
-            <!-- Update Price Form -->
-            <form method="POST" action="/stock" class="mt-4">
-                <input type="hidden" name="action" value="update_price">
-                <input type="hidden" name="stock_id" value="{{ item.id }}">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                
                 <div class="p-3 bg-white dark:bg-gray-700 rounded-md shadow-sm">
                     <div class="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Update Prices</div>
                     <div class="grid grid-cols-2 gap-3">
@@ -202,7 +196,7 @@
                             <input type="number" name="new_wholesale_price" min="0" step="0.01" class="w-full p-2 border rounded-md text-sm shadow-sm focus:ring focus:ring-blue-200 dark:focus:ring-blue-800 dark:bg-gray-600 dark:text-white" value="{{ item.wholesale }}">
                         </div>
                     </div>
-                    <button type="submit" class="mt-3 w-full bg-blue-500 text-white font-medium px-4 py-2 rounded-md border border-blue-600 shadow-sm hover:bg-blue-600 focus:outline-none transition-colors duration-200 text-sm dark:bg-blue-600 dark:hover:bg-blue-700 dark:border-blue-700">
+                    <button type="submit" name="action" value="update_price" class="mt-3 w-full bg-blue-500 text-white font-medium px-4 py-2 rounded-md border border-blue-600 shadow-sm hover:bg-blue-600 focus:outline-none transition-colors duration-200 text-sm dark:bg-blue-600 dark:hover:bg-blue-700 dark:border-blue-700">
                         Update Prices
                     </button>
                 </div>
@@ -237,26 +231,20 @@
 </div>
 
 <script>
-    console.log("[STOCK_HTML] Script loaded at", new Date().toISOString());
-
     // Toggle Add Stock Form
-    console.log("[STOCK_HTML] Initializing toggle button");
     const toggleButton = document.getElementById('toggle-add-stock-form');
     const addStockForm = document.getElementById('add-stock-form');
     if (toggleButton && addStockForm) {
         toggleButton.addEventListener('click', () => {
-            console.log("[STOCK_HTML] Toggling add stock form");
             addStockForm.classList.toggle('hidden');
         });
     }
 
     // Category Selection Logic
-    console.log("[STOCK_HTML] Initializing category selection");
     const categorySelect = document.getElementById('category');
     const newCategoryInput = document.getElementById('new_category');
     if (categorySelect && newCategoryInput) {
         categorySelect.addEventListener('change', () => {
-            console.log("[STOCK_HTML] Category changed:", categorySelect.value);
             if (categorySelect.value === 'new') {
                 newCategoryInput.classList.remove('hidden');
                 newCategoryInput.required = true;
@@ -269,16 +257,15 @@
     }
 
     // Search and Filter Logic
-    console.log("[STOCK_HTML] Initializing search and filter");
     const searchInput = document.getElementById('search');
     const categoryFilter = document.getElementById('category-filter');
     const stockGrid = document.getElementById('stock-grid');
     const cards = Array.from(stockGrid.getElementsByClassName('stock-card'));
 
     function filterStock() {
-        console.log("[STOCK_HTML] Filtering stock: search=", searchInput.value, "category=", categoryFilter.value);
         const searchText = searchInput.value.toLowerCase();
         const category = categoryFilter.value;
+
         cards.forEach(card => {
             const name = card.querySelector('h3').textContent.toLowerCase();
             const categorySpan = card.querySelector('span.inline-flex').textContent.trim();
@@ -291,21 +278,8 @@
     searchInput.addEventListener('input', filterStock);
     categoryFilter.addEventListener('change', filterStock);
 
-    // Form Submission Handler (for cache clearing only)
-    function handleFormSubmit(event) {
-        event.preventDefault();
-        console.log("[STOCK_HTML] Form submitted");
-        const form = event.target;
-        const formData = new FormData(form);
-        console.log("[STOCK_HTML] Form data:", Object.fromEntries(formData));
-        
-        // Submit form normally (server handles redirect)
-        form.submit();
-    }
-
     // Expiry Notification System
     function showNotification(title, message) {
-        console.log("[STOCK_HTML] Showing notification:", title, message);
         const toast = document.getElementById('notification-toast');
         const titleElement = document.getElementById('notification-title');
         const messageElement = document.getElementById('notification-message');
@@ -318,20 +292,22 @@
         
         setTimeout(() => {
             toast.classList.add('translate-y-10', 'opacity-0');
-            setTimeout(() => toast.classList.add('hidden'), 300);
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 300);
         }, 5000);
     }
-
+    
     document.getElementById('close-notification').addEventListener('click', () => {
-        console.log("[STOCK_HTML] Closing notification");
         const toast = document.getElementById('notification-toast');
         toast.classList.add('translate-y-10', 'opacity-0');
-        setTimeout(() => toast.classList.add('hidden'), 300);
+        setTimeout(() => {
+            toast.classList.add('hidden');
+        }, 300);
     });
 
     // Check expiry dates and send notifications
     function checkExpiryDates() {
-        console.log("[STOCK_HTML] Checking expiry dates");
         const stockItems = Array.from(document.querySelectorAll('.stock-card'));
         const expiringItems = [];
         const expiredItems = [];
@@ -340,97 +316,69 @@
             const daysLeft = parseInt(item.dataset.daysLeft);
             const name = item.dataset.name;
             const expiry = item.dataset.expiry;
-            console.log(`[STOCK_HTML] Stock ${name}: daysLeft=${daysLeft}, expiry=${expiry}`);
+            
             if (daysLeft !== undefined && !isNaN(daysLeft)) {
                 if (daysLeft === 0) {
-                    expiredItems.push({ name, expiry });
+                    expiredItems.push({name, expiry});
                 } else if (daysLeft <= 7) {
-                    expiringItems.push({ name, expiry, daysLeft });
+                    expiringItems.push({name, expiry, daysLeft});
                 }
             }
         });
         
+        // Send notifications for expired items
         if (expiredItems.length > 0) {
             const message = expiredItems.length === 1 
                 ? `${expiredItems[0].name} has expired!` 
                 : `${expiredItems.length} items have expired!`;
-            console.log("[STOCK_HTML] Expired items notification:", message);
+            
             showNotification('Expired Items Alert', message);
             sendNotificationToServer('expired', expiredItems);
         }
         
+        // Send notifications for soon-to-expire items
         if (expiringItems.length > 0) {
             const message = expiringItems.length === 1 
                 ? `${expiringItems[0].name} will expire in ${expiringItems[0].daysLeft} day(s)!` 
                 : `${expiringItems.length} items will expire soon!`;
-            console.log("[STOCK_HTML] Expiring items notification:", message);
+            
             showNotification('Expiry Warning', message);
             sendNotificationToServer('expiring', expiringItems);
         }
     }
-
+    
     function sendNotificationToServer(type, items) {
-        console.log("[STOCK_HTML] Sending notification to server:", type, items);
-        fetch('/api/notifications', {
+        // Placeholder for your notification endpoint
+        const notificationEndpoint = '/api/notifications';
+        
+        fetch(notificationEndpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': document.querySelector('input[name="csrf_token"]').value
             },
-            body: JSON.stringify({ type, items })
+            body: JSON.stringify({
+                type: type,
+                items: items
+            })
         })
         .then(response => {
-            console.log("[STOCK_HTML] /api/notifications response status:", response.status);
-            if (!response.ok) console.error('[STOCK_HTML] Failed to send notification to server');
+            if (!response.ok) {
+                console.error('Failed to send notification to server');
+            }
         })
-        .catch(error => console.error('[STOCK_HTML] Error sending notification:', error));
+        .catch(error => {
+            console.error('Error sending notification:', error);
+        });
     }
 
-    // Initialize
+    // Check for expiring items when page loads
     document.addEventListener('DOMContentLoaded', () => {
-        console.log("[STOCK_HTML] DOM loaded, initializing");
         checkExpiryDates();
-        // Attach form submission handler
-        document.querySelectorAll('form').forEach(form => {
-            console.log("[STOCK_HTML] Binding submit event to form");
-            form.addEventListener('submit', handleFormSubmit);
-        });
     });
-
-    setInterval(() => {
-        console.log("[STOCK_HTML] Periodic expiry check");
-        checkExpiryDates();
-    }, 1800000);
-
-    // Handle page load after form submission (check for success)
-    window.addEventListener('load', () => {
-        console.log("[STOCK_HTML] Page loaded, checking for form submission");
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('success')) {
-            console.log("[STOCK_HTML] Form submission success, clearing cache");
-            const csrfToken = document.querySelector('input[name="csrf_token"]').value;
-            fetch('/clear_stock_cache', {
-                method: 'POST',
-                headers: { 'X-CSRF-TOKEN': csrfToken }
-            })
-            .then(response => {
-                console.log("[STOCK_HTML] /clear_stock_cache response status:", response.status);
-                return response.json();
-            })
-            .then(result => {
-                console.log("[STOCK_HTML] /clear_stock_cache response JSON:", result);
-                if (result.status === 'success') {
-                    showNotification('Success', result.message || 'Action completed successfully');
-                } else {
-                    console.error("[STOCK_HTML] /clear_stock_cache error:", result.error);
-                    showNotification('Error', result.error || 'Failed to clear cache');
-                }
-            })
-            .catch(error => {
-                console.error("[STOCK_HTML] Error clearing cache:", error);
-                showNotification('Error', 'Failed to clear cache');
-            });
-        }
-    });
+    
+    // For demo purposes, check periodically (in a real app, this might be handled by server-side scheduler)
+    // This check is every 30 minutes (1800000 ms)
+    setInterval(checkExpiryDates, 1800000);
 </script>
 {% endblock %}
