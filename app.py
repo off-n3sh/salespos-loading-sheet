@@ -57,6 +57,13 @@ def update_stock_version():
     new_version = int(current_version) + 1
     version_ref.set({'version': new_version})
     return new_version
+# In-memory cache
+stock_cache = {
+    'data': None,
+    'timestamp': None,
+    'timeout': timedelta(hours=1)  # 1 hour cache duration
+}
+
     
 def update_clients_counter(change, context):
     count = sum(1 for _ in db.collection('clients').stream())
@@ -163,13 +170,6 @@ else:
     firebase_admin.initialize_app()
 
 db = firestore.client()
-
-# In-memory cache
-stock_cache = {
-    'data': None,
-    'timestamp': None,
-    'timeout': timedelta(hours=1)  # 1 hour cache duration
-}
 
 with open('firebase_config.json', 'r') as f:
     firebase_config = json.load(f)
@@ -497,60 +497,55 @@ def group_orders(filtered_orders, time_filter, today_start, today_end, now):
     return grouped_orders
     
 @app.route('/stock_data', methods=['GET'])
-@login_required
 @no_cache
+@login_required
 def stock_data():
     """Fetch stock data from Firestore for retail/wholesale modals."""
     try:
-        db = firestore.Client()
-        version_doc = db.collection('metadata').document('stock_version').get()
-        current_version = str(version_doc.to_dict().get('version', '0')) if version_doc.exists else '0'
-
-        if (stock_cache.get('data') and
-                stock_cache.get('version') == current_version and
-                stock_cache.get('timestamp') and
+        # Check cache
+        if (stock_cache['data'] is not None and
+                stock_cache['timestamp'] is not None and
                 datetime.now() < stock_cache['timestamp'] + stock_cache['timeout']):
-            print(f"Serving {len(stock_cache['data'])} stock items from cache (version: {current_version})")
+            print("Serving stock data from cache")  # Debug log
             return jsonify(stock_cache['data']), 200
 
+        # Fetch stock items from Firestore
         stock_items = [
             {
-                'stock_name': doc.to_dict().get('stock_name', ''),
-                'selling_price': float(doc.to_dict().get('selling_price', 0) or 0),
-                'wholesale': float(doc.to_dict().get('wholesale', 0) or 0),
-                'stock_quantity': float(doc.to_dict().get('stock_quantity', 0) or 0),
-                'uom': doc.to_dict().get('uom', 'Unit'),
-                'category': doc.to_dict().get('category', ''),
-                'id': doc.id,
-                'company_price': float(doc.to_dict().get('company_price', 0) or 0),
-                'expire_date': doc.to_dict().get('expire_date', None),
-                'reorder_quantity': int(doc.to_dict().get('reorder_quantity', 0) or 0)
+                'stock_name': doc.to_dict()['stock_name'],
+                'selling_price': float(doc.to_dict()['selling_price'] or 0),
+                'wholesale': float(doc.to_dict()['wholesale'] or 0),
+                'stock_quantity': float(doc.to_dict()['stock_quantity'] or 0),
+                'uom': doc.to_dict().get('uom', 'Unit')  # Default to 'Unit' if null
             }
             for doc in db.collection('stock').order_by('stock_name').get()
         ]
 
+        # Remove duplicates by stock_name
         seen = set()
         unique_stock_items = []
         for item in stock_items:
             stock_name = item['stock_name']
-            if stock_name and stock_name not in seen:
+            if stock_name not in seen and all(
+                item[key] is not None for key in ['selling_price', 'wholesale', 'stock_quantity']
+            ):
                 seen.add(stock_name)
                 unique_stock_items.append(item)
-
+        
         if not unique_stock_items:
-            print("No valid stock items found in Firestore")
+            print("No stock items found in Firestore")  # Debug log
             return jsonify([]), 200
 
+        # Update cache
         stock_cache['data'] = unique_stock_items
-        stock_cache['version'] = current_version
         stock_cache['timestamp'] = datetime.now()
         
-        print(f"Returning {len(unique_stock_items)} stock items from Firestore (version: {current_version})")
+        print(f"Returning {len(unique_stock_items)} stock items")  # Debug log
         return jsonify(unique_stock_items), 200
 
     except Exception as e:
-        print(f"Error fetching stock data: {str(e)}")
-        return jsonify({'error': f"Failed to fetch stock data: {str(e)}"}), 500
+        print(f"Error fetching stock data: {str(e)}")  # Debug log
+        return jsonify({'error': 'Failed to fetch stock data'}), 500
 
 
 @app.route('/clear_stock_cache', methods=['POST'])
