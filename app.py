@@ -577,8 +577,9 @@ def stock():
             return jsonify({'error': 'Unauthorized: Only managers can modify stock'}), 403
 
         try:
-            validate_csrf(request.headers.get('X-CSRF-TOKEN'))
+            validate_csrf(request.headers.get('X-CSRF-TOKEN'), secret_key=app.secret_key)
             action = request.form.get('action')
+            print(f"Processing action: {action}")  # Debug log
 
             if action == 'add_stock':
                 stock_name = request.form.get('stock_name')
@@ -603,7 +604,8 @@ def stock():
                     datetime.strptime(expire_date, '%Y-%m-%d')
                     if any(x < 0 for x in [initial_quantity, reorder_quantity, selling_price, wholesale_price, company_price]):
                         return jsonify({'error': 'Numeric fields cannot be negative'}), 400
-                except ValueError:
+                except ValueError as e:
+                    print(f"Validation error: {str(e)}")
                     return jsonify({'error': 'Invalid numeric or date format'}), 400
 
                 final_category = new_category.strip() if new_category else category
@@ -640,9 +642,13 @@ def stock():
 
                 doc_id = stock_id.replace('/', '-')
                 db.collection('stock').document(doc_id).set(stock_data)
-                log_stock_change(final_category, stock_name, 'add_stock', initial_quantity, selling_price)
-                log_stock_change(final_category, stock_name, 'wholesale_price_set', 0, wholesale_price)
-                update_stock_version()
+                try:
+                    log_stock_change(final_category, stock_name, 'add_stock', initial_quantity, selling_price)
+                    log_stock_change(final_category, stock_name, 'wholesale_price_set', 0, wholesale_price)
+                    update_stock_version()
+                except Exception as e:
+                    print(f"Error in log_stock_change/update_stock_version: {str(e)}")
+                    return jsonify({'error': 'Stock added but failed to log changes'}), 500
                 return jsonify({'status': 'success', 'message': f'Added stock: {stock_name}'}), 200
 
             elif action == 'restock':
@@ -659,8 +665,12 @@ def stock():
                         return jsonify({'error': 'Restock quantity must be positive'}), 400
                     current_qty = stock.to_dict().get('stock_quantity', 0)
                     stock_ref.update({'stock_quantity': current_qty + restock_qty})
-                    log_stock_change(stock.to_dict().get('category'), stock.to_dict().get('stock_name'), 'restock', restock_qty, stock.to_dict().get('selling_price'))
-                    update_stock_version()
+                    try:
+                        log_stock_change(stock.to_dict().get('category'), stock.to_dict().get('stock_name'), 'restock', restock_qty, stock.to_dict().get('selling_price'))
+                        update_stock_version()
+                    except Exception as e:
+                        print(f"Error in log_stock_change/update_stock_version: {str(e)}")
+                        return jsonify({'error': 'Stock restocked but failed to log changes'}), 500
                     return jsonify({'status': 'success', 'message': f'Restocked {restock_qty} units'}), 200
                 except ValueError:
                     return jsonify({'error': 'Invalid restock quantity'}), 400
@@ -686,12 +696,16 @@ def stock():
                     if not updates:
                         return jsonify({'error': 'No valid price updates provided'}), 400
                     stock_ref.update(updates)
-                    stock_data = stock.to_dict()
-                    if new_selling_price > 0:
-                        log_stock_change(stock_data.get('category'), stock_data.get('stock_name'), 'price_update', 0, new_selling_price)
-                    if new_wholesale_price > 0:
-                        log_stock_change(stock_data.get('category'), stock_data.get('stock_name'), 'wholesale_price_update', 0, new_wholesale_price)
-                    update_stock_version()
+                    try:
+                        stock_data = stock.to_dict()
+                        if new_selling_price > 0:
+                            log_stock_change(stock_data.get('category'), stock_data.get('stock_name'), 'price_update', 0, new_selling_price)
+                        if new_wholesale_price > 0:
+                            log_stock_change(stock_data.get('category'), stock_data.get('stock_name'), 'wholesale_price_update', 0, new_wholesale_price)
+                        update_stock_version()
+                    except Exception as e:
+                        print(f"Error in log_stock_change/update_stock_version: {str(e)}")
+                        return jsonify({'error': 'Prices updated but failed to log changes'}), 500
                     return jsonify({'status': 'success', 'message': 'Prices updated successfully'}), 200
                 except ValueError:
                     return jsonify({'error': 'Invalid price format'}), 400
@@ -699,9 +713,10 @@ def stock():
             return jsonify({'error': 'Invalid action'}), 400
 
         except CSRFError:
+            print("CSRF validation failed")
             return jsonify({'error': 'Invalid CSRF token'}), 403
         except Exception as e:
-            print(f"Error processing stock action: {str(e)}")
+            print(f"Unexpected error in /stock: {str(e)}\n{traceback.format_exc()}")
             return jsonify({'error': 'Internal server error'}), 500
 
     # GET: Render stock page
@@ -730,7 +745,8 @@ def stock():
                             'order_id': None,
                             'read': False
                         })
-            except ValueError:
+            except Exception as e:
+                print(f"Error processing expiry notification: {str(e)}")
                 continue
 
     recent_activity = [
