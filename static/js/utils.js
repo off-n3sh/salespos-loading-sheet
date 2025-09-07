@@ -3,9 +3,16 @@
 let stockDataCache = null;
 let currentStockVersion = null;
 
-async function fetchStockData() {
+async function fetchStockData(forceRefresh = false) {
+    // If forceRefresh is true, bypass cache entirely
+    if (forceRefresh) {
+        console.log('Force refresh requested - bypassing cache');
+        stockDataCache = null;
+        currentStockVersion = null;
+    }
+    
     // Check server version if cache exists
-    if (stockDataCache && currentStockVersion !== null) {
+    if (stockDataCache && currentStockVersion !== null && !forceRefresh) {
         try {
             const versionResponse = await fetch('/stock_data?version_only=true', {
                 credentials: 'include'
@@ -24,10 +31,11 @@ async function fetchStockData() {
             // Proceed to fetch new data on version check failure
         }
     }
-
+    
     try {
         const response = await fetch('/stock_data', {
-            credentials: 'include'
+            credentials: 'include',
+            cache: 'no-cache'  // Ensure fresh fetch from server
         });
         if (!response.ok) {
             throw new Error(`HTTP error: ${response.status}`);
@@ -36,7 +44,9 @@ async function fetchStockData() {
         if (!Array.isArray(data)) {
             throw new Error('Invalid response format: Expected an array');
         }
+        
         stockDataCache = data.map(item => ({
+            id: item.id,
             stock_name: item.stock_name,
             selling_price: parseFloat(item.selling_price) || 0,
             wholesale: parseFloat(item.wholesale) || 0,
@@ -44,6 +54,7 @@ async function fetchStockData() {
             uom: item.uom || 'Unit'
         }));
         currentStockVersion = version;
+        
         if (!stockDataCache.length) {
             console.warn('No stock items returned from /stock_data');
         }
@@ -54,6 +65,25 @@ async function fetchStockData() {
         return [];
     }
 }
+
+// Function to invalidate cache and fetch fresh data
+function invalidateStockCache() {
+    console.log('Invalidating stock cache');
+    stockDataCache = null;
+    currentStockVersion = null;
+}
+
+// Function to refresh stock data after operations
+async function refreshStockData() {
+    return await fetchStockData(true);
+}
+
+// Example usage after form submissions or stock operations:
+// After adding stock, restocking, or updating prices, call:
+// refreshStockData().then(data => {
+//     // Update your UI with fresh data
+//     console.log('Stock data refreshed:', data);
+// });
 
 function updateSubtotal(container) {
     let subtotal = 0;

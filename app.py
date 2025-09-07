@@ -585,22 +585,6 @@ def clear_stock_cache_logic():
         print(f"[CLEAR_STOCK_CACHE] Error: {str(e)}\n{traceback.format_exc()}")
         return False
 
-def clear_stock_cache_logic():
-    """Clear stock cache logic without HTTP overhead."""
-    print(f"[CLEAR_STOCK_CACHE] Clearing cache: user={session['user']['email']}")
-    try:
-        print("[CLEAR_STOCK_CACHE] Calling update_stock_version")
-        update_stock_version()
-        print("[CLEAR_STOCK_CACHE] Clearing stock_cache")
-        stock_cache['data'] = None
-        stock_cache['version'] = None
-        stock_cache['timestamp'] = None
-        print("[CLEAR_STOCK_CACHE] Stock cache cleared successfully")
-        return True
-    except Exception as e:
-        print(f"[CLEAR_STOCK_CACHE] Error: {str(e)}\n{traceback.format_exc()}")
-        return False
-
 @app.route('/stock', methods=['GET', 'POST'])
 @no_cache
 @login_required
