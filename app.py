@@ -585,7 +585,7 @@ def stock():
 
         try:
             print("[STOCK] Validating CSRF token")
-            validate_csrf(request.headers.get('X-CSRF-TOKEN'), secret_key=app.secret_key)
+            validate_csrf(request.headers.get('X-CSRF-TOKEN', request.form.get('csrf_token')), secret_key=app.secret_key)
             action = request.form.get('action')
             print(f"[STOCK] Action: {action}")
 
@@ -662,7 +662,8 @@ def stock():
                     'date2': None
                 }
                 print(f"[STOCK] Saving stock data: {stock_data}")
-                db.collection('stock').document(stock_id.replace('/', '-')).set(stock_data)
+                doc_id = stock_id.replace('/', '-')
+                db.collection('stock').document(doc_id).set(stock_data)
                 print("[STOCK] Stock data saved successfully")
 
                 try:
@@ -675,7 +676,7 @@ def stock():
                     print(f"[STOCK] Error in log_stock_change/update_stock_version: {str(e)}\n{traceback.format_exc()}")
                     return jsonify({'error': 'Stock added but failed to log changes'}), 500
                 print("[STOCK] add_stock completed successfully")
-                return jsonify({'status': 'success', 'message': f'Added stock: {stock_name}'}), 200
+                return redirect(url_for('stock', success=1))
 
             elif action == 'restock':
                 print("[STOCK] Processing restock")
@@ -707,7 +708,7 @@ def stock():
                         print(f"[STOCK] Error in log_stock_change/update_stock_version: {str(e)}\n{traceback.format_exc()}")
                         return jsonify({'error': 'Stock restocked but failed to log changes'}), 500
                     print("[STOCK] restock completed successfully")
-                    return jsonify({'status': 'success', 'message': f'Restocked {restock_qty} units'}), 200
+                    return redirect(url_for('stock', success=1))
                 except ValueError:
                     print("[STOCK] Error: Invalid restock quantity format")
                     return jsonify({'error': 'Invalid restock quantity'}), 400
@@ -754,7 +755,7 @@ def stock():
                         print(f"[STOCK] Error in log_stock_change/update_stock_version: {str(e)}\n{traceback.format_exc()}")
                         return jsonify({'error': 'Prices updated but failed to log changes'}), 500
                     print("[STOCK] update_price completed successfully")
-                    return jsonify({'status': 'success', 'message': 'Prices updated successfully'}), 200
+                    return redirect(url_for('stock', success=1))
                 except ValueError:
                     print("[STOCK] Error: Invalid price format")
                     return jsonify({'error': 'Invalid price format'}), 400

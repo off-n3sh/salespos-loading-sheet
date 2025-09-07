@@ -17,7 +17,7 @@
         </button>
         <div id="add-stock-form" class="hidden mt-6 p-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
             <h3 class="text-xl font-semibold mb-6 text-gray-900 dark:text-white border-b pb-3 dark:border-gray-700">Add New Stock Item</h3>
-            <form method="POST">
+            <form method="POST" action="/stock">
                 <input type="hidden" name="action" value="add_stock">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -171,19 +171,25 @@
             </div>
             
             {% if session['user']['role'] == 'manager' %}
-            <form method="POST" class="mt-4 space-y-3 stock-form">
+            <!-- Restock Form -->
+            <form method="POST" action="/stock" class="mt-4">
+                <input type="hidden" name="action" value="restock">
                 <input type="hidden" name="stock_id" value="{{ item.id }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                
                 <div class="flex items-center gap-2">
                     <div class="relative flex-grow">
                         <input type="number" name="restock_quantity" min="1" placeholder="Qty" class="w-full p-2 pl-3 border rounded-md text-sm shadow-sm focus:ring focus:ring-orange-200 dark:focus:ring-orange-800 dark:bg-gray-700 dark:text-white">
                     </div>
-                    <button type="submit" name="action" value="restock" class="bg-orange-500 text-white font-medium px-4 py-2 rounded-md border border-orange-600 shadow-sm hover:bg-orange-600 focus:outline-none transition-colors duration-200 text-sm dark:bg-orange-600 dark:hover:bg-orange-700 dark:border-orange-700">
+                    <button type="submit" class="bg-orange-500 text-white font-medium px-4 py-2 rounded-md border border-orange-600 shadow-sm hover:bg-orange-600 focus:outline-none transition-colors duration-200 text-sm dark:bg-orange-600 dark:hover:bg-orange-700 dark:border-orange-700">
                         Restock
                     </button>
                 </div>
-                
+            </form>
+            <!-- Update Price Form -->
+            <form method="POST" action="/stock" class="mt-4">
+                <input type="hidden" name="action" value="update_price">
+                <input type="hidden" name="stock_id" value="{{ item.id }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="p-3 bg-white dark:bg-gray-700 rounded-md shadow-sm">
                     <div class="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Update Prices</div>
                     <div class="grid grid-cols-2 gap-3">
@@ -196,7 +202,7 @@
                             <input type="number" name="new_wholesale_price" min="0" step="0.01" class="w-full p-2 border rounded-md text-sm shadow-sm focus:ring focus:ring-blue-200 dark:focus:ring-blue-800 dark:bg-gray-600 dark:text-white" value="{{ item.wholesale }}">
                         </div>
                     </div>
-                    <button type="submit" name="action" value="update_price" class="mt-3 w-full bg-blue-500 text-white font-medium px-4 py-2 rounded-md border border-blue-600 shadow-sm hover:bg-blue-600 focus:outline-none transition-colors duration-200 text-sm dark:bg-blue-600 dark:hover:bg-blue-700 dark:border-blue-700">
+                    <button type="submit" class="mt-3 w-full bg-blue-500 text-white font-medium px-4 py-2 rounded-md border border-blue-600 shadow-sm hover:bg-blue-600 focus:outline-none transition-colors duration-200 text-sm dark:bg-blue-600 dark:hover:bg-blue-700 dark:border-blue-700">
                         Update Prices
                     </button>
                 </div>
@@ -231,8 +237,7 @@
 </div>
 
 <script>
-    let stockDataCache = null;
-    let currentStockVersion = null;
+    console.log("[STOCK_HTML] Script loaded at", new Date().toISOString());
 
     // Toggle Add Stock Form
     console.log("[STOCK_HTML] Initializing toggle button");
@@ -251,7 +256,7 @@
     const newCategoryInput = document.getElementById('new_category');
     if (categorySelect && newCategoryInput) {
         categorySelect.addEventListener('change', () => {
-            console.log("[STOCK_HTML] Category changed: ", categorySelect.value);
+            console.log("[STOCK_HTML] Category changed:", categorySelect.value);
             if (categorySelect.value === 'new') {
                 newCategoryInput.classList.remove('hidden');
                 newCategoryInput.required = true;
@@ -286,78 +291,16 @@
     searchInput.addEventListener('input', filterStock);
     categoryFilter.addEventListener('change', filterStock);
 
-    // Form Submission Handler
-    async function handleFormSubmit(event) {
+    // Form Submission Handler (for cache clearing only)
+    function handleFormSubmit(event) {
         event.preventDefault();
         console.log("[STOCK_HTML] Form submitted");
         const form = event.target;
         const formData = new FormData(form);
         console.log("[STOCK_HTML] Form data:", Object.fromEntries(formData));
-        try {
-            console.log("[STOCK_HTML] Sending POST to /stock");
-            const response = await fetch('/stock', {
-                method: 'POST',
-                body: formData,
-                headers: { 'X-CSRF-TOKEN': formData.get('csrf_token') }
-            });
-            console.log("[STOCK_HTML] /stock response status:", response.status);
-            // Clone response to allow multiple reads
-            const responseClone = response.clone();
-            let result;
-            try {
-                result = await response.json();
-                console.log("[STOCK_HTML] /stock response JSON:", result);
-            } catch (e) {
-                const responseText = await responseClone.text();
-                console.error("[STOCK_HTML] Invalid JSON from /stock:", responseText, "Status:", response.status);
-                showNotification('Error', `Server error: ${response.status}`);
-                return;
-            }
-            if (response.ok && result.status === 'success') {
-                console.log("[STOCK_HTML] /stock success:", result.message);
-                showNotification('Success', result.message);
-                if (formData.get('action') === 'add_stock') {
-                    console.log("[STOCK_HTML] Resetting add stock form");
-                    form.reset();
-                    addStockForm.classList.add('hidden');
-                    newCategoryInput.classList.add('hidden');
-                    newCategoryInput.required = false;
-                }
-                console.log("[STOCK_HTML] Clearing client cache");
-                stockDataCache = null;
-                currentStockVersion = null;
-                console.log("[STOCK_HTML] Sending POST to /clear_stock_cache");
-                const cacheResponse = await fetch('/clear_stock_cache', {
-                    method: 'POST',
-                    headers: { 'X-CSRF-TOKEN': formData.get('csrf_token') }
-                });
-                console.log("[STOCK_HTML] /clear_stock_cache response status:", cacheResponse.status);
-                let cacheResult;
-                try {
-                    cacheResult = await cacheResponse.json();
-                    console.log("[STOCK_HTML] /clear_stock_cache response JSON:", cacheResult);
-                } catch (e) {
-                    const cacheResponseText = await cacheResponse.text();
-                    console.error("[STOCK_HTML] Invalid JSON from /clear_stock_cache:", cacheResponseText, "Status:", cacheResponse.status);
-                    showNotification('Error', `Cache clear failed: ${cacheResponse.status}`);
-                    return;
-                }
-                if (cacheResponse.ok && cacheResult.status === 'success') {
-                    console.log("[STOCK_HTML] Cache cleared successfully");
-                } else {
-                    console.error("[STOCK_HTML] /clear_stock_cache failed:", cacheResult.error);
-                    showNotification('Error', cacheResult.error || 'Failed to clear cache');
-                }
-                console.log("[STOCK_HTML] Reloading page");
-                setTimeout(() => location.reload(), 1000);
-            } else {
-                console.error("[STOCK_HTML] /stock error:", result.error);
-                showNotification('Error', result.error || 'Failed to process request');
-            }
-        } catch (error) {
-            console.error("[STOCK_HTML] Form submission error:", error);
-            showNotification('Error', 'Failed to process request');
-        }
+        
+        // Submit form normally (server handles redirect)
+        form.submit();
     }
 
     // Expiry Notification System
@@ -447,6 +390,7 @@
     document.addEventListener('DOMContentLoaded', () => {
         console.log("[STOCK_HTML] DOM loaded, initializing");
         checkExpiryDates();
+        // Attach form submission handler
         document.querySelectorAll('form').forEach(form => {
             console.log("[STOCK_HTML] Binding submit event to form");
             form.addEventListener('submit', handleFormSubmit);
@@ -457,5 +401,36 @@
         console.log("[STOCK_HTML] Periodic expiry check");
         checkExpiryDates();
     }, 1800000);
+
+    // Handle page load after form submission (check for success)
+    window.addEventListener('load', () => {
+        console.log("[STOCK_HTML] Page loaded, checking for form submission");
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('success')) {
+            console.log("[STOCK_HTML] Form submission success, clearing cache");
+            const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+            fetch('/clear_stock_cache', {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': csrfToken }
+            })
+            .then(response => {
+                console.log("[STOCK_HTML] /clear_stock_cache response status:", response.status);
+                return response.json();
+            })
+            .then(result => {
+                console.log("[STOCK_HTML] /clear_stock_cache response JSON:", result);
+                if (result.status === 'success') {
+                    showNotification('Success', result.message || 'Action completed successfully');
+                } else {
+                    console.error("[STOCK_HTML] /clear_stock_cache error:", result.error);
+                    showNotification('Error', result.error || 'Failed to clear cache');
+                }
+            })
+            .catch(error => {
+                console.error("[STOCK_HTML] Error clearing cache:", error);
+                showNotification('Error', 'Failed to clear cache');
+            });
+        }
+    });
 </script>
 {% endblock %}
