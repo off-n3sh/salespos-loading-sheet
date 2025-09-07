@@ -599,8 +599,8 @@ def stock():
                     return jsonify({'error': 'All fields are required'}), 400
 
                 try:
-                    initial_quantity = int(initial_quantity)
-                    reorder_quantity = int(reorder_quantity)
+                    initial_quantity = int(float(initial_quantity))
+                    reorder_quantity = int(float(reorder_quantity))
                     selling_price = float(selling_price)
                     wholesale_price = float(wholesale_price)
                     company_price = float(company_price)
@@ -608,7 +608,7 @@ def stock():
                         print("Negative values detected")
                         return jsonify({'error': 'Numeric fields cannot be negative'}), 400
                     datetime.strptime(expire_date, '%Y-%m-%d')
-                except ValueError as e:
+                except (ValueError, TypeError) as e:
                     print(f"Invalid format: {str(e)}")
                     return jsonify({'error': 'Invalid numeric or date format'}), 400
 
@@ -616,13 +616,8 @@ def stock():
                 category_prefix = ''.join(c for c in final_category[:3] if c.isalnum()).upper()
                 counter_ref = db.collection('metadata').document('stock_counter')
                 counter = counter_ref.get()
-                if not counter.exists:
-                    counter_ref.set({'last_id': 0})
-                    new_counter = 1
-                else:
-                    last_id = counter.to_dict().get('last_id', 0)
-                    new_counter = last_id + 1
-                counter_ref.update({'last_id': new_counter})
+                new_counter = 1 if not counter.exists else counter.to_dict().get('last_id', 0) + 1
+                counter_ref.set({'last_id': new_counter})
                 stock_id = f"{category_prefix}{new_counter:03d}"
 
                 existing_stock = db.collection('stock').where('stock_name', '==', stock_name).get()
@@ -675,7 +670,7 @@ def stock():
                     print(f"Stock ID '{stock_id}' not found")
                     return jsonify({'error': f"Stock ID '{stock_id}' not found"}), 404
                 try:
-                    restock_qty = int(request.form.get('restock_quantity', 0))
+                    restock_qty = int(float(request.form.get('restock_quantity', 0)))
                     if restock_qty <= 0:
                         print("Invalid restock quantity")
                         return jsonify({'error': 'Restock quantity must be positive'}), 400
@@ -688,9 +683,9 @@ def stock():
                     stock_cache['version'] = None
                     stock_cache['timestamp'] = None
                     return jsonify({'status': 'success', 'message': 'Stock restocked successfully'}), 200
-                except ValueError as e:
+                except (ValueError, TypeError) as e:
                     print(f"Invalid restock quantity: {str(e)}")
-                    return jsonify({'error': 'Invalid restock quantity'}), 400
+                    return jsonify({'error': 'Invalid restock quantity format'}), 400
 
             elif action == 'update_price':
                 stock_id = request.form.get('stock_id')
@@ -728,7 +723,7 @@ def stock():
                     stock_cache['version'] = None
                     stock_cache['timestamp'] = None
                     return jsonify({'status': 'success', 'message': 'Prices updated successfully'}), 200
-                except ValueError as e:
+                except (ValueError, TypeError) as e:
                     print(f"Invalid price format: {str(e)}")
                     return jsonify({'error': 'Invalid price format'}), 400
 
@@ -742,15 +737,9 @@ def stock():
     try:
         stock_items = [doc.to_dict() | {'id': doc.id} for doc in db.collection('stock').order_by('stock_name').get()]
         seen = set()
-        unique_stock_items = []
-        for item in stock_items:
-            stock_name = item['stock_name']
-            if stock_name not in seen:
-                seen.add(stock_name)
-                unique_stock_items.append(item)
-        stock_items = unique_stock_items
+        unique_stock_items = [item for item in stock_items if not (item['stock_name'] in seen or seen.add(item['stock_name']))]
 
-        for item in stock_items:
+        for item in unique_stock_items:
             expire_date = item.get('expire_date')
             if expire_date and expire_date != "0000-00-00 00:00:00":
                 try:
@@ -779,7 +768,7 @@ def stock():
             for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).limit(3).get()
         ]
 
-        return render_template('stock.html', stock_items=stock_items, recent_activity=recent_activity)
+        return render_template('stock.html', stock_items=unique_stock_items, recent_activity=recent_activity)
     except Exception as e:
         print(f"Error rendering stock page: {str(e)}")
         return jsonify({'error': f"Error loading stock: {str(e)}"}), 500
