@@ -1,9 +1,30 @@
 // static/js/utils.js
 
 let stockDataCache = null;
+let currentStockVersion = null;
 
 async function fetchStockData() {
-    if (stockDataCache) return stockDataCache;
+    // Check server version if cache exists
+    if (stockDataCache && currentStockVersion !== null) {
+        try {
+            const versionResponse = await fetch('/stock_data?version_only=true', {
+                credentials: 'include'
+            });
+            if (!versionResponse.ok) {
+                throw new Error(`HTTP error: ${versionResponse.status}`);
+            }
+            const { version } = await versionResponse.json();
+            if (version === currentStockVersion) {
+                console.log('Using cached stock data (version: ' + currentStockVersion + ')');
+                return stockDataCache;
+            }
+            console.log('Version mismatch (cache: ' + currentStockVersion + ', server: ' + version + '). Fetching new data.');
+        } catch (error) {
+            console.error('Error checking stock version:', error);
+            // Proceed to fetch new data on version check failure
+        }
+    }
+
     try {
         const response = await fetch('/stock_data', {
             credentials: 'include'
@@ -11,7 +32,7 @@ async function fetchStockData() {
         if (!response.ok) {
             throw new Error(`HTTP error: ${response.status}`);
         }
-        const data = await response.json();
+        const { version, data } = await response.json();
         if (!Array.isArray(data)) {
             throw new Error('Invalid response format: Expected an array');
         }
@@ -22,9 +43,11 @@ async function fetchStockData() {
             stock_quantity: parseFloat(item.stock_quantity) || 0,
             uom: item.uom || 'Unit'
         }));
+        currentStockVersion = version;
         if (!stockDataCache.length) {
             console.warn('No stock items returned from /stock_data');
         }
+        console.log('Fetched new stock data (version: ' + version + ')');
         return stockDataCache;
     } catch (error) {
         console.error('Error fetching stock data from /stock_data:', error);
