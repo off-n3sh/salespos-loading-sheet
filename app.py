@@ -36,14 +36,92 @@ app.jinja_env.globals['csrf_token'] = lambda: session.get('_csrf_token', '')
 
 stock_cache = {'data': None, 'version': None, 'timestamp': None, 'timeout': timedelta(hours=1)}
 def update_stock_version():
-    """Increment the stock version in Firestore."""
-    db = firestore.Client()
-    version_ref = db.collection('metadata').document('stock_version')
-    version_doc = version_ref.get()
-    current_version = version_doc.to_dict().get('version', 0) if version_doc.exists else 0
-    new_version = int(current_version) + 1
-    version_ref.set({'version': new_version})
-    return new_version
+    """Increment the stock version in Firestore with detailed logging."""
+    logger.info("[UPDATE_STOCK_VERSION] Starting stock version update")
+    client_log_messages = []  # Collect logs for client-side display
+    
+    try:
+        # Initialize Firestore client
+        logger.info("[UPDATE_STOCK_VERSION] Initializing Firestore client")
+        client_log_messages.append("Initializing Firestore client")
+        db = firestore.Client()
+        logger.info("[UPDATE_STOCK_VERSION] Firestore client initialized successfully")
+        client_log_messages.append("Firestore client initialized successfully")
+        
+        # Get reference to stock_version document
+        version_ref: DocumentReference = db.collection('metadata').document('stock_version')
+        logger.info("[UPDATE_STOCK_VERSION] Fetching stock_version document")
+        client_log_messages.append("Fetching stock_version document")
+        
+        # Fetch the document
+        version_doc: DocumentSnapshot = version_ref.get()
+        logger.info(f"[UPDATE_STOCK_VERSION] Document exists: {version_doc.exists}")
+        client_log_messages.append(f"stock_version document exists: {version_doc.exists}")
+        
+        # Determine current version
+        if not version_doc.exists:
+            logger.info("[UPDATE_STOCK_VERSION] stock_version document does not exist, initializing with version 0")
+            client_log_messages.append("stock_version document does not exist, initializing with version 0")
+            current_version = 0
+        else:
+            version_data = version_doc.to_dict()
+            logger.info(f"[UPDATE_STOCK_VERSION] Document data: {version_data}")
+            client_log_messages.append(f"stock_version document data: {version_data}")
+            current_version = version_data.get('version', 0)
+            logger.info(f"[UPDATE_STOCK_VERSION] Current version: {current_version}, type: {type(current_version)}")
+            client_log_messages.append(f"Current version: {current_version}, type: {type(current_version).__name__}")
+            
+            # Validate version type
+            if not isinstance(current_version, (int, float)):
+                logger.warning(f"[UPDATE_STOCK_VERSION] Invalid version type: {type(current_version)}, resetting to 0")
+                client_log_messages.append(f"Invalid version type: {type(current_version).__name__}, resetting to 0")
+                current_version = 0
+        
+        # Calculate new version
+        new_version = int(current_version) + 1
+        logger.info(f"[UPDATE_STOCK_VERSION] New version: {new_version}")
+        client_log_messages.append(f"New version: {new_version}")
+        
+        # Write new version to Firestore
+        logger.info("[UPDATE_STOCK_VERSION] Writing new version to Firestore")
+        client_log_messages.append("Writing new version to Firestore")
+        version_ref.set({'version': new_version})
+        logger.info("[UPDATE_STOCK_VERSION] Successfully updated stock_version to %d", new_version)
+        client_log_messages.append(f"Successfully updated stock_version to {new_version}")
+        
+        return new_version, client_log_messages
+    
+    except Exception as e:
+        error_message = f"Error in update_stock_version: {str(e)}\n{traceback.format_exc()}"
+        logger.error("[UPDATE_STOCK_VERSION] %s", error_message)
+        client_log_messages.append(error_message)
+        raise  # Re-raise to be caught by clear_stock_cache_logic
+
+def clear_stock_cache_logic():
+    """Clear stock cache logic without HTTP overhead."""
+    client_log_messages = []
+    logger.info("[CLEAR_STOCK_CACHE] Clearing cache: user=%s", session.get('user', {}).get('email', 'unknown'))
+    client_log_messages.append(f"Clearing cache: user={session.get('user', {}).get('email', 'unknown')}")
+    
+    try:
+        logger.info("[CLEAR_STOCK_CACHE] Calling update_stock_version")
+        client_log_messages.append("Calling update_stock_version")
+        new_version, update_logs = update_stock_version()
+        client_log_messages.extend(update_logs)
+        
+        logger.info("[CLEAR_STOCK_CACHE] Clearing stock_cache")
+        client_log_messages.append("Clearing stock_cache")
+        stock_cache['data'] = None
+        stock_cache['version'] = None
+        stock_cache['timestamp'] = None
+        logger.info("[CLEAR_STOCK_CACHE] Stock cache cleared successfully")
+        client_log_messages.append("Stock cache cleared successfully")
+        return True, client_log_messages
+    except Exception as e:
+        error_message = f"Error in clear_stock_cache_logic: {str(e)}\n{traceback.format_exc()}"
+        logger.error("[CLEAR_STOCK_CACHE] %s", error_message)
+        client_log_messages.append(error_message)
+        return False, client_log_messages
 
 
 def format_datetime(value):
