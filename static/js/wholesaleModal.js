@@ -11,33 +11,58 @@ let eventListeners = [];
 let preloadedStockData = null;
 
 async function openWholesaleModal() {
+    console.log('Attempting to open wholesale modal');
     if (!wholesaleModal) {
-        console.warn('Wholesale modal not found');
+        console.error('Wholesale modal element not found in DOM');
         return;
     }
-    console.log('Opening wholesale modal, userRole:', window.userRole);
-    document.querySelectorAll('.modal').forEach(modal => modal.classList.add('hidden'));
+    if (!wholesaleContainer) {
+        console.error('Wholesale items container not found in DOM');
+        return;
+    }
+    console.log('Wholesale modal found, userRole:', window.userRole);
+    console.log('Current modal classes:', wholesaleModal.classList.toString());
+    
+    // Hide other modals
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.classList.add('hidden');
+        console.log(`Hiding modal: ${modal.id}`);
+    });
+    
     resetModal(wholesaleContainer);
     wholesaleModal.classList.remove('hidden');
+    console.log('Removed hidden class, new classes:', wholesaleModal.classList.toString());
+    
     currentContainer = wholesaleContainer;
     
-    // Fetch stock data with version check (no force refresh)
+    // Fetch stock data with version check
     console.log('Loading stock data with version check...');
-    preloadedStockData = await fetchStockData(false); // Use version comparison
-    console.log('Stock data loaded:', preloadedStockData.length, 'items');
+    try {
+        preloadedStockData = await fetchStockData(false); // Use version comparison
+        console.log('Stock data loaded:', preloadedStockData.length, 'items');
+    } catch (error) {
+        console.error('Failed to fetch stock data:', error);
+        showModalError('wholesale', 'Failed to load stock data.');
+    }
     
     attachAddItemListeners(wholesaleContainer);
     wholesaleModal.dispatchEvent(new Event('modal:open'));
+    console.log('Wholesale modal opened, event dispatched');
 }
 
 function resetModal(container) {
     if (!container) {
-        console.warn('Container not found');
+        console.error('Container not found for reset');
         return;
     }
-    // Do NOT clear preloadedStockData here to preserve cache
+    console.log('Resetting modal container:', container.id);
+    // Do NOT clear preloadedStockData to preserve cache
     const header = container.querySelector('.item-row-header');
     const initialAddBtn = container.querySelector('.add-item-btn');
+    if (!header || !initialAddBtn) {
+        console.error('Header or add button not found in container');
+        return;
+    }
     container.innerHTML = '';
     container.appendChild(header);
     container.appendChild(initialAddBtn);
@@ -45,18 +70,23 @@ function resetModal(container) {
     const modalId = container.id.split('-')[0];
     const changeSpan = document.getElementById(`${modalId}-order-change`);
     const debtElement = document.getElementById(`${modalId}-client-debt`);
-    if (changeSpan) changeSpan.textContent = '0.00';
+    if (changeSpan) {
+        changeSpan.textContent = '0.00';
+        console.log(`Reset change span for ${modalId}`);
+    }
     if (debtElement) {
         debtElement.textContent = '';
         debtElement.classList.add('hidden');
+        console.log(`Reset debt element for ${modalId}`);
     }
 }
 
 function attachAddItemListeners(container) {
     if (!container) {
-        console.warn('Container not found for add item listeners');
+        console.error('Container not found for add item listeners');
         return;
     }
+    console.log('Attaching add item listeners to container:', container.id);
     container.removeEventListener('click', handleAddItemClick);
     container.addEventListener('click', handleAddItemClick);
     eventListeners.push({ element: container, type: 'click', handler: handleAddItemClick });
@@ -64,6 +94,7 @@ function attachAddItemListeners(container) {
 
 function handleAddItemClick(event) {
     if (event.target.classList.contains('add-item-btn')) {
+        console.log('Add item button clicked');
         addItem(event.target.closest('.space-y-4'));
     }
 }
@@ -83,7 +114,7 @@ async function addItem(container) {
             <option value="">Search or select a product</option>
         </select>
         <input name="quantities[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="0.01" disabled>
-        <input name="unit_prices[]" type="number" class="price-display p-2 border rounded-lg text-center w-full" ${isManager ? '' : 'readonly'} step="0.01" min="0">
+        <input name="unit_prices[]" type="number" class="price-display p-2 border rounded-lg text-center w-full" step="0.01" min="0">
         <input type="number" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
         <input type="number" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
         <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
@@ -146,7 +177,7 @@ function addManualItem(container) {
 
     const div = document.createElement('div');
     div.className = 'grid grid-cols-6 gap-2 item-row';
-    div.dataset.manual = 'true'; // Mark as manual item
+    div.dataset.manual = 'true';
     div.innerHTML = `
         <input name="items[]" type="text" placeholder="Manual Item Name" class="col-span-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-input w-full" required>
         <input name="quantities[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="0.01">
@@ -253,17 +284,18 @@ function attachPriceListener(row) {
 }
 
 function cleanupEventListeners() {
+    console.log('Cleaning up event listeners, count:', eventListeners.length);
     eventListeners.forEach(({ element, type, handler }) => {
         if (element) {
             element.removeEventListener(type, handler);
         }
     });
     eventListeners = [];
-    // Do NOT clear preloadedStockData here to preserve cache
 }
 
 if (closeWholesale) {
     const closeHandler = () => {
+        console.log('Closing wholesale modal');
         resetModal(wholesaleContainer);
         wholesaleModal.classList.add('hidden');
         cleanupEventListeners();
@@ -292,6 +324,7 @@ if (wholesaleForm) {
             console.warn('Skipping form submission: modal is hidden');
             return;
         }
+        console.log('Submitting wholesale form');
         const submitBtn = this.querySelector('.submit-btn');
         submitBtn.classList.add('processing');
         submitBtn.disabled = true;
@@ -326,10 +359,11 @@ if (wholesaleForm) {
         });
 
         try {
+            console.log('Sending form data:', Object.fromEntries(formData));
             const response = await fetch(this.action, {
                 method: 'POST',
                 body: formData,
-                signal: AbortSignal.timeout(5000) // 5-second timeout
+                signal: AbortSignal.timeout(5000)
             });
             const text = await response.text();
             let result;
@@ -343,12 +377,14 @@ if (wholesaleForm) {
                 return;
             }
             if (response.ok) {
+                console.log('Form submitted successfully, reloading page');
                 wholesaleModal.classList.add('hidden');
                 cleanupEventListeners();
-                preloadedStockData = null; // Clear cache after successful submission
-                await refreshStockData(); // Force refresh to update cache
+                preloadedStockData = null;
+                await refreshStockData();
                 window.location.reload();
             } else {
+                console.error('Form submission failed:', result.error || text);
                 showModalError('wholesale', `Error submitting wholesale order: ${result.error || text}`);
                 submitBtn.classList.remove('processing');
                 submitBtn.disabled = false;
@@ -364,10 +400,12 @@ if (wholesaleForm) {
 
 const addManualBtn = document.getElementById('add-wholesale-manual');
 if (addManualBtn) {
-    addManualBtn.addEventListener('click', () => {
+    const manualHandler = () => {
+        console.log('Add manual item button clicked');
         addManualItem(wholesaleContainer);
-    });
-    eventListeners.push({ element: addManualBtn, type: 'click', handler: () => addManualItem(wholesaleContainer) });
+    };
+    addManualBtn.addEventListener('click', manualHandler);
+    eventListeners.push({ element: addManualBtn, type: 'click', handler: manualHandler });
 }
 
 export { openWholesaleModal, addItem, resetModal, attachPriceListener };
