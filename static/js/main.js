@@ -1,7 +1,6 @@
 import { openRetailModal } from './retailModal.js';
 import { openWholesaleModal } from './wholesaleModal.js';
 import { openExpenseModal } from './expenseModal.js';
-import { openManualModal } from './manualItemModal.js';
 import { editOrder } from './editOrderModal.js';
 import { returnStock } from './returnStockModal.js';
 import { markPaid } from './markPaidModal.js';
