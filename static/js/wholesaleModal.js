@@ -7,7 +7,7 @@ const wholesaleAmountPaid = document.getElementById('wholesale-amount-paid');
 let currentContainer = wholesaleContainer;
 let eventListeners = [];
 
-// Pre-loaded stock data for instant access
+// Pre-loaded stock data persists across modal opens
 let preloadedStockData = null;
 
 async function openWholesaleModal() {
@@ -21,10 +21,10 @@ async function openWholesaleModal() {
     wholesaleModal.classList.remove('hidden');
     currentContainer = wholesaleContainer;
     
-    // Pre-load stock data immediately when opening modal
-    console.log('Pre-loading stock data...');
-    preloadedStockData = await fetchStockData();
-    console.log('Stock data pre-loaded:', preloadedStockData.length, 'items');
+    // Fetch stock data with version check (no force refresh)
+    console.log('Loading stock data with version check...');
+    preloadedStockData = await fetchStockData(false); // Use version comparison
+    console.log('Stock data loaded:', preloadedStockData.length, 'items');
     
     attachAddItemListeners(wholesaleContainer);
     wholesaleModal.dispatchEvent(new Event('modal:open'));
@@ -35,9 +35,7 @@ function resetModal(container) {
         console.warn('Container not found');
         return;
     }
-    // Clear pre-loaded data when resetting
-    preloadedStockData = null;
-    
+    // Do NOT clear preloadedStockData here to preserve cache
     const header = container.querySelector('.item-row-header');
     const initialAddBtn = container.querySelector('.add-item-btn');
     container.innerHTML = '';
@@ -102,12 +100,13 @@ async function addItem(container) {
         placeholderValue: 'Search or select a product'
     });
 
-    // Use pre-loaded data if available, otherwise fetch
+    // Use preloaded data if available, otherwise fetch with version check
     let stockItems = preloadedStockData;
     if (!stockItems) {
         console.log('No pre-loaded data, fetching...');
         try {
-            stockItems = await fetchStockData();
+            stockItems = await fetchStockData(false); // Use version comparison
+            preloadedStockData = stockItems; // Update cache
         } catch (error) {
             console.error('Failed to load stock items:', error);
             showModalError(container.id.split('-')[0], 'Failed to load stock items.');
@@ -229,7 +228,7 @@ function cleanupEventListeners() {
         }
     });
     eventListeners = [];
-    preloadedStockData = null; // Clear pre-loaded data
+    // Do NOT clear preloadedStockData here to preserve cache
 }
 
 if (closeWholesale) {
@@ -256,7 +255,7 @@ if (wholesaleAmountPaid) {
 
 const wholesaleForm = document.getElementById('wholesale-form');
 if (wholesaleForm) {
-    wholesaleForm.addEventListener('submit', function(e) {
+    wholesaleForm.addEventListener('submit', async function(e) {
         e.preventDefault();
         if (!wholesaleModal || wholesaleModal.classList.contains('hidden')) {
             console.warn('Skipping form submission: modal is hidden');
@@ -283,27 +282,30 @@ if (wholesaleForm) {
         formData.delete('items[]');
         items.forEach(item => formData.append('items[]', item));
 
-        fetch(this.action, {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => {
+        try {
+            const response = await fetch(this.action, {
+                method: 'POST',
+                body: formData,
+                signal: AbortSignal.timeout(5000) // 5-second timeout
+            });
             if (response.ok) {
                 wholesaleModal.classList.add('hidden');
                 cleanupEventListeners();
+                preloadedStockData = null; // Clear cache after successful submission
+                await refreshStockData(); // Force refresh to update cache
                 window.location.reload();
             } else {
-                response.text().then(text => showModalError('wholesale', 'Error submitting wholesale order: ' + text));
+                const text = await response.text();
+                showModalError('wholesale', `Error submitting wholesale order: ${text}`);
                 submitBtn.classList.remove('processing');
                 submitBtn.disabled = false;
             }
-        })
-        .catch(error => {
+        } catch (error) {
             console.error('Form submission error:', error);
             showModalError('wholesale', 'An error occurred while submitting the wholesale order.');
             submitBtn.classList.remove('processing');
             submitBtn.disabled = false;
-        });
+        }
     });
 }
 
