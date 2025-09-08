@@ -2435,23 +2435,39 @@ def get_order(order_id):
 @app.route('/edit_order/<order_id>', methods=['POST'])
 @login_required
 def edit_order(order_id):
+    client_logs = []  # Collect logs for client-side display
+    logger.info(f"[EDIT_ORDER] Starting edit for order {order_id}, user: {session['user']['email']}")
+    client_logs.append(f"Starting edit for order {order_id}")
+
     try:
         db = firestore.Client()
+        client_logs.append("Initialized Firestore client")
+
+        # Fetch order by document ID or receipt_id
         order_ref = db.collection('orders').document(order_id)
         order = order_ref.get()
         if not order.exists:
+            logger.info(f"[EDIT_ORDER] Order {order_id} not found by document ID, trying receipt_id")
+            client_logs.append(f"Order {order_id} not found by document ID, trying receipt_id")
             order_query = db.collection('orders').where('receipt_id', '==', order_id).limit(1).stream()
             order_doc = next(order_query, None)
             if not order_doc:
-                return jsonify({"error": "Order not found"}), 404
+                logger.error(f"[EDIT_ORDER] Order {order_id} not found")
+                client_logs.append(f"Order {order_id} not found")
+                return jsonify({"error": "Order not found", "client_logs": client_logs}), 404
             order_ref = order_doc.reference
             order = order_doc
+        logger.info(f"[EDIT_ORDER] Found order {order_id}")
+        client_logs.append(f"Found order {order_id}")
 
         order_data = order.to_dict()
         current_user_name = f"{session['user']['firstName']} {session['user']['lastName']}"
         if session['user']['role'] != 'manager' and current_user_name != order_data.get('salesperson_name'):
-            return jsonify({"error": "Unauthorized: Only the order creator or a manager can edit this order"}), 403
+            logger.warning(f"[EDIT_ORDER] Unauthorized: user {current_user_name} (role: {session['user']['role']}) attempted to edit order {order_id}")
+            client_logs.append(f"Unauthorized: Only the order creator or a manager can edit this order")
+            return jsonify({"error": "Unauthorized: Only the order creator or a manager can edit this order", "client_logs": client_logs}), 403
 
+        # Parse existing items
         old_items_list = []
         for i in range(0, len(order_data.get('items', [])), 6):
             if order_data['items'][i] == 'product':
@@ -2460,11 +2476,17 @@ def edit_order(order_id):
                     'quantity': int(order_data['items'][i+3]),
                     'price': float(order_data['items'][i+5])
                 })
+        logger.info(f"[EDIT_ORDER] Parsed {len(old_items_list)} existing items: {old_items_list}")
+        client_logs.append(f"Parsed {len(old_items_list)} existing items")
 
+        # Parse form data
         items_raw = request.form.getlist('items[]')
         quantities = request.form.getlist('quantities[]')
         unit_prices = request.form.getlist('unit_prices[]')
-        amount_paid = float(request.form.get('amount_paid') or 0)
+        amount_paid = float(request.form.get('amount_paid', 0))
+        total_payments_form = float(request.form.get('total_payments', 0))
+        logger.info(f"[EDIT_ORDER] Form data: {len(items_raw)} items, amount_paid={amount_paid}, total_payments={total_payments_form}")
+        client_logs.append(f"Received {len(items_raw)} items, amount_paid={amount_paid}")
 
         new_items_list = []
         for i in range(len(items_raw)):
@@ -2476,8 +2498,11 @@ def edit_order(order_id):
                 if quantity > 0:
                     new_items_list.append({'name': product_name, 'quantity': quantity, 'price': price})
             except (IndexError, ValueError) as e:
-                logger.error(f"Error processing item: {e}")
+                logger.error(f"[EDIT_ORDER] Error processing item {items_raw[i]}: {str(e)}")
+                client_logs.append(f"Error processing item {items_raw[i]}: {str(e)}")
                 continue
+        logger.info(f"[EDIT_ORDER] Parsed {len(new_items_list)} new items: {new_items_list}")
+        client_logs.append(f"Parsed {len(new_items_list)} new items")
 
         # Combine items (replace existing with new, keep unchanged old items)
         combined_items_list = []
@@ -2486,7 +2511,10 @@ def edit_order(order_id):
         for old_item in old_items_list:
             if not any(item['name'] == old_item['name'] for item in new_items_list):
                 combined_items_list.append(old_item)
+        logger.info(f"[EDIT_ORDER] Combined {len(combined_items_list)} items: {combined_items_list}")
+        client_logs.append(f"Combined {len(combined_items_list)} items")
 
+        # Calculate subtotal and total items
         combined_items = []
         subtotal = 0.0
         total_items = 0
@@ -2495,7 +2523,10 @@ def edit_order(order_id):
                 combined_items.extend(['product', item['name'], 'quantity', str(item['quantity']), 'price', str(item['price'])])
                 subtotal += item['quantity'] * item['price']
                 total_items += item['quantity']
+        logger.info(f"[EDIT_ORDER] Subtotal: {subtotal}, Total items: {total_items}")
+        client_logs.append(f"Subtotal: {subtotal}, Total items: {total_items}")
 
+        # Update stock for wholesale orders
         if order_data.get('order_type') == 'wholesale':
             for item in combined_items_list:
                 old_item = next((oi for oi in old_items_list if oi['name'] == item['name']), None)
@@ -2507,23 +2538,44 @@ def edit_order(order_id):
                     if stock_doc:
                         current_qty = stock_doc.to_dict().get('stock_quantity', 0)
                         if qty_diff > 0 and current_qty < qty_diff:
-                            return jsonify({"error": f"Insufficient stock for {item['name']}. Available: {current_qty}"}), 400
+                            logger.error(f"[EDIT_ORDER] Insufficient stock for {item['name']}. Available: {current_qty}, Requested: {qty_diff}")
+                            client_logs.append(f"Insufficient stock for {item['name']}. Available: {current_qty}")
+                            return jsonify({"error": f"Insufficient stock for {item['name']}. Available: {current_qty}", "client_logs": client_logs}), 400
                         stock_doc.reference.update({'stock_quantity': current_qty - qty_diff})
                         log_stock_change(stock_doc.to_dict().get('category', 'Unknown'), item['name'], 'order_reduction', -qty_diff, item['price'])
+                        logger.info(f"[EDIT_ORDER] Updated stock for {item['name']}: qty_diff={qty_diff}, new_qty={current_qty - qty_diff}")
+                        client_logs.append(f"Updated stock for {item['name']}: qty_diff={qty_diff}")
+                    else:
+                        logger.warning(f"[EDIT_ORDER] Stock not found for {item['name']}")
+                        client_logs.append(f"Stock not found for {item['name']}")
 
+        # Update payment history
         payment_history = order_data.get('payment_history', [])
         if amount_paid > 0:
             payment_history.append({'amount': amount_paid, 'date': datetime.now(NAIROBI_TZ)})
+            logger.info(f"[EDIT_ORDER] Added payment: amount={amount_paid}, date={datetime.now(NAIROBI_TZ)}")
+            client_logs.append(f"Added payment: amount={amount_paid}")
 
-        # Calculate new balance: subtotal minus any new payment
-        new_balance = subtotal - amount_paid
+        # Calculate total payments (existing + new)
+        total_payments = sum(float(p['amount']) for p in payment_history) if payment_history else 0
+        if total_payments_form > 0 and abs(total_payments - total_payments_form) > 0.01:
+            logger.warning(f"[EDIT_ORDER] Mismatch in total_payments: form={total_payments_form}, calculated={total_payments}")
+            client_logs.append(f"Warning: Payment mismatch detected")
+        logger.info(f"[EDIT_ORDER] Total payments: {total_payments}")
+        client_logs.append(f"Total payments: {total_payments}")
 
+        # Calculate balance
+        new_balance = subtotal - total_payments
+        logger.info(f"[EDIT_ORDER] Calculated balance: subtotal={subtotal} - total_payments={total_payments} = {new_balance}")
+        client_logs.append(f"Calculated balance: {new_balance}")
+
+        # Prepare updated order
         updated_order = {
             'items': combined_items,
             'items_list': combined_items_list,
             'total_items': total_items,
             'subtotal': subtotal,
-            'payment': order_data.get('payment', 0) + amount_paid,
+            'payment': total_payments,  # Update to total payments
             'balance': max(new_balance, 0),
             'shop_name': order_data.get('shop_name', ''),
             'salesperson_name': order_data.get('salesperson_name', ''),
@@ -2534,17 +2586,22 @@ def edit_order(order_id):
             'payment_history': payment_history
         }
         order_ref.set(updated_order)
+        logger.info(f"[EDIT_ORDER] Updated order {order_id}: {updated_order}")
+        client_logs.append(f"Order {order_id} updated successfully")
 
         log_user_action('Updated Order', f"Updated order {order_id} with {total_items} items")
         return jsonify({
             "status": "success",
             "message": f"Order #{order_id} edited successfully on {datetime.now(NAIROBI_TZ).strftime('%d/%m/%Y')}",
             "subtotal": subtotal,
-            "balance": max(new_balance, 0)
+            "balance": max(new_balance, 0),
+            "client_logs": client_logs
         }), 200
+
     except Exception as e:
-        logger.error(f"Failed to update order {order_id}: {str(e)}")
-        return jsonify({"error": f"Failed to update order: {str(e)}"}), 500
+        logger.error(f"[EDIT_ORDER] Failed to update order {order_id}: {str(e)}")
+        client_logs.append(f"Failed to update order: {str(e)}")
+        return jsonify({"error": f"Failed to update order: {str(e)}", "client_logs": client_logs}), 500
 
 @app.route('/receipt/<receipt_id>', methods=['GET'])
 @login_required
