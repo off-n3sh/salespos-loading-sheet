@@ -1,5 +1,3 @@
-// static/js/main.js
-
 import { openRetailModal } from './retailModal.js';
 import { openWholesaleModal } from './wholesaleModal.js';
 import { openExpenseModal } from './expenseModal.js';
@@ -7,14 +5,28 @@ import { openManualModal } from './manualItemModal.js';
 import { editOrder } from './editOrderModal.js';
 import { returnStock } from './returnStockModal.js';
 import { markPaid } from './markPaidModal.js';
-import { populateClients } from './utils.js';
+import { populateClients, addManualItem } from './utils.js';
 
-document.getElementById('open-retail-modal').addEventListener('click', openRetailModal);
-document.getElementById('open-wholesale-modal').addEventListener('click', openWholesaleModal);
+const openWholesaleBtn = document.getElementById('open-wholesale-modal');
+if (openWholesaleBtn) {
+    openWholesaleBtn.addEventListener('click', openWholesaleModal);
+} else {
+    console.error('Open wholesale modal button not found');
+}
+
+document.getElementById('open-retail-modal')?.addEventListener('click', openRetailModal);
 document.getElementById('open-expense-modal')?.addEventListener('click', openExpenseModal);
-document.getElementById('add-retail-manual').addEventListener('click', () => openManualModal('retail'));
-document.getElementById('add-wholesale-manual').addEventListener('click', () => openManualModal('wholesale'));
-document.getElementById('add-edit-manual').addEventListener('click', () => openManualModal('edit'));
+const addWholesaleManualBtn = document.getElementById('add-wholesale-manual');
+if (addWholesaleManualBtn) {
+    addWholesaleManualBtn.addEventListener('click', () => addManualItem(
+        document.getElementById('wholesale-items-container'),
+        document.getElementById('wholesale-modal')
+    ));
+} else {
+    console.error('Add wholesale manual button not found');
+}
+document.getElementById('add-retail-manual')?.addEventListener('click', () => openManualModal('retail'));
+document.getElementById('add-edit-manual')?.addEventListener('click', () => openManualModal('edit'));
 
 populateClients(document.getElementById('retail-client-input'), document.getElementById('retail-client-debt'));
 populateClients(document.getElementById('wholesale-client-input'), document.getElementById('wholesale-client-debt'));

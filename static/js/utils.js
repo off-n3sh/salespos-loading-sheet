@@ -1,25 +1,17 @@
-// static/js/utils.js
-
 let stockDataCache = null;
 let currentStockVersion = null;
 
 async function fetchStockData(forceRefresh = false) {
-    // If forceRefresh is true, bypass cache entirely
     if (forceRefresh) {
         console.log('Force refresh requested - bypassing cache');
         stockDataCache = null;
         currentStockVersion = null;
     }
     
-    // Check server version if cache exists
     if (stockDataCache && currentStockVersion !== null && !forceRefresh) {
         try {
-            const versionResponse = await fetch('/stock_data?version_only=true', {
-                credentials: 'include'
-            });
-            if (!versionResponse.ok) {
-                throw new Error(`HTTP error: ${versionResponse.status}`);
-            }
+            const versionResponse = await fetch('/stock_data?version_only=true', { credentials: 'include' });
+            if (!versionResponse.ok) throw new Error(`HTTP error: ${versionResponse.status}`);
             const { version } = await versionResponse.json();
             if (version === currentStockVersion) {
                 console.log('Using cached stock data (version: ' + currentStockVersion + ')');
@@ -28,22 +20,14 @@ async function fetchStockData(forceRefresh = false) {
             console.log('Version mismatch (cache: ' + currentStockVersion + ', server: ' + version + '). Fetching new data.');
         } catch (error) {
             console.error('Error checking stock version:', error);
-            // Proceed to fetch new data on version check failure
         }
     }
     
     try {
-        const response = await fetch('/stock_data', {
-            credentials: 'include',
-            cache: 'no-cache'  // Ensure fresh fetch from server
-        });
-        if (!response.ok) {
-            throw new Error(`HTTP error: ${response.status}`);
-        }
+        const response = await fetch('/stock_data', { credentials: 'include', cache: 'no-cache' });
+        if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
         const { version, data } = await response.json();
-        if (!Array.isArray(data)) {
-            throw new Error('Invalid response format: Expected an array');
-        }
+        if (!Array.isArray(data)) throw new Error('Invalid response format: Expected an array');
         
         stockDataCache = data.map(item => ({
             id: item.id,
@@ -54,10 +38,6 @@ async function fetchStockData(forceRefresh = false) {
             uom: item.uom || 'Unit'
         }));
         currentStockVersion = version;
-        
-        if (!stockDataCache.length) {
-            console.warn('No stock items returned from /stock_data');
-        }
         console.log('Fetched new stock data (version: ' + version + ')');
         return stockDataCache;
     } catch (error) {
@@ -66,24 +46,15 @@ async function fetchStockData(forceRefresh = false) {
     }
 }
 
-// Function to invalidate cache and fetch fresh data
 function invalidateStockCache() {
     console.log('Invalidating stock cache');
     stockDataCache = null;
     currentStockVersion = null;
 }
 
-// Function to refresh stock data after operations
 async function refreshStockData() {
     return await fetchStockData(true);
 }
-
-// Example usage after form submissions or stock operations:
-// After adding stock, restocking, or updating prices, call:
-// refreshStockData().then(data => {
-//     // Update your UI with fresh data
-//     console.log('Stock data refreshed:', data);
-// });
 
 function updateSubtotal(container) {
     let subtotal = 0;
@@ -194,4 +165,121 @@ async function populateClients(inputElement, debtElement) {
     }
 }
 
-export { fetchStockData, updateSubtotal, updateChange, showModalError, populateClients };
+function addManualItem(container, modal) {
+    if (!container || !modal || modal.classList.contains('hidden')) {
+        console.warn('Skipping addManualItem: container or modal not found or modal is hidden');
+        return;
+    }
+    console.log('Adding manual item to container:', container.id);
+
+    const div = document.createElement('div');
+    div.className = 'grid grid-cols-6 gap-2 item-row';
+    div.dataset.manual = 'true';
+    div.innerHTML = `
+        <input name="items[]" type="text" placeholder="Manual Item Name" class="col-span-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-input w-full" required>
+        <input name="quantities[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="0.01">
+        <input name="unit_prices[]" type="number" placeholder="Price" class="price-display p-2 border rounded-lg text-center w-full" step="0.01" min="0">
+        <input type="number" value="" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly disabled>
+        <input type="number" value="0" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+        <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
+    `;
+    const addBtn = container.querySelector('.add-item-btn');
+    if (!addBtn) {
+        console.error('Add item button not found in container');
+        return;
+    }
+    container.insertBefore(div, addBtn);
+    console.log('Manual item row added');
+
+    const removeHandler = () => {
+        console.log('Removing manual item row');
+        div.remove();
+        updateSubtotal(container);
+    };
+    div.querySelector('.remove-item').addEventListener('click', removeHandler);
+
+    attachPriceListener(div, modal);
+    updateSubtotal(container);
+}
+
+function attachPriceListener(row, modal) {
+    if (!row || !modal || modal.classList.contains('hidden')) {
+        console.warn('Skipping attachPriceListener: row or modal not found or modal is hidden');
+        return;
+    }
+    const select = row.querySelector('.product-select');
+    const productInput = row.querySelector('.product-input');
+    const priceDisplay = row.querySelector('.price-display');
+    const stockDisplay = row.querySelector('.stock-display');
+    const totalDisplay = row.querySelector('.total-display');
+    const qtyInput = row.querySelector('.qty-input');
+    let basePrice = 0;
+    let maxStock = 0;
+
+    const selectHandler = () => {
+        if (!modal || modal.classList.contains('hidden')) {
+            console.warn('Skipping selectHandler: modal is hidden');
+            return;
+        }
+        const selectedOption = select.options[select.selectedIndex];
+        if (selectedOption.value) {
+            const values = selectedOption.value.split('|');
+            basePrice = parseFloat(values[5]) || 0;
+            maxStock = parseFloat(values[7]) || 0;
+            priceDisplay.value = basePrice.toFixed(2);
+            stockDisplay.value = maxStock.toFixed(2);
+            qtyInput.max = maxStock;
+            qtyInput.disabled = false;
+            const qty = parseFloat(qtyInput.value) || 0;
+            if (maxStock !== undefined && qty > maxStock) {
+                qtyInput.value = maxStock;
+                showModalError(row.closest('.modal').id.split('-')[0], `Cannot order more than ${maxStock} units of ${values[1]}.`);
+            }
+            totalDisplay.value = (basePrice * qty).toFixed(2);
+            updateSubtotal(row.closest('.space-y-4'));
+        } else {
+            basePrice = 0;
+            maxStock = 0;
+            priceDisplay.value = '';
+            stockDisplay.value = '';
+            totalDisplay.value = '';
+            qtyInput.max = '';
+            qtyInput.disabled = true;
+            qtyInput.value = '';
+            updateSubtotal(row.closest('.space-y-4'));
+        }
+    };
+    if (select) {
+        select.addEventListener('change', selectHandler);
+    }
+
+    const qtyHandler = () => {
+        if (!modal || modal.classList.contains('hidden')) {
+            console.warn('Skipping qtyHandler: modal is hidden');
+            return;
+        }
+        const qty = parseFloat(qtyInput.value) || 0;
+        if (maxStock !== undefined && qty > maxStock && !row.dataset.manual) {
+            qtyInput.value = maxStock;
+            showModalError(row.closest('.modal').id.split('-')[0], `Cannot order more than ${maxStock} units.`);
+        }
+        const currentPrice = parseFloat(priceDisplay.value) || basePrice;
+        totalDisplay.value = (currentPrice * qty).toFixed(2);
+        updateSubtotal(row.closest('.space-y-4'));
+    };
+    qtyInput.addEventListener('input', qtyHandler);
+
+    const priceHandler = () => {
+        if (!modal || modal.classList.contains('hidden')) {
+            console.warn('Skipping priceHandler: modal is hidden');
+            return;
+        }
+        const qty = parseFloat(qtyInput.value) || 0;
+        const newPrice = parseFloat(priceDisplay.value) || 0;
+        totalDisplay.value = (newPrice * qty).toFixed(2);
+        updateSubtotal(row.closest('.space-y-4'));
+    };
+    priceDisplay.addEventListener('input', priceHandler);
+}
+
+export { fetchStockData, updateSubtotal, updateChange, showModalError, populateClients, addManualItem, attachPriceListener };

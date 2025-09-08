@@ -1,4 +1,4 @@
-import { fetchStockData, updateSubtotal, updateChange, showModalError } from './utils.js';
+import { fetchStockData, updateSubtotal, updateChange, showModalError, addManualItem, attachPriceListener } from './utils.js';
 
 const wholesaleModal = document.getElementById('wholesale-modal');
 const closeWholesale = document.getElementById('close-wholesale-modal');
@@ -11,43 +11,32 @@ let eventListeners = [];
 let preloadedStockData = null;
 
 async function openWholesaleModal() {
-    console.log('Attempting to open wholesale modal');
     if (!wholesaleModal) {
-        console.error('Wholesale modal element not found in DOM');
+        console.error('Wholesale modal not found in DOM');
         return;
     }
-    if (!wholesaleContainer) {
-        console.error('Wholesale items container not found in DOM');
-        return;
-    }
-    console.log('Wholesale modal found, userRole:', window.userRole);
-    console.log('Current modal classes:', wholesaleModal.classList.toString());
-    
-    // Hide other modals
+    console.log('Opening wholesale modal, userRole:', window.userRole);
     document.querySelectorAll('.modal').forEach(modal => {
-        modal.classList.add('hidden');
         console.log(`Hiding modal: ${modal.id}`);
+        modal.classList.add('hidden');
     });
-    
     resetModal(wholesaleContainer);
     wholesaleModal.classList.remove('hidden');
-    console.log('Removed hidden class, new classes:', wholesaleModal.classList.toString());
-    
+    console.log('Wholesale modal opened, classes:', wholesaleModal.classList.toString());
     currentContainer = wholesaleContainer;
-    
-    // Fetch stock data with version check
+
     console.log('Loading stock data with version check...');
     try {
-        preloadedStockData = await fetchStockData(false); // Use version comparison
+        preloadedStockData = await fetchStockData(false);
         console.log('Stock data loaded:', preloadedStockData.length, 'items');
     } catch (error) {
         console.error('Failed to fetch stock data:', error);
         showModalError('wholesale', 'Failed to load stock data.');
     }
-    
+
     attachAddItemListeners(wholesaleContainer);
     wholesaleModal.dispatchEvent(new Event('modal:open'));
-    console.log('Wholesale modal opened, event dispatched');
+    console.log('Dispatched modal:open event');
 }
 
 function resetModal(container) {
@@ -56,7 +45,6 @@ function resetModal(container) {
         return;
     }
     console.log('Resetting modal container:', container.id);
-    // Do NOT clear preloadedStockData to preserve cache
     const header = container.querySelector('.item-row-header');
     const initialAddBtn = container.querySelector('.add-item-btn');
     if (!header || !initialAddBtn) {
@@ -106,7 +94,7 @@ async function addItem(container) {
     }
     const isManager = window.userRole === 'manager';
     console.log('Adding item, isManager:', isManager);
-    
+
     const div = document.createElement('div');
     div.className = 'grid grid-cols-6 gap-2 item-row';
     div.innerHTML = `
@@ -114,7 +102,7 @@ async function addItem(container) {
             <option value="">Search or select a product</option>
         </select>
         <input name="quantities[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="0.01" disabled>
-        <input name="unit_prices[]" type="number" class="price-display p-2 border rounded-lg text-center w-full" step="0.01" min="0">
+        <input name="unit_prices[]" type="number" class="price-display p-2 border rounded-lg text-center w-full" ${isManager ? '' : 'readonly'} step="0.01" min="0">
         <input type="number" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
         <input type="number" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
         <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
@@ -130,13 +118,12 @@ async function addItem(container) {
         placeholderValue: 'Search or select a product'
     });
 
-    // Use preloaded data if available, otherwise fetch with version check
     let stockItems = preloadedStockData;
     if (!stockItems) {
         console.log('No pre-loaded data, fetching...');
         try {
-            stockItems = await fetchStockData(false); // Use version comparison
-            preloadedStockData = stockItems; // Update cache
+            stockItems = await fetchStockData(false);
+            preloadedStockData = stockItems;
         } catch (error) {
             console.error('Failed to load stock items:', error);
             showModalError(container.id.split('-')[0], 'Failed to load stock items.');
@@ -158,129 +145,15 @@ async function addItem(container) {
     choices.setChoices(choicesData, 'value', 'label', true);
 
     const removeHandler = () => {
+        console.log('Removing item row');
         div.remove();
         updateSubtotal(container);
     };
     div.querySelector('.remove-item').addEventListener('click', removeHandler);
     eventListeners.push({ element: div.querySelector('.remove-item'), type: 'click', handler: removeHandler });
 
-    attachPriceListener(div);
+    attachPriceListener(div, wholesaleModal);
     updateSubtotal(container);
-}
-
-function addManualItem(container) {
-    if (!container || !wholesaleModal || wholesaleModal.classList.contains('hidden')) {
-        console.warn('Skipping addManualItem: modal is hidden or not found');
-        return;
-    }
-    console.log('Adding manual item');
-
-    const div = document.createElement('div');
-    div.className = 'grid grid-cols-6 gap-2 item-row';
-    div.dataset.manual = 'true';
-    div.innerHTML = `
-        <input name="items[]" type="text" placeholder="Manual Item Name" class="col-span-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-input w-full" required>
-        <input name="quantities[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="0.01">
-        <input name="unit_prices[]" type="number" placeholder="Price" class="price-display p-2 border rounded-lg text-center w-full" step="0.01" min="0">
-        <input type="number" value="" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly disabled>
-        <input type="number" value="0" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-        <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
-    `;
-    const addBtn = container.querySelector('.add-item-btn');
-    container.insertBefore(div, addBtn);
-
-    const removeHandler = () => {
-        div.remove();
-        updateSubtotal(container);
-    };
-    div.querySelector('.remove-item').addEventListener('click', removeHandler);
-    eventListeners.push({ element: div.querySelector('.remove-item'), type: 'click', handler: removeHandler });
-
-    attachPriceListener(div);
-    updateSubtotal(container);
-}
-
-function attachPriceListener(row) {
-    if (!row || !wholesaleModal || wholesaleModal.classList.contains('hidden')) {
-        console.warn('Skipping attachPriceListener: modal is hidden or row not found');
-        return;
-    }
-    const select = row.querySelector('.product-select');
-    const productInput = row.querySelector('.product-input');
-    const priceDisplay = row.querySelector('.price-display');
-    const stockDisplay = row.querySelector('.stock-display');
-    const totalDisplay = row.querySelector('.total-display');
-    const qtyInput = row.querySelector('.qty-input');
-    let basePrice = 0;
-    let maxStock = 0;
-
-    const selectHandler = () => {
-        if (!wholesaleModal || wholesaleModal.classList.contains('hidden')) {
-            console.warn('Skipping selectHandler: modal is hidden');
-            return;
-        }
-        const selectedOption = select.options[select.selectedIndex];
-        if (selectedOption.value) {
-            const values = selectedOption.value.split('|');
-            basePrice = parseFloat(values[5]) || 0;
-            maxStock = parseFloat(values[7]) || 0;
-            priceDisplay.value = basePrice.toFixed(2);
-            stockDisplay.value = maxStock.toFixed(2);
-            qtyInput.max = maxStock;
-            qtyInput.disabled = false;
-            const qty = parseFloat(qtyInput.value) || 0;
-            if (maxStock !== undefined && qty > maxStock) {
-                qtyInput.value = maxStock;
-                showModalError(row.closest('.modal').id.split('-')[0], `Cannot order more than ${maxStock} units of ${values[1]}.`);
-            }
-            totalDisplay.value = (basePrice * qty).toFixed(2);
-            updateSubtotal(row.closest('.space-y-4'));
-        } else {
-            basePrice = 0;
-            maxStock = 0;
-            priceDisplay.value = '';
-            stockDisplay.value = '';
-            totalDisplay.value = '';
-            qtyInput.max = '';
-            qtyInput.disabled = true;
-            qtyInput.value = '';
-            updateSubtotal(row.closest('.space-y-4'));
-        }
-    };
-    if (select) {
-        select.addEventListener('change', selectHandler);
-        eventListeners.push({ element: select, type: 'change', handler: selectHandler });
-    }
-
-    const qtyHandler = () => {
-        if (!wholesaleModal || wholesaleModal.classList.contains('hidden')) {
-            console.warn('Skipping qtyHandler: modal is hidden');
-            return;
-        }
-        const qty = parseFloat(qtyInput.value) || 0;
-        if (maxStock !== undefined && qty > maxStock && !row.dataset.manual) {
-            qtyInput.value = maxStock;
-            showModalError(row.closest('.modal').id.split('-')[0], `Cannot order more than ${maxStock} units.`);
-        }
-        const currentPrice = parseFloat(priceDisplay.value) || 0;
-        totalDisplay.value = (currentPrice * qty).toFixed(2);
-        updateSubtotal(row.closest('.space-y-4'));
-    };
-    qtyInput.addEventListener('input', qtyHandler);
-    eventListeners.push({ element: qtyInput, type: 'input', handler: qtyHandler });
-
-    const priceHandler = () => {
-        if (!wholesaleModal || wholesaleModal.classList.contains('hidden')) {
-            console.warn('Skipping priceHandler: modal is hidden');
-            return;
-        }
-        const qty = parseFloat(qtyInput.value) || 0;
-        const newPrice = parseFloat(priceDisplay.value) || 0;
-        totalDisplay.value = (newPrice * qty).toFixed(2);
-        updateSubtotal(row.closest('.space-y-4'));
-    };
-    priceDisplay.addEventListener('input', priceHandler);
-    eventListeners.push({ element: priceDisplay, type: 'input', handler: priceHandler });
 }
 
 function cleanupEventListeners() {
@@ -342,24 +215,24 @@ if (wholesaleForm) {
                 values[5] = parseFloat(priceInput.value) || parseFloat(values[5]);
                 items.push(values.join('|'));
                 items.push(qtyInput.value);
-                items.push(priceInput.value);
             } else if (productInput && productInput.value && qtyInput.value) {
+                console.log('Adding manual item to form data:', productInput.value);
                 items.push(`product|${productInput.value}|quantity|0|price|${priceInput.value}|stock|0|uom|Unit`);
                 items.push(qtyInput.value);
-                items.push(priceInput.value);
             }
         });
         formData.delete('items[]');
         formData.delete('quantities[]');
-        formData.delete('unit_prices[]');
         items.forEach((item, index) => {
-            if (index % 3 === 0) formData.append('items[]', item);
-            else if (index % 3 === 1) formData.append('quantities[]', item);
-            else formData.append('unit_prices[]', item);
+            if (index % 2 === 0) {
+                formData.append('items[]', item);
+            } else {
+                formData.append('quantities[]', item);
+            }
         });
+        console.log('Form data prepared:', Object.fromEntries(formData));
 
         try {
-            console.log('Sending form data:', Object.fromEntries(formData));
             const response = await fetch(this.action, {
                 method: 'POST',
                 body: formData,
@@ -402,10 +275,10 @@ const addManualBtn = document.getElementById('add-wholesale-manual');
 if (addManualBtn) {
     const manualHandler = () => {
         console.log('Add manual item button clicked');
-        addManualItem(wholesaleContainer);
+        addManualItem(wholesaleContainer, wholesaleModal);
     };
     addManualBtn.addEventListener('click', manualHandler);
     eventListeners.push({ element: addManualBtn, type: 'click', handler: manualHandler });
 }
 
-export { openWholesaleModal, addItem, resetModal, attachPriceListener };
+export { openWholesaleModal, addItem, resetModal };
