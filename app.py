@@ -597,7 +597,10 @@ def stock():
             return "Unauthorized: Only managers can modify stock", 403
 
         action = request.form.get('action')
+        print(f"[STOCK_ROUTE] Processing action: {action}")  # Debug log for action start
+
         if action == 'add_stock':
+            print("[STOCK_ROUTE] Entering add_stock action")  # Debug log
             stock_name = request.form.get('stock_name')
             category = request.form.get('category')
             new_category = request.form.get('new_category')
@@ -609,6 +612,7 @@ def stock():
             expire_date = request.form.get('expire_date')
 
             if not all([stock_name, category or new_category, initial_quantity, reorder_quantity, selling_price, wholesale_price, company_price, expire_date]):
+                print("[STOCK_ROUTE] Error: Missing required fields in add_stock")  # Debug log
                 return "All fields are required", 400
 
             try:
@@ -618,9 +622,11 @@ def stock():
                 wholesale_price = float(wholesale_price)
                 company_price = float(company_price)
                 if any(x < 0 for x in [initial_quantity, reorder_quantity, selling_price, wholesale_price, company_price]):
+                    print("[STOCK_ROUTE] Error: Negative values detected in add_stock")  # Debug log
                     return "Numeric fields cannot be negative", 400
                 datetime.strptime(expire_date, '%Y-%m-%d')
             except ValueError:
+                print("[STOCK_ROUTE] Error: Invalid numeric or date format in add_stock")  # Debug log
                 return "Invalid numeric or date format", 400
 
             final_category = new_category.strip() if new_category else category
@@ -638,9 +644,11 @@ def stock():
 
             existing_stock = db.collection('stock').where('stock_name', '==', stock_name).get()
             if existing_stock:
+                print(f"[STOCK_ROUTE] Error: Stock item '{stock_name}' already exists")  # Debug log
                 return f"Stock item '{stock_name}' already exists", 400
             existing_id = db.collection('stock').where('stock_id', '==', stock_id).get()
             if existing_id:
+                print(f"[STOCK_ROUTE] Error: Stock ID '{stock_id}' already exists")  # Debug log
                 return f"Stock ID '{stock_id}' already exists", 400
 
             stock_data = {
@@ -667,8 +675,10 @@ def stock():
             log_stock_change(final_category, stock_name, 'add_stock', initial_quantity, selling_price)
             log_stock_change(final_category, stock_name, 'wholesale_price_set', 0, wholesale_price)
             cache_cleared = clear_stock_cache_logic()
+            print(f"[STOCK_ROUTE] add_stock completed, cache cleared: {cache_cleared}")  # Debug log
 
         elif action == 'restock':
+            print("[STOCK_ROUTE] Entering restock action")  # Debug log
             stock_id = request.form.get('stock_id')
             if stock_id:
                 stock_ref = db.collection('stock').document(stock_id)
@@ -677,15 +687,19 @@ def stock():
                     try:
                         restock_qty = int(request.form.get('restock_quantity', 0))
                         if restock_qty <= 0:
+                            print("[STOCK_ROUTE] Error: Restock quantity must be positive")  # Debug log
                             return "Restock quantity must be positive", 400
                         current_qty = stock.to_dict().get('stock_quantity', 0)
                         stock_ref.update({'stock_quantity': current_qty + restock_qty})
                         log_stock_change(stock.to_dict().get('category'), stock.to_dict().get('stock_name'), 'restock', restock_qty, stock.to_dict().get('selling_price'))
                         cache_cleared = clear_stock_cache_logic()
+                        print(f"[STOCK_ROUTE] restock completed, cache cleared: {cache_cleared}")  # Debug log
                     except ValueError:
+                        print("[STOCK_ROUTE] Error: Invalid restock quantity")  # Debug log
                         return "Invalid restock quantity", 400
 
         elif action == 'update_price':
+            print("[STOCK_ROUTE] Entering update_price action")  # Debug log
             stock_id = request.form.get('stock_id')
             if stock_id:
                 stock_ref = db.collection('stock').document(stock_id)
@@ -695,6 +709,7 @@ def stock():
                         new_selling_price = float(request.form.get('new_selling_price', 0))
                         new_wholesale_price = float(request.form.get('new_wholesale_price', 0))
                         if new_selling_price < 0 or new_wholesale_price < 0:
+                            print("[STOCK_ROUTE] Error: Negative prices detected in update_price")  # Debug log
                             return "Prices cannot be negative", 400
                         updates = {}
                         if new_selling_price > 0:
@@ -709,7 +724,9 @@ def stock():
                             if new_wholesale_price > 0:
                                 log_stock_change(stock_data.get('category'), stock_data.get('stock_name'), 'wholesale_price_update', 0, new_wholesale_price)
                             cache_cleared = clear_stock_cache_logic()
+                            print(f"[STOCK_ROUTE] update_price completed, cache cleared: {cache_cleared}")  # Debug log
                     except ValueError:
+                        print("[STOCK_ROUTE] Error: Invalid price format in update_price")  # Debug log
                         return "Invalid price format", 400
 
         # Log cache clearing result
@@ -761,7 +778,9 @@ def stock():
         for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).limit(3).get()
     ]
 
+    print("[STOCK_ROUTE] Rendering stock.html with stock_items and recent_activity")  # Debug log for GET
     return render_template('stock.html', stock_items=stock_items, recent_activity=recent_activity)
+    
 @app.route('/logout')
 def logout():
     session.pop('user', None)
