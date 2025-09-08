@@ -82,8 +82,8 @@ async function addItem(container) {
         <select name="items[]" class="col-span-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-select w-full">
             <option value="">Search or select a product</option>
         </select>
-        <input name="items[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="0.01" disabled>
-        <input type="number" class="price-display p-2 border rounded-lg text-center w-full" ${isManager ? '' : 'readonly'} step="0.01" min="0">
+        <input name="quantities[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="0.01" disabled>
+        <input name="unit_prices[]" type="number" class="price-display p-2 border rounded-lg text-center w-full" ${isManager ? '' : 'readonly'} step="0.01" min="0">
         <input type="number" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
         <input type="number" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
         <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
@@ -92,7 +92,6 @@ async function addItem(container) {
     container.insertBefore(div, addBtn);
 
     const select = div.querySelector('.product-select');
-    const qtyInput = div.querySelector('.qty-input');
     const choices = new Choices(select, {
         searchEnabled: true,
         searchChoices: true,
@@ -138,12 +137,45 @@ async function addItem(container) {
     updateSubtotal(container);
 }
 
+function addManualItem(container) {
+    if (!container || !wholesaleModal || wholesaleModal.classList.contains('hidden')) {
+        console.warn('Skipping addManualItem: modal is hidden or not found');
+        return;
+    }
+    console.log('Adding manual item');
+
+    const div = document.createElement('div');
+    div.className = 'grid grid-cols-6 gap-2 item-row';
+    div.dataset.manual = 'true'; // Mark as manual item
+    div.innerHTML = `
+        <input name="items[]" type="text" placeholder="Manual Item Name" class="col-span-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-input w-full" required>
+        <input name="quantities[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="0.01">
+        <input name="unit_prices[]" type="number" placeholder="Price" class="price-display p-2 border rounded-lg text-center w-full" step="0.01" min="0">
+        <input type="number" value="" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly disabled>
+        <input type="number" value="0" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+        <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
+    `;
+    const addBtn = container.querySelector('.add-item-btn');
+    container.insertBefore(div, addBtn);
+
+    const removeHandler = () => {
+        div.remove();
+        updateSubtotal(container);
+    };
+    div.querySelector('.remove-item').addEventListener('click', removeHandler);
+    eventListeners.push({ element: div.querySelector('.remove-item'), type: 'click', handler: removeHandler });
+
+    attachPriceListener(div);
+    updateSubtotal(container);
+}
+
 function attachPriceListener(row) {
     if (!row || !wholesaleModal || wholesaleModal.classList.contains('hidden')) {
         console.warn('Skipping attachPriceListener: modal is hidden or row not found');
         return;
     }
     const select = row.querySelector('.product-select');
+    const productInput = row.querySelector('.product-input');
     const priceDisplay = row.querySelector('.price-display');
     const stockDisplay = row.querySelector('.stock-display');
     const totalDisplay = row.querySelector('.total-display');
@@ -184,8 +216,10 @@ function attachPriceListener(row) {
             updateSubtotal(row.closest('.space-y-4'));
         }
     };
-    select.addEventListener('change', selectHandler);
-    eventListeners.push({ element: select, type: 'change', handler: selectHandler });
+    if (select) {
+        select.addEventListener('change', selectHandler);
+        eventListeners.push({ element: select, type: 'change', handler: selectHandler });
+    }
 
     const qtyHandler = () => {
         if (!wholesaleModal || wholesaleModal.classList.contains('hidden')) {
@@ -193,32 +227,29 @@ function attachPriceListener(row) {
             return;
         }
         const qty = parseFloat(qtyInput.value) || 0;
-        if (maxStock !== undefined && qty > maxStock) {
+        if (maxStock !== undefined && qty > maxStock && !row.dataset.manual) {
             qtyInput.value = maxStock;
             showModalError(row.closest('.modal').id.split('-')[0], `Cannot order more than ${maxStock} units.`);
         }
-        const currentPrice = window.userRole === 'manager' ? parseFloat(priceDisplay.value) || basePrice : basePrice;
+        const currentPrice = parseFloat(priceDisplay.value) || 0;
         totalDisplay.value = (currentPrice * qty).toFixed(2);
         updateSubtotal(row.closest('.space-y-4'));
     };
     qtyInput.addEventListener('input', qtyHandler);
     eventListeners.push({ element: qtyInput, type: 'input', handler: qtyHandler });
 
-    if (window.userRole === 'manager') {
-        console.log('Attaching price edit listener for manager');
-        const priceHandler = () => {
-            if (!wholesaleModal || wholesaleModal.classList.contains('hidden')) {
-                console.warn('Skipping priceHandler: modal is hidden');
-                return;
-            }
-            const qty = parseFloat(qtyInput.value) || 0;
-            const newPrice = parseFloat(priceDisplay.value) || 0;
-            totalDisplay.value = (newPrice * qty).toFixed(2);
-            updateSubtotal(row.closest('.space-y-4'));
-        };
-        priceDisplay.addEventListener('input', priceHandler);
-        eventListeners.push({ element: priceDisplay, type: 'input', handler: priceHandler });
-    }
+    const priceHandler = () => {
+        if (!wholesaleModal || wholesaleModal.classList.contains('hidden')) {
+            console.warn('Skipping priceHandler: modal is hidden');
+            return;
+        }
+        const qty = parseFloat(qtyInput.value) || 0;
+        const newPrice = parseFloat(priceDisplay.value) || 0;
+        totalDisplay.value = (newPrice * qty).toFixed(2);
+        updateSubtotal(row.closest('.space-y-4'));
+    };
+    priceDisplay.addEventListener('input', priceHandler);
+    eventListeners.push({ element: priceDisplay, type: 'input', handler: priceHandler });
 }
 
 function cleanupEventListeners() {
@@ -270,17 +301,29 @@ if (wholesaleForm) {
         const items = [];
         itemRows.forEach(row => {
             const select = row.querySelector('.product-select');
+            const productInput = row.querySelector('.product-input');
             const qtyInput = row.querySelector('.qty-input');
             const priceInput = row.querySelector('.price-display');
-            if (select.value && qtyInput.value) {
+            if (select && select.value && qtyInput.value) {
                 const values = select.value.split('|');
                 values[5] = parseFloat(priceInput.value) || parseFloat(values[5]);
                 items.push(values.join('|'));
                 items.push(qtyInput.value);
+                items.push(priceInput.value);
+            } else if (productInput && productInput.value && qtyInput.value) {
+                items.push(`product|${productInput.value}|quantity|0|price|${priceInput.value}|stock|0|uom|Unit`);
+                items.push(qtyInput.value);
+                items.push(priceInput.value);
             }
         });
         formData.delete('items[]');
-        items.forEach(item => formData.append('items[]', item));
+        formData.delete('quantities[]');
+        formData.delete('unit_prices[]');
+        items.forEach((item, index) => {
+            if (index % 3 === 0) formData.append('items[]', item);
+            else if (index % 3 === 1) formData.append('quantities[]', item);
+            else formData.append('unit_prices[]', item);
+        });
 
         try {
             const response = await fetch(this.action, {
@@ -288,6 +331,17 @@ if (wholesaleForm) {
                 body: formData,
                 signal: AbortSignal.timeout(5000) // 5-second timeout
             });
+            const text = await response.text();
+            let result;
+            try {
+                result = JSON.parse(text);
+            } catch (error) {
+                console.error('JSON parse error:', text);
+                showModalError('wholesale', 'Invalid server response.');
+                submitBtn.classList.remove('processing');
+                submitBtn.disabled = false;
+                return;
+            }
             if (response.ok) {
                 wholesaleModal.classList.add('hidden');
                 cleanupEventListeners();
@@ -295,8 +349,7 @@ if (wholesaleForm) {
                 await refreshStockData(); // Force refresh to update cache
                 window.location.reload();
             } else {
-                const text = await response.text();
-                showModalError('wholesale', `Error submitting wholesale order: ${text}`);
+                showModalError('wholesale', `Error submitting wholesale order: ${result.error || text}`);
                 submitBtn.classList.remove('processing');
                 submitBtn.disabled = false;
             }
@@ -307,6 +360,14 @@ if (wholesaleForm) {
             submitBtn.disabled = false;
         }
     });
+}
+
+const addManualBtn = document.getElementById('add-wholesale-manual');
+if (addManualBtn) {
+    addManualBtn.addEventListener('click', () => {
+        addManualItem(wholesaleContainer);
+    });
+    eventListeners.push({ element: addManualBtn, type: 'click', handler: () => addManualItem(wholesaleContainer) });
 }
 
 export { openWholesaleModal, addItem, resetModal, attachPriceListener };
