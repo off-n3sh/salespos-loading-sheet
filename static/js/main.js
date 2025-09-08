@@ -24,8 +24,6 @@ if (addWholesaleManualBtn) {
 } else {
     console.error('Add wholesale manual button not found');
 }
-document.getElementById('add-retail-manual')?.addEventListener('click', () => openManualModal('retail'));
-document.getElementById('add-edit-manual')?.addEventListener('click', () => openManualModal('edit'));
 
 populateClients(document.getElementById('retail-client-input'), document.getElementById('retail-client-debt'));
 populateClients(document.getElementById('wholesale-client-input'), document.getElementById('wholesale-client-debt'));

@@ -1,34 +1,47 @@
 let stockDataCache = null;
 let currentStockVersion = null;
 
-async function fetchStockData(forceRefresh = false) {
+export async function fetchStockData(forceRefresh = false) {
     if (forceRefresh) {
         console.log('Force refresh requested - bypassing cache');
         stockDataCache = null;
         currentStockVersion = null;
     }
-    
+
     if (stockDataCache && currentStockVersion !== null && !forceRefresh) {
         try {
-            const versionResponse = await fetch('/stock_data?version_only=true', { credentials: 'include' });
-            if (!versionResponse.ok) throw new Error(`HTTP error: ${versionResponse.status}`);
-            const { version } = await versionResponse.json();
-            if (version === currentStockVersion) {
-                console.log('Using cached stock data (version: ' + currentStockVersion + ')');
-                return stockDataCache;
+            const versionResponse = await fetch('/stock_data?version_only=true', {
+                credentials: 'include',
+                headers: { 'X-CSRFToken': document.querySelector('[name=csrf_token]').value }
+            });
+            if (!versionResponse.ok) {
+                console.error(`Version check failed: HTTP ${versionResponse.status}`);
+                // Fall through to fetch new data
+            } else {
+                const { version } = await versionResponse.json();
+                if (version === currentStockVersion) {
+                    console.log(`Using cached stock data (version: ${currentStockVersion})`);
+                    return stockDataCache;
+                }
+                console.log(`Version mismatch (cache: ${currentStockVersion}, server: ${version}). Fetching new data.`);
             }
-            console.log('Version mismatch (cache: ' + currentStockVersion + ', server: ' + version + '). Fetching new data.');
         } catch (error) {
             console.error('Error checking stock version:', error);
+            // Fall through to fetch new data
         }
     }
-    
+
+    console.log('Fetching new stock data...');
     try {
-        const response = await fetch('/stock_data', { credentials: 'include', cache: 'no-cache' });
+        const response = await fetch('/stock_data', {
+            credentials: 'include',
+            cache: 'no-cache',
+            headers: { 'X-CSRFToken': document.querySelector('[name=csrf_token]').value }
+        });
         if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
         const { version, data } = await response.json();
         if (!Array.isArray(data)) throw new Error('Invalid response format: Expected an array');
-        
+
         stockDataCache = data.map(item => ({
             id: item.id,
             stock_name: item.stock_name,
@@ -38,7 +51,7 @@ async function fetchStockData(forceRefresh = false) {
             uom: item.uom || 'Unit'
         }));
         currentStockVersion = version;
-        console.log('Fetched new stock data (version: ' + version + ')');
+        console.log(`Fetched new stock data (version: ${version})`);
         return stockDataCache;
     } catch (error) {
         console.error('Error fetching stock data from /stock_data:', error);
@@ -46,17 +59,13 @@ async function fetchStockData(forceRefresh = false) {
     }
 }
 
-function invalidateStockCache() {
+export function invalidateStockCache() {
     console.log('Invalidating stock cache');
     stockDataCache = null;
     currentStockVersion = null;
 }
 
-async function refreshStockData() {
-    return await fetchStockData(true);
-}
-
-function updateSubtotal(container) {
+export function updateSubtotal(container) {
     let subtotal = 0;
     const rows = container.querySelectorAll('.item-row');
     rows.forEach(row => {
@@ -68,7 +77,7 @@ function updateSubtotal(container) {
     updateChange(container);
 }
 
-function updateChange(container) {
+export function updateChange(container) {
     const modalId = container.id.split('-')[0];
     const amountPaidInput = document.getElementById(`${modalId}-amount-paid`);
     const changeSpan = document.getElementById(`${modalId}-order-change`);
@@ -81,7 +90,7 @@ function updateChange(container) {
     changeSpan.parentElement.classList.toggle('text-red-600', change < 0);
 }
 
-function showModalError(modalId, message) {
+export function showModalError(modalId, message) {
     const errorDiv = document.getElementById(`${modalId}-error`);
     if (errorDiv) {
         errorDiv.textContent = message;
@@ -93,7 +102,7 @@ function showModalError(modalId, message) {
     }
 }
 
-async function populateClients(inputElement, debtElement) {
+export async function populateClients(inputElement, debtElement) {
     try {
         const response = await fetch('/clients_data');
         const clients = await response.json();
@@ -165,7 +174,7 @@ async function populateClients(inputElement, debtElement) {
     }
 }
 
-function addManualItem(container, modal) {
+export function addManualItem(container, modal) {
     if (!container || !modal || modal.classList.contains('hidden')) {
         console.warn('Skipping addManualItem: container or modal not found or modal is hidden');
         return;
@@ -202,7 +211,7 @@ function addManualItem(container, modal) {
     updateSubtotal(container);
 }
 
-function attachPriceListener(row, modal) {
+export function attachPriceListener(row, modal) {
     if (!row || !modal || modal.classList.contains('hidden')) {
         console.warn('Skipping attachPriceListener: row or modal not found or modal is hidden');
         return;
@@ -281,5 +290,3 @@ function attachPriceListener(row, modal) {
     };
     priceDisplay.addEventListener('input', priceHandler);
 }
-
-export { fetchStockData, updateSubtotal, updateChange, showModalError, populateClients, addManualItem, attachPriceListener };
