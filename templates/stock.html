@@ -380,5 +380,12 @@
     // For demo purposes, check periodically (in a real app, this might be handled by server-side scheduler)
     // This check is every 30 minutes (1800000 ms)
     setInterval(checkExpiryDates, 1800000);
+
+    // Client-side logging for server-side actions
+    {% if client_logs %}
+        {% for log in client_logs %}
+            console.log('[STOCK_ROUTE] {{ log | safe }}');
+        {% endfor %}
+    {% endif %}
 </script>
 {% endblock %}
