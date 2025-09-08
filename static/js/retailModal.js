@@ -27,8 +27,12 @@ async function openRetailModal() {
 
     console.log('Loading stock data with version check...');
     try {
-        preloadedStockData = await fetchStockData(false);
-        console.log('Stock data loaded:', preloadedStockData.length, 'items');
+        if (!preloadedStockData) {
+            preloadedStockData = await fetchStockData(false);
+            console.log('Stock data loaded:', preloadedStockData.length, 'items');
+        } else {
+            console.log('Using pre-loaded stock data:', preloadedStockData.length, 'items');
+        }
     } catch (error) {
         console.error('Failed to fetch stock data:', error);
         showModalError('retail', 'Failed to load stock data.');
@@ -276,8 +280,7 @@ if (retailForm) {
                 console.log('Form submitted successfully, reloading page');
                 retailModal.classList.add('hidden');
                 cleanupEventListeners();
-                preloadedStockData = null;
-                await refreshStockData(); // Ensure refreshStockData is defined in utils.js
+                preloadedStockData = null; // Reset cache to ensure fresh data on next open
                 window.location.reload();
             } else {
                 console.error('Form submission failed:', result.error || text);
