@@ -27,8 +27,12 @@ async function openWholesaleModal() {
 
     console.log('Loading stock data with version check...');
     try {
-        preloadedStockData = await fetchStockData(false);
-        console.log('Stock data loaded:', preloadedStockData.length, 'items');
+        if (!preloadedStockData) {
+            preloadedStockData = await fetchStockData(false);
+            console.log('Stock data loaded:', preloadedStockData.length, 'items');
+        } else {
+            console.log('Using pre-loaded stock data:', preloadedStockData.length, 'items');
+        }
     } catch (error) {
         console.error('Failed to fetch stock data:', error);
         showModalError('wholesale', 'Failed to load stock data.');
@@ -205,37 +209,60 @@ if (wholesaleForm) {
         const formData = new FormData(this);
         const itemRows = wholesaleContainer.querySelectorAll('.item-row');
         const items = [];
+
         itemRows.forEach(row => {
             const select = row.querySelector('.product-select');
             const productInput = row.querySelector('.product-input');
             const qtyInput = row.querySelector('.qty-input');
             const priceInput = row.querySelector('.price-display');
-            if (select && select.value && qtyInput.value) {
+
+            if (select && select.value && qtyInput.value && priceInput.value) {
                 const values = select.value.split('|');
-                values[5] = parseFloat(priceInput.value) || parseFloat(values[5]);
-                items.push(values.join('|'));
+                const price = parseFloat(priceInput.value) || parseFloat(values[5]) || 0;
+                if (price <= 0) {
+                    console.error('Invalid price for stock item:', values[1]);
+                    return;
+                }
+                values[5] = price.toFixed(2);
+                items.push(values.join('|')); // e.g., product|Bread|quantity|0|price|50.00|stock|100|uom|Unit
+                items.push(qtyInput.value); // e.g., 2
+            } else if (productInput && productInput.value && qtyInput.value && priceInput.value) {
+                const price = parseFloat(priceInput.value) || 0;
+                if (price <= 0) {
+                    console.error('Invalid price for manual item:', productInput.value);
+                    return;
+                }
+                items.push(`product|${productInput.value}|quantity|0|price|${price.toFixed(2)}|stock|0|uom|Unit`);
                 items.push(qtyInput.value);
-            } else if (productInput && productInput.value && qtyInput.value) {
-                console.log('Adding manual item to form data:', productInput.value);
-                items.push(`product|${productInput.value}|quantity|0|price|${priceInput.value}|stock|0|uom|Unit`);
-                items.push(qtyInput.value);
+            } else {
+                console.error('Invalid item row:', row);
             }
         });
+
+        if (items.length === 0) {
+            showModalError('wholesale', 'No valid items in order. Please add items with valid quantities and prices.');
+            submitBtn.classList.remove('processing');
+            submitBtn.disabled = false;
+            return;
+        }
+
         formData.delete('items[]');
         formData.delete('quantities[]');
-        items.forEach((item, index) => {
-            if (index % 2 === 0) {
-                formData.append('items[]', item);
-            } else {
-                formData.append('quantities[]', item);
-            }
-        });
-        console.log('Form data prepared:', Object.fromEntries(formData));
+        formData.delete('unit_prices[]');
+        items.forEach(item => formData.append('items[]', item));
+
+        console.log('Form data entries:');
+        for (let [key, value] of formData.entries()) {
+            console.log(`${key}: ${value}`);
+        }
 
         try {
             const response = await fetch(this.action, {
                 method: 'POST',
                 body: formData,
+                headers: {
+                    'X-CSRFToken': formData.get('csrf_token')
+                },
                 signal: AbortSignal.timeout(5000)
             });
             const text = await response.text();
@@ -253,8 +280,7 @@ if (wholesaleForm) {
                 console.log('Form submitted successfully, reloading page');
                 wholesaleModal.classList.add('hidden');
                 cleanupEventListeners();
-                preloadedStockData = null;
-                await refreshStockData();
+                preloadedStockData = null; // Reset cache to ensure fresh data on next open
                 window.location.reload();
             } else {
                 console.error('Form submission failed:', result.error || text);
