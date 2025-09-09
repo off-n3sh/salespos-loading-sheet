@@ -673,11 +673,11 @@ def stock():
     
     if request.method == 'POST':
         if session['user']['role'] != 'manager':
-            return "Unauthorized: Only managers can modify stock", 403
+            return jsonify({'status': 'error', 'error': 'Unauthorized: Only managers can modify stock'}), 403
 
         action = request.form.get('action')
         print(f"[STOCK_ROUTE] Processing action: {action}")
-        client_logs.append(f"Processing action: {action}")  # Client-side log
+        client_logs.append(f"Processing action: {action}")
 
         if action == 'add_stock':
             print("[STOCK_ROUTE] Entering add_stock action")
@@ -695,7 +695,7 @@ def stock():
             if not all([stock_name, category or new_category, initial_quantity, reorder_quantity, selling_price, wholesale_price, company_price, expire_date]):
                 print("[STOCK_ROUTE] Error: Missing required fields in add_stock")
                 client_logs.append("Error: Missing required fields in add_stock")
-                return "All fields are required", 400
+                return jsonify({'status': 'error', 'error': 'All fields are required'}), 400
 
             try:
                 initial_quantity = int(initial_quantity)
@@ -706,12 +706,12 @@ def stock():
                 if any(x < 0 for x in [initial_quantity, reorder_quantity, selling_price, wholesale_price, company_price]):
                     print("[STOCK_ROUTE] Error: Negative values detected in add_stock")
                     client_logs.append("Error: Negative values detected in add_stock")
-                    return "Numeric fields cannot be negative", 400
+                    return jsonify({'status': 'error', 'error': 'Numeric fields cannot be negative'}), 400
                 datetime.strptime(expire_date, '%Y-%m-%d')
             except ValueError:
                 print("[STOCK_ROUTE] Error: Invalid numeric or date format in add_stock")
                 client_logs.append("Error: Invalid numeric or date format in add_stock")
-                return "Invalid numeric or date format", 400
+                return jsonify({'status': 'error', 'error': 'Invalid numeric or date format'}), 400
 
             final_category = new_category.strip() if new_category else category
             category_prefix = ''.join(c for c in final_category[:3] if c.isalnum()).upper()
@@ -730,12 +730,12 @@ def stock():
             if existing_stock:
                 print(f"[STOCK_ROUTE] Error: Stock item '{stock_name}' already exists")
                 client_logs.append(f"Error: Stock item '{stock_name}' already exists")
-                return f"Stock item '{stock_name}' already exists", 400
+                return jsonify({'status': 'error', 'error': f"Stock item '{stock_name}' already exists"}), 400
             existing_id = db.collection('stock').where('stock_id', '==', stock_id).get()
             if existing_id:
                 print(f"[STOCK_ROUTE] Error: Stock ID '{stock_id}' already exists")
                 client_logs.append(f"Error: Stock ID '{stock_id}' already exists")
-                return f"Stock ID '{stock_id}' already exists", 400
+                return jsonify({'status': 'error', 'error': f"Stock ID '{stock_id}' already exists"}), 400
 
             stock_data = {
                 'id': new_counter,
@@ -763,6 +763,7 @@ def stock():
             cache_cleared = clear_stock_cache_logic()
             print(f"[STOCK_ROUTE] add_stock completed, cache cleared: {cache_cleared}")
             client_logs.append(f"add_stock completed, cache cleared: {cache_cleared}")
+            return jsonify({'status': 'success', 'message': 'Stock added successfully'}), 200
 
         elif action == 'restock':
             print("[STOCK_ROUTE] Entering restock action")
@@ -777,17 +778,22 @@ def stock():
                         if restock_qty <= 0:
                             print("[STOCK_ROUTE] Error: Restock quantity must be positive")
                             client_logs.append("Error: Restock quantity must be positive")
-                            return "Restock quantity must be positive", 400
+                            return jsonify({'status': 'error', 'error': 'Restock quantity must be positive'}), 400
                         current_qty = stock.to_dict().get('stock_quantity', 0)
                         stock_ref.update({'stock_quantity': current_qty + restock_qty})
                         log_stock_change(stock.to_dict().get('category'), stock.to_dict().get('stock_name'), 'restock', restock_qty, stock.to_dict().get('selling_price'))
                         cache_cleared = clear_stock_cache_logic()
                         print(f"[STOCK_ROUTE] restock completed, cache cleared: {cache_cleared}")
                         client_logs.append(f"restock completed, cache cleared: {cache_cleared}")
+                        return jsonify({'status': 'success', 'message': 'Stock restocked successfully'}), 200
                     except ValueError:
                         print("[STOCK_ROUTE] Error: Invalid restock quantity")
                         client_logs.append("Error: Invalid restock quantity")
-                        return "Invalid restock quantity", 400
+                        return jsonify({'status': 'error', 'error': 'Invalid restock quantity'}), 400
+                else:
+                    print(f"[STOCK_ROUTE] Error: Stock ID '{stock_id}' not found")
+                    client_logs.append(f"Error: Stock ID '{stock_id}' not found")
+                    return jsonify({'status': 'error', 'error': f"Stock ID '{stock_id}' not found"}), 404
 
         elif action == 'update_price':
             print("[STOCK_ROUTE] Entering update_price action")
@@ -803,7 +809,7 @@ def stock():
                         if new_selling_price < 0 or new_wholesale_price < 0:
                             print("[STOCK_ROUTE] Error: Negative prices detected in update_price")
                             client_logs.append("Error: Negative prices detected in update_price")
-                            return "Prices cannot be negative", 400
+                            return jsonify({'status': 'error', 'error': 'Prices cannot be negative'}), 400
                         updates = {}
                         if new_selling_price > 0:
                             updates['selling_price'] = new_selling_price
@@ -819,10 +825,19 @@ def stock():
                             cache_cleared = clear_stock_cache_logic()
                             print(f"[STOCK_ROUTE] update_price completed, cache cleared: {cache_cleared}")
                             client_logs.append(f"update_price completed, cache cleared: {cache_cleared}")
+                            return jsonify({'status': 'success', 'message': 'Prices updated successfully'}), 200
+                        else:
+                            print("[STOCK_ROUTE] Error: No valid prices provided for update_price")
+                            client_logs.append("Error: No valid prices provided for update_price")
+                            return jsonify({'status': 'error', 'error': 'No valid prices provided'}), 400
                     except ValueError:
                         print("[STOCK_ROUTE] Error: Invalid price format in update_price")
                         client_logs.append("Error: Invalid price format in update_price")
-                        return "Invalid price format", 400
+                        return jsonify({'status': 'error', 'error': 'Invalid price format'}), 400
+                else:
+                    print(f"[STOCK_ROUTE] Error: Stock ID '{stock_id}' not found")
+                    client_logs.append(f"Error: Stock ID '{stock_id}' not found")
+                    return jsonify({'status': 'error', 'error': f"Stock ID '{stock_id}' not found"}), 404
 
         elif action == 'edit_stock_name':
             print("[STOCK_ROUTE] Entering edit_stock_name action")
@@ -832,7 +847,7 @@ def stock():
             if not stock_id or not new_stock_name:
                 print("[STOCK_ROUTE] Error: Missing stock_id or new_stock_name")
                 client_logs.append("Error: Missing stock_id or new_stock_name")
-                return "Stock ID and new stock name are required", 400
+                return jsonify({'status': 'error', 'error': 'Stock ID and new stock name are required'}), 400
             stock_ref = db.collection('stock').document(stock_id)
             stock = stock_ref.get()
             if stock.exists:
@@ -840,16 +855,17 @@ def stock():
                 if existing_stock and existing_stock[0].id != stock_id:
                     print(f"[STOCK_ROUTE] Error: Stock name '{new_stock_name}' already exists")
                     client_logs.append(f"Error: Stock name '{new_stock_name}' already exists")
-                    return f"Stock name '{new_stock_name}' already exists", 400
+                    return jsonify({'status': 'error', 'error': f"Stock name '{new_stock_name}' already exists"}), 400
                 stock_ref.update({'stock_name': new_stock_name})
                 log_stock_change(stock.to_dict().get('category'), new_stock_name, 'name_update', 0, stock.to_dict().get('selling_price'))
                 cache_cleared = clear_stock_cache_logic()
                 print(f"[STOCK_ROUTE] edit_stock_name completed, cache cleared: {cache_cleared}")
                 client_logs.append(f"edit_stock_name completed, cache cleared: {cache_cleared}")
+                return jsonify({'status': 'success', 'message': 'Stock name updated successfully'}), 200
             else:
                 print(f"[STOCK_ROUTE] Error: Stock ID '{stock_id}' not found")
                 client_logs.append(f"Error: Stock ID '{stock_id}' not found")
-                return f"Stock ID '{stock_id}' not found", 404
+                return jsonify({'status': 'error', 'error': f"Stock ID '{stock_id}' not found"}), 404
 
         elif action == 'update_price_and_category':
             print("[STOCK_ROUTE] Entering update_price_and_category action")
@@ -867,27 +883,26 @@ def stock():
                         new_category = request.form.get('new_category')
                         new_category_input = request.form.get('new_category_input')
 
-                        # Only include fields that were provided and valid
                         if new_selling_price:
                             new_selling_price = float(new_selling_price)
                             if new_selling_price < 0:
                                 print("[STOCK_ROUTE] Error: Negative selling price detected")
                                 client_logs.append("Error: Negative selling price detected")
-                                return "Selling price cannot be negative", 400
+                                return jsonify({'status': 'error', 'error': 'Selling price cannot be negative'}), 400
                             updates['selling_price'] = new_selling_price
                         if new_wholesale_price:
                             new_wholesale_price = float(new_wholesale_price)
                             if new_wholesale_price < 0:
                                 print("[STOCK_ROUTE] Error: Negative wholesale price detected")
                                 client_logs.append("Error: Negative wholesale price detected")
-                                return "Wholesale price cannot be negative", 400
+                                return jsonify({'status': 'error', 'error': 'Wholesale price cannot be negative'}), 400
                             updates['wholesale'] = new_wholesale_price
                         if new_company_price:
                             new_company_price = float(new_company_price)
                             if new_company_price < 0:
                                 print("[STOCK_ROUTE] Error: Negative company price detected")
                                 client_logs.append("Error: Negative company price detected")
-                                return "Company price cannot be negative", 400
+                                return jsonify({'status': 'error', 'error': 'Company price cannot be negative'}), 400
                             updates['company_price'] = new_company_price
                         if new_category == 'new' and new_category_input:
                             updates['category'] = new_category_input.strip()
@@ -897,7 +912,7 @@ def stock():
                         if not updates:
                             print("[STOCK_ROUTE] Error: No valid fields provided for update_price_and_category")
                             client_logs.append("Error: No valid fields provided for update_price_and_category")
-                            return "At least one field must be updated", 400
+                            return jsonify({'status': 'error', 'error': 'At least one field must be updated'}), 400
 
                         stock_ref.update(updates)
                         stock_data = stock.to_dict()
@@ -912,22 +927,19 @@ def stock():
                         cache_cleared = clear_stock_cache_logic()
                         print(f"[STOCK_ROUTE] update_price_and_category completed, cache cleared: {cache_cleared}")
                         client_logs.append(f"update_price_and_category completed, cache cleared: {cache_cleared}")
+                        return jsonify({'status': 'success', 'message': 'Price and category updated successfully'}), 200
                     except ValueError:
                         print("[STOCK_ROUTE] Error: Invalid numeric format in update_price_and_category")
                         client_logs.append("Error: Invalid numeric format in update_price_and_category")
-                        return "Invalid numeric format", 400
+                        return jsonify({'status': 'error', 'error': 'Invalid numeric format'}), 400
                 else:
                     print(f"[STOCK_ROUTE] Error: Stock ID '{stock_id}' not found")
                     client_logs.append(f"Error: Stock ID '{stock_id}' not found")
-                    return f"Stock ID '{stock_id}' not found", 404
+                    return jsonify({'status': 'error', 'error': f"Stock ID '{stock_id}' not found"}), 404
 
-        # Log cache clearing result
-        if cache_cleared:
-            print(f"[STOCK_ROUTE] Cache cleared successfully after {action}")
-            client_logs.append(f"Cache cleared successfully after {action}")
-        else:
-            print(f"[STOCK_ROUTE] Cache clearing failed after {action}")
-            client_logs.append(f"Cache clearing failed after {action}")
+        print(f"[STOCK_ROUTE] Invalid action: {action}")
+        client_logs.append(f"Invalid action: {action}")
+        return jsonify({'status': 'error', 'error': 'Invalid action'}), 400
 
     # GET: Render stock page
     stock_items = [doc.to_dict() | {'id': doc.id} for doc in db.collection('stock').order_by('stock_name').get()]

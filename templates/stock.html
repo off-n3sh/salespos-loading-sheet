@@ -262,7 +262,7 @@
             </svg>
         </div>
         <div class="ml-3 w-0 flex-1">
-            <p class="text-sm font-medium text-gray-900 dark:text-white" id="notification-title">Expiry Alert</p>
+            <p class="text-sm font-medium text-gray-900 dark:text-white" id="notification-title">Alert</p>
             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400" id="notification-message"></p>
         </div>
         <div class="ml-4 flex-shrink-0 flex">
@@ -351,20 +351,24 @@
                     headers: { 'X-CSRFToken': formData.get('csrf_token') },
                     body: formData
                 });
-                if (response.ok) {
-                    const result = await response.json();
-                    if (result.status === 'success') {
-                        editStockNameModal.classList.add('hidden');
-                        showNotification('Success', 'Stock name updated successfully');
-                        setTimeout(() => window.location.reload(), 2000);
-                    } else {
-                        showNotification('Error', result.error || 'Failed to update stock name');
-                    }
+                let result;
+                try {
+                    result = await response.json();
+                } catch (jsonError) {
+                    console.error('Failed to parse JSON response:', jsonError, await response.text());
+                    showNotification('Error', 'Invalid server response. Please try again.');
+                    return;
+                }
+                if (response.ok && result.status === 'success') {
+                    editStockNameModal.classList.add('hidden');
+                    showNotification('Success', result.message || 'Stock name updated successfully');
+                    setTimeout(() => window.location.reload(), 2000);
                 } else {
-                    showNotification('Error', 'Failed to update stock name');
+                    showNotification('Error', result.error || 'Failed to update stock name');
                 }
             } catch (error) {
-                showNotification('Error', `Error: ${error.message}`);
+                console.error('Fetch error:', error);
+                showNotification('Error', `Network error: ${error.message}`);
             }
         });
     }
@@ -439,7 +443,6 @@
             }
         });
         
-        // Send notifications for expired items
         if (expiredItems.length > 0) {
             const message = expiredItems.length === 1 
                 ? `${expiredItems[0].name} has expired!` 
@@ -449,7 +452,6 @@
             sendNotificationToServer('expired', expiredItems);
         }
         
-        // Send notifications for soon-to-expire items
         if (expiringItems.length > 0) {
             const message = expiringItems.length === 1 
                 ? `${expiringItems[0].name} will expire in ${expiringItems[0].daysLeft} day(s)!` 
