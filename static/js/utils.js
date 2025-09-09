@@ -1,45 +1,29 @@
 let stockDataCache = null;
 let currentStockVersion = null;
 
-export async function fetchStockData(forceRefresh = false) {
-    if (forceRefresh) {
-        console.log('Force refresh requested - bypassing cache');
-        stockDataCache = null;
-        currentStockVersion = null;
-    }
-
-    if (stockDataCache && currentStockVersion !== null && !forceRefresh) {
-        try {
-            const versionResponse = await fetch('/stock_data?version_only=true', {
-                credentials: 'include',
-                headers: { 'X-CSRFToken': document.querySelector('[name=csrf_token]').value }
-            });
-            if (!versionResponse.ok) {
-                console.error(`Version check failed: HTTP ${versionResponse.status}`);
-                // Fall through to fetch new data
-            } else {
-                const { version } = await versionResponse.json();
-                if (version === currentStockVersion) {
-                    console.log(`Using cached stock data (version: ${currentStockVersion})`);
-                    return stockDataCache;
-                }
-                console.log(`Version mismatch (cache: ${currentStockVersion}, server: ${version}). Fetching new data.`);
-            }
-        } catch (error) {
-            console.error('Error checking stock version:', error);
-            // Fall through to fetch new data
-        }
-    }
-
-    console.log('Fetching new stock data...');
+export async function fetchStockData() {
     try {
+        console.log('Checking stock data version...');
+        const versionResponse = await fetch('/stock_data?version_only=true', {
+            credentials: 'include',
+            headers: { 'X-CSRFToken': document.querySelector('[name=csrf_token]').value }
+        });
+        if (!versionResponse.ok) throw new Error(`HTTP ${versionResponse.status}`);
+        const { version } = await versionResponse.json();
+        
+        if (stockDataCache && currentStockVersion === version) {
+            console.log(`Using cached stock data (version: ${currentStockVersion})`);
+            return stockDataCache;
+        }
+        
+        console.log(`Version mismatch or no cache (cache: ${currentStockVersion}, server: ${version}). Fetching new data.`);
         const response = await fetch('/stock_data', {
             credentials: 'include',
             cache: 'no-cache',
             headers: { 'X-CSRFToken': document.querySelector('[name=csrf_token]').value }
         });
-        if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
-        const { version, data } = await response.json();
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const { version: newVersion, data } = await response.json();
         if (!Array.isArray(data)) throw new Error('Invalid response format: Expected an array');
 
         stockDataCache = data.map(item => ({
@@ -50,12 +34,12 @@ export async function fetchStockData(forceRefresh = false) {
             stock_quantity: parseFloat(item.stock_quantity) || 0,
             uom: item.uom || 'Unit'
         }));
-        currentStockVersion = version;
-        console.log(`Fetched new stock data (version: ${version})`);
+        currentStockVersion = newVersion;
+        console.log(`Fetched new stock data (version: ${newVersion})`);
         return stockDataCache;
     } catch (error) {
         console.error('Error fetching stock data from /stock_data:', error);
-        return [];
+        return stockDataCache || [];
     }
 }
 
