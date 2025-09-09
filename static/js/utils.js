@@ -48,6 +48,11 @@ export function invalidateStockCache() {
     stockDataCache = null;
     currentStockVersion = null;
 }
+// initialize stockdata on page load
+document.addEventListener('DOMContentLoaded', async () => {
+	console.log('Init Stock Data on page load')
+	await fetchStockData();
+});
 
 export function updateSubtotal(container) {
     let subtotal = 0;
