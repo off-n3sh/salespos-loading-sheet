@@ -1,4 +1,4 @@
-import { fetchStockData, showModalError } from './utils.js';
+import { showModalError } from './utils.js';
 
 const editModal = document.getElementById('edit-order-modal');
 const closeEdit = document.getElementById('close-edit-modal');
@@ -6,7 +6,8 @@ const editContainer = document.getElementById('edit-items-container');
 const editAmountPaid = document.getElementById('edit-amount-paid');
 const editOrderChange = document.getElementById('edit-order-change');
 let eventListeners = [];
-let preloadedStockData = null; // Cache stock data
+let preloadedStockData = null;
+let currentVersion = null;
 
 async function fetchOrderData(receiptId) {
     try {
@@ -17,6 +18,32 @@ async function fetchOrderData(receiptId) {
         console.error('Fetch order error:', error);
         showModalError('edit-order', `Failed to fetch order: ${error.message}`);
         return null;
+    }
+}
+
+async function fetchStockData() {
+    try {
+        console.log('Checking stock data version...');
+        const versionResponse = await fetch('/stock_data?version_only=true');
+        if (!versionResponse.ok) throw new Error(`HTTP ${versionResponse.status}`);
+        const { version } = await versionResponse.json();
+        if (version !== currentVersion || !preloadedStockData) {
+            console.log('Version mismatch or no cache (cache:', currentVersion, ', server:', version, '). Fetching new data.');
+            const response = await fetch('/stock_data', {
+                headers: { 'Accept': 'application/json' }
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            preloadedStockData = data.items;
+            currentVersion = data.version;
+            console.log('Fetched new stock data (version:', data.version, ')');
+            return data.items;
+        }
+        console.log('Using cached stock data (version:', currentVersion, ')');
+        return preloadedStockData;
+    } catch (error) {
+        console.error('Error fetching stock data:', error);
+        throw error;
     }
 }
 
@@ -64,12 +91,8 @@ async function editOrder(receiptId) {
     // Load stock data with version check
     console.log('Loading stock data with version check...');
     try {
-        if (!preloadedStockData) {
-            preloadedStockData = await fetchStockData(false);
-            console.log('Stock data loaded:', preloadedStockData.length, 'items');
-        } else {
-            console.log('Using pre-loaded stock data:', preloadedStockData.length, 'items');
-        }
+        const stockItems = await fetchStockData();
+        console.log('Stock data loaded:', stockItems.length, 'items');
     } catch (error) {
         console.error('Failed to fetch stock data:', error);
         showModalError('edit-order', 'Failed to load stock data.');
@@ -158,7 +181,7 @@ const addItemHandler = async () => {
     editContainer.insertBefore(div, addBtn);
     const select = div.querySelector('.product-select');
     const choices = new Choices(select, { searchEnabled: true, searchChoices: true, itemSelectText: '' });
-    const stockItems = preloadedStockData || await fetchStockData(false);
+    const stockItems = preloadedStockData || await fetchStockData();
     const choicesData = stockItems.map(stock => ({
         value: `product|${stock.stock_name}|quantity|0|price|${stock.wholesale}|stock|${stock.stock_quantity}|uom|${stock.uom}`,
         label: `${stock.stock_name} (${stock.uom})`
@@ -319,7 +342,6 @@ if (form) {
                 console.log('Form submitted successfully, reloading page');
                 editModal.classList.add('hidden');
                 showSuccessMessage(result.message);
-                preloadedStockData = null; // Reset cache
                 setTimeout(() => window.location.reload(), 2000);
             } else {
                 console.error('Form submission failed:', result.error || text);
