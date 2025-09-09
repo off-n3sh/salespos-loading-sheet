@@ -6,6 +6,7 @@ const editContainer = document.getElementById('edit-items-container');
 const editAmountPaid = document.getElementById('edit-amount-paid');
 const editOrderChange = document.getElementById('edit-order-change');
 let eventListeners = [];
+let preloadedStockData = null; // Cache stock data
 
 async function fetchOrderData(receiptId) {
     try {
@@ -44,10 +45,6 @@ function updateSubtotal(container, existingBalance = 0) {
 }
 
 async function editOrder(receiptId) {
-    // Clear previous listeners
-    eventListeners.forEach(({ element, type, handler }) => element?.removeEventListener(type, handler));
-    eventListeners = [];
-
     const orderData = await fetchOrderData(receiptId);
     if (!orderData) return;
 
@@ -63,6 +60,21 @@ async function editOrder(receiptId) {
     // Set subtotal to existing balance
     const existingBalance = parseFloat(balance) || 0;
     document.getElementById('edit-order-total').textContent = existingBalance.toFixed(2);
+
+    // Load stock data with version check
+    console.log('Loading stock data with version check...');
+    try {
+        if (!preloadedStockData) {
+            preloadedStockData = await fetchStockData(false);
+            console.log('Stock data loaded:', preloadedStockData.length, 'items');
+        } else {
+            console.log('Using pre-loaded stock data:', preloadedStockData.length, 'items');
+        }
+    } catch (error) {
+        console.error('Failed to fetch stock data:', error);
+        showModalError('edit-order', 'Failed to load stock data.');
+        return;
+    }
 
     // Parse items
     let itemsList = [];
@@ -85,7 +97,7 @@ async function editOrder(receiptId) {
     }
 
     // Populate existing items (read-only)
-    const stockItems = await fetchStockData(true);
+    const stockItems = preloadedStockData;
     itemsList.forEach(item => {
         const div = document.createElement('div');
         div.className = 'grid grid-cols-6 gap-2 item-row';
@@ -123,97 +135,110 @@ async function editOrder(receiptId) {
         } });
     });
 
-    // Add new item
-    const addItemBtn = editContainer.querySelector('.add-item-btn');
-    const addItemHandler = async () => {
-        const div = document.createElement('div');
-        div.className = 'grid grid-cols-6 gap-2 item-row';
-        div.innerHTML = `
-            <select name="items[]" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-select w-full">
-                <option value="">Select Item</option>
-            </select>
-            <input name="quantities[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="1">
-            <input name="unit_prices[]" type="number" placeholder="Price" class="price-display p-2 border rounded-lg text-center w-full" step="0.01" ${window.userRole === 'manager' ? '' : 'readonly'}>
-            <input type="number" value="0" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-            <input type="number" value="0" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-            <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
-        `;
-        const addBtn = editContainer.querySelector('.add-item-btn');
-        editContainer.insertBefore(div, addBtn);
-        const select = div.querySelector('.product-select');
-        const choices = new Choices(select, { searchEnabled: true, searchChoices: true, itemSelectText: '' });
-        const choicesData = stockItems.map(stock => ({
-            value: `product|${stock.stock_name}|quantity|0|price|${stock.wholesale}|stock|${stock.stock_quantity}|uom|${stock.uom}`,
-            label: `${stock.stock_name} (${stock.uom})`
-        }));
-        choices.setChoices(choicesData, 'value', 'label', true);
-        attachPriceListener(div, existingBalance);
-        div.querySelector('.remove-item').addEventListener('click', () => {
-            div.remove();
-            updateSubtotal(editContainer, existingBalance);
-        });
-        eventListeners.push({ element: div.querySelector('.remove-item'), type: 'click', handler: () => {
-            div.remove();
-            updateSubtotal(editContainer, existingBalance);
-        } });
-        div.querySelector('.product-select').addEventListener('change', (e) => {
-            const values = e.target.value.split('|');
-            const stock = values[7] ? parseFloat(values[7]) : 0;
-            const price = values[5] ? parseFloat(values[5]) : 0;
-            div.querySelector('.stock-display').value = stock.toFixed(2);
-            div.querySelector('.price-display').value = price.toFixed(2);
-            div.querySelector('.qty-input').max = stock;
-            if (stock === 0) showModalError('edit-order', `No stock available for ${values[1]}.`);
-            updateSubtotal(editContainer, existingBalance);
-        });
-        updateSubtotal(editContainer, existingBalance);
-    };
+    updateSubtotal(editContainer, existingBalance);
+    editModal.dispatchEvent(new Event('modal:open'));
+}
+
+// Add item
+const addItemBtn = editContainer?.querySelector('.add-item-btn');
+const addItemHandler = async () => {
+    const div = document.createElement('div');
+    div.className = 'grid grid-cols-6 gap-2 item-row';
+    div.innerHTML = `
+        <select name="items[]" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-select w-full">
+            <option value="">Select Item</option>
+        </select>
+        <input name="quantities[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="1">
+        <input name="unit_prices[]" type="number" placeholder="Price" class="price-display p-2 border rounded-lg text-center w-full" step="0.01" ${window.userRole === 'manager' ? '' : 'readonly'}>
+        <input type="number" value="0" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+        <input type="number" value="0" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+        <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
+    `;
+    const addBtn = editContainer.querySelector('.add-item-btn');
+    editContainer.insertBefore(div, addBtn);
+    const select = div.querySelector('.product-select');
+    const choices = new Choices(select, { searchEnabled: true, searchChoices: true, itemSelectText: '' });
+    const stockItems = preloadedStockData || await fetchStockData(false);
+    const choicesData = stockItems.map(stock => ({
+        value: `product|${stock.stock_name}|quantity|0|price|${stock.wholesale}|stock|${stock.stock_quantity}|uom|${stock.uom}`,
+        label: `${stock.stock_name} (${stock.uom})`
+    }));
+    choices.setChoices(choicesData, 'value', 'label', true);
+    attachPriceListener(div, parseFloat(document.getElementById('edit-order-total').textContent) || 0);
+    div.querySelector('.remove-item').addEventListener('click', () => {
+        div.remove();
+        updateSubtotal(editContainer, parseFloat(document.getElementById('edit-order-total').textContent) || 0);
+    });
+    eventListeners.push({ element: div.querySelector('.remove-item'), type: 'click', handler: () => {
+        div.remove();
+        updateSubtotal(editContainer, parseFloat(document.getElementById('edit-order-total').textContent) || 0);
+    } });
+    div.querySelector('.product-select').addEventListener('change', (e) => {
+        const values = e.target.value.split('|');
+        const stock = values[7] ? parseFloat(values[7]) : 0;
+        const price = values[5] ? parseFloat(values[5]) : 0;
+        div.querySelector('.stock-display').value = stock.toFixed(2);
+        div.querySelector('.price-display').value = price.toFixed(2);
+        div.querySelector('.qty-input').max = stock;
+        if (stock === 0) showModalError('edit-order', `No stock available for ${values[1]}.`);
+        updateSubtotal(editContainer, parseFloat(document.getElementById('edit-order-total').textContent) || 0);
+    });
+    updateSubtotal(editContainer, parseFloat(document.getElementById('edit-order-total').textContent) || 0);
+};
+if (addItemBtn) {
     addItemBtn.removeEventListener('click', addItemHandler);
     addItemBtn.addEventListener('click', addItemHandler);
     eventListeners.push({ element: addItemBtn, type: 'click', handler: addItemHandler });
+}
 
-    // Manual item
-    const addManualBtn = document.getElementById('add-edit-manual');
-    const addManualHandler = () => {
-        const div = document.createElement('div');
-        div.className = 'grid grid-cols-6 gap-2 item-row';
-        div.innerHTML = `
-            <input name="items[]" type="text" placeholder="Manual Item" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-input w-full">
-            <input name="quantities[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="1">
-            <input name="unit_prices[]" type="number" placeholder="Price" class="price-display p-2 border rounded-lg text-center w-full" step="0.01" ${window.userRole === 'manager' ? '' : 'readonly'}>
-            <input type="number" value="0" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-            <input type="number" value="0" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-            <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
-        `;
-        const addBtn = editContainer.querySelector('.add-item-btn');
-        editContainer.insertBefore(div, addBtn);
-        attachPriceListener(div, existingBalance);
-        div.querySelector('.remove-item').addEventListener('click', () => {
-            div.remove();
-            updateSubtotal(editContainer, existingBalance);
-        });
-        eventListeners.push({ element: div.querySelector('.remove-item'), type: 'click', handler: () => {
-            div.remove();
-            updateSubtotal(editContainer, existingBalance);
-        } });
-        updateSubtotal(editContainer, existingBalance);
-    };
+// Manual item
+const addManualBtn = document.getElementById('add-edit-manual');
+const addManualHandler = () => {
+    const div = document.createElement('div');
+    div.className = 'grid grid-cols-6 gap-2 item-row';
+    div.innerHTML = `
+        <input name="items[]" type="text" placeholder="Manual Item" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-input w-full">
+        <input name="quantities[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="1">
+        <input name="unit_prices[]" type="number" placeholder="Price" class="price-display p-2 border rounded-lg text-center w-full" step="0.01" ${window.userRole === 'manager' ? '' : 'readonly'}>
+        <input type="number" value="0" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+        <input type="number" value="0" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+        <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
+    `;
+    const addBtn = editContainer.querySelector('.add-item-btn');
+    editContainer.insertBefore(div, addBtn);
+    attachPriceListener(div, parseFloat(document.getElementById('edit-order-total').textContent) || 0);
+    div.querySelector('.remove-item').addEventListener('click', () => {
+        div.remove();
+        updateSubtotal(editContainer, parseFloat(document.getElementById('edit-order-total').textContent) || 0);
+    });
+    eventListeners.push({ element: div.querySelector('.remove-item'), type: 'click', handler: () => {
+        div.remove();
+        updateSubtotal(editContainer, parseFloat(document.getElementById('edit-order-total').textContent) || 0);
+    } });
+    updateSubtotal(editContainer, parseFloat(document.getElementById('edit-order-total').textContent) || 0);
+};
+if (addManualBtn) {
     addManualBtn.removeEventListener('click', addManualHandler);
     addManualBtn.addEventListener('click', addManualHandler);
     eventListeners.push({ element: addManualBtn, type: 'click', handler: addManualHandler });
+}
 
-    // Update change
-    const amountPaidHandler = () => {
-        const subtotal = parseFloat(document.getElementById('edit-order-total').textContent) || 0;
-        const amountPaid = parseFloat(editAmountPaid.value) || 0;
-        const change = amountPaid > subtotal ? amountPaid - subtotal : 0;
-        editOrderChange.textContent = change.toFixed(2);
-    };
+// Update change
+const amountPaidHandler = () => {
+    const subtotal = parseFloat(document.getElementById('edit-order-total').textContent) || 0;
+    const amountPaid = parseFloat(editAmountPaid.value) || 0;
+    const change = amountPaid > subtotal ? amountPaid - subtotal : 0;
+    editOrderChange.textContent = change.toFixed(2);
+};
+if (editAmountPaid) {
     editAmountPaid.removeEventListener('input', amountPaidHandler);
     editAmountPaid.addEventListener('input', amountPaidHandler);
     eventListeners.push({ element: editAmountPaid, type: 'input', handler: amountPaidHandler });
+}
 
-    // Form submission
+// Form submission
+const form = document.getElementById('edit-order-form');
+if (form) {
     form.onsubmit = async function(e) {
         e.preventDefault();
         const submitBtn = form.querySelector('.submit-btn');
@@ -294,6 +319,7 @@ async function editOrder(receiptId) {
                 console.log('Form submitted successfully, reloading page');
                 editModal.classList.add('hidden');
                 showSuccessMessage(result.message);
+                preloadedStockData = null; // Reset cache
                 setTimeout(() => window.location.reload(), 2000);
             } else {
                 console.error('Form submission failed:', result.error || text);
@@ -307,7 +333,6 @@ async function editOrder(receiptId) {
             submitBtn.disabled = false;
         }
     };
-    updateSubtotal(editContainer, existingBalance);
 }
 
 function showSuccessMessage(message) {
@@ -334,11 +359,13 @@ function attachPriceListener(row, existingBalance) {
     eventListeners.push({ element: priceInput, type: 'input', handler: updateTotal });
 }
 
-closeEdit.addEventListener('click', () => {
-    resetModal(editContainer);
-    editModal.classList.add('hidden');
-    eventListeners.forEach(({ element, type, handler }) => element?.removeEventListener(type, handler));
-    eventListeners = [];
-});
+if (closeEdit) {
+    closeEdit.addEventListener('click', () => {
+        resetModal(editContainer);
+        editModal.classList.add('hidden');
+        eventListeners.forEach(({ element, type, handler }) => element?.removeEventListener(type, handler));
+        eventListeners = [];
+    });
+}
 
 export { editOrder, resetModal, attachPriceListener };
