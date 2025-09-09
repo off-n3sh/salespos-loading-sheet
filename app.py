@@ -681,7 +681,7 @@ def stock():
 
         if action == 'add_stock':
             print("[STOCK_ROUTE] Entering add_stock action")
-            client_logs.append("Entering add_stock action")  # Client-side log
+            client_logs.append("Entering add_stock action")
             stock_name = request.form.get('stock_name')
             category = request.form.get('category')
             new_category = request.form.get('new_category')
@@ -694,7 +694,7 @@ def stock():
 
             if not all([stock_name, category or new_category, initial_quantity, reorder_quantity, selling_price, wholesale_price, company_price, expire_date]):
                 print("[STOCK_ROUTE] Error: Missing required fields in add_stock")
-                client_logs.append("Error: Missing required fields in add_stock")  # Client-side log
+                client_logs.append("Error: Missing required fields in add_stock")
                 return "All fields are required", 400
 
             try:
@@ -705,12 +705,12 @@ def stock():
                 company_price = float(company_price)
                 if any(x < 0 for x in [initial_quantity, reorder_quantity, selling_price, wholesale_price, company_price]):
                     print("[STOCK_ROUTE] Error: Negative values detected in add_stock")
-                    client_logs.append("Error: Negative values detected in add_stock")  # Client-side log
+                    client_logs.append("Error: Negative values detected in add_stock")
                     return "Numeric fields cannot be negative", 400
                 datetime.strptime(expire_date, '%Y-%m-%d')
             except ValueError:
                 print("[STOCK_ROUTE] Error: Invalid numeric or date format in add_stock")
-                client_logs.append("Error: Invalid numeric or date format in add_stock")  # Client-side log
+                client_logs.append("Error: Invalid numeric or date format in add_stock")
                 return "Invalid numeric or date format", 400
 
             final_category = new_category.strip() if new_category else category
@@ -729,12 +729,12 @@ def stock():
             existing_stock = db.collection('stock').where('stock_name', '==', stock_name).get()
             if existing_stock:
                 print(f"[STOCK_ROUTE] Error: Stock item '{stock_name}' already exists")
-                client_logs.append(f"Error: Stock item '{stock_name}' already exists")  # Client-side log
+                client_logs.append(f"Error: Stock item '{stock_name}' already exists")
                 return f"Stock item '{stock_name}' already exists", 400
             existing_id = db.collection('stock').where('stock_id', '==', stock_id).get()
             if existing_id:
                 print(f"[STOCK_ROUTE] Error: Stock ID '{stock_id}' already exists")
-                client_logs.append(f"Error: Stock ID '{stock_id}' already exists")  # Client-side log
+                client_logs.append(f"Error: Stock ID '{stock_id}' already exists")
                 return f"Stock ID '{stock_id}' already exists", 400
 
             stock_data = {
@@ -762,11 +762,11 @@ def stock():
             log_stock_change(final_category, stock_name, 'wholesale_price_set', 0, wholesale_price)
             cache_cleared = clear_stock_cache_logic()
             print(f"[STOCK_ROUTE] add_stock completed, cache cleared: {cache_cleared}")
-            client_logs.append(f"add_stock completed, cache cleared: {cache_cleared}")  # Client-side log
+            client_logs.append(f"add_stock completed, cache cleared: {cache_cleared}")
 
         elif action == 'restock':
             print("[STOCK_ROUTE] Entering restock action")
-            client_logs.append("Entering restock action")  # Client-side log
+            client_logs.append("Entering restock action")
             stock_id = request.form.get('stock_id')
             if stock_id:
                 stock_ref = db.collection('stock').document(stock_id)
@@ -776,22 +776,22 @@ def stock():
                         restock_qty = int(request.form.get('restock_quantity', 0))
                         if restock_qty <= 0:
                             print("[STOCK_ROUTE] Error: Restock quantity must be positive")
-                            client_logs.append("Error: Restock quantity must be positive")  # Client-side log
+                            client_logs.append("Error: Restock quantity must be positive")
                             return "Restock quantity must be positive", 400
                         current_qty = stock.to_dict().get('stock_quantity', 0)
                         stock_ref.update({'stock_quantity': current_qty + restock_qty})
                         log_stock_change(stock.to_dict().get('category'), stock.to_dict().get('stock_name'), 'restock', restock_qty, stock.to_dict().get('selling_price'))
                         cache_cleared = clear_stock_cache_logic()
                         print(f"[STOCK_ROUTE] restock completed, cache cleared: {cache_cleared}")
-                        client_logs.append(f"restock completed, cache cleared: {cache_cleared}")  # Client-side log
+                        client_logs.append(f"restock completed, cache cleared: {cache_cleared}")
                     except ValueError:
                         print("[STOCK_ROUTE] Error: Invalid restock quantity")
-                        client_logs.append("Error: Invalid restock quantity")  # Client-side log
+                        client_logs.append("Error: Invalid restock quantity")
                         return "Invalid restock quantity", 400
 
         elif action == 'update_price':
             print("[STOCK_ROUTE] Entering update_price action")
-            client_logs.append("Entering update_price action")  # Client-side log
+            client_logs.append("Entering update_price action")
             stock_id = request.form.get('stock_id')
             if stock_id:
                 stock_ref = db.collection('stock').document(stock_id)
@@ -802,7 +802,7 @@ def stock():
                         new_wholesale_price = float(request.form.get('new_wholesale_price', 0))
                         if new_selling_price < 0 or new_wholesale_price < 0:
                             print("[STOCK_ROUTE] Error: Negative prices detected in update_price")
-                            client_logs.append("Error: Negative prices detected in update_price")  # Client-side log
+                            client_logs.append("Error: Negative prices detected in update_price")
                             return "Prices cannot be negative", 400
                         updates = {}
                         if new_selling_price > 0:
@@ -818,24 +818,121 @@ def stock():
                                 log_stock_change(stock_data.get('category'), stock_data.get('stock_name'), 'wholesale_price_update', 0, new_wholesale_price)
                             cache_cleared = clear_stock_cache_logic()
                             print(f"[STOCK_ROUTE] update_price completed, cache cleared: {cache_cleared}")
-                            client_logs.append(f"update_price completed, cache cleared: {cache_cleared}")  # Client-side log
+                            client_logs.append(f"update_price completed, cache cleared: {cache_cleared}")
                     except ValueError:
                         print("[STOCK_ROUTE] Error: Invalid price format in update_price")
-                        client_logs.append("Error: Invalid price format in update_price")  # Client-side log
+                        client_logs.append("Error: Invalid price format in update_price")
                         return "Invalid price format", 400
+
+        elif action == 'edit_stock_name':
+            print("[STOCK_ROUTE] Entering edit_stock_name action")
+            client_logs.append("Entering edit_stock_name action")
+            stock_id = request.form.get('stock_id')
+            new_stock_name = request.form.get('new_stock_name')
+            if not stock_id or not new_stock_name:
+                print("[STOCK_ROUTE] Error: Missing stock_id or new_stock_name")
+                client_logs.append("Error: Missing stock_id or new_stock_name")
+                return "Stock ID and new stock name are required", 400
+            stock_ref = db.collection('stock').document(stock_id)
+            stock = stock_ref.get()
+            if stock.exists:
+                existing_stock = db.collection('stock').where('stock_name', '==', new_stock_name).get()
+                if existing_stock and existing_stock[0].id != stock_id:
+                    print(f"[STOCK_ROUTE] Error: Stock name '{new_stock_name}' already exists")
+                    client_logs.append(f"Error: Stock name '{new_stock_name}' already exists")
+                    return f"Stock name '{new_stock_name}' already exists", 400
+                stock_ref.update({'stock_name': new_stock_name})
+                log_stock_change(stock.to_dict().get('category'), new_stock_name, 'name_update', 0, stock.to_dict().get('selling_price'))
+                cache_cleared = clear_stock_cache_logic()
+                print(f"[STOCK_ROUTE] edit_stock_name completed, cache cleared: {cache_cleared}")
+                client_logs.append(f"edit_stock_name completed, cache cleared: {cache_cleared}")
+            else:
+                print(f"[STOCK_ROUTE] Error: Stock ID '{stock_id}' not found")
+                client_logs.append(f"Error: Stock ID '{stock_id}' not found")
+                return f"Stock ID '{stock_id}' not found", 404
+
+        elif action == 'update_price_and_category':
+            print("[STOCK_ROUTE] Entering update_price_and_category action")
+            client_logs.append("Entering update_price_and_category action")
+            stock_id = request.form.get('stock_id')
+            if stock_id:
+                stock_ref = db.collection('stock').document(stock_id)
+                stock = stock_ref.get()
+                if stock.exists:
+                    try:
+                        updates = {}
+                        new_selling_price = request.form.get('new_selling_price')
+                        new_wholesale_price = request.form.get('new_wholesale_price')
+                        new_company_price = request.form.get('new_company_price')
+                        new_category = request.form.get('new_category')
+                        new_category_input = request.form.get('new_category_input')
+
+                        # Only include fields that were provided and valid
+                        if new_selling_price:
+                            new_selling_price = float(new_selling_price)
+                            if new_selling_price < 0:
+                                print("[STOCK_ROUTE] Error: Negative selling price detected")
+                                client_logs.append("Error: Negative selling price detected")
+                                return "Selling price cannot be negative", 400
+                            updates['selling_price'] = new_selling_price
+                        if new_wholesale_price:
+                            new_wholesale_price = float(new_wholesale_price)
+                            if new_wholesale_price < 0:
+                                print("[STOCK_ROUTE] Error: Negative wholesale price detected")
+                                client_logs.append("Error: Negative wholesale price detected")
+                                return "Wholesale price cannot be negative", 400
+                            updates['wholesale'] = new_wholesale_price
+                        if new_company_price:
+                            new_company_price = float(new_company_price)
+                            if new_company_price < 0:
+                                print("[STOCK_ROUTE] Error: Negative company price detected")
+                                client_logs.append("Error: Negative company price detected")
+                                return "Company price cannot be negative", 400
+                            updates['company_price'] = new_company_price
+                        if new_category == 'new' and new_category_input:
+                            updates['category'] = new_category_input.strip()
+                        elif new_category:
+                            updates['category'] = new_category
+
+                        if not updates:
+                            print("[STOCK_ROUTE] Error: No valid fields provided for update_price_and_category")
+                            client_logs.append("Error: No valid fields provided for update_price_and_category")
+                            return "At least one field must be updated", 400
+
+                        stock_ref.update(updates)
+                        stock_data = stock.to_dict()
+                        if 'selling_price' in updates:
+                            log_stock_change(stock_data.get('category'), stock_data.get('stock_name'), 'price_update', 0, updates['selling_price'])
+                        if 'wholesale' in updates:
+                            log_stock_change(stock_data.get('category'), stock_data.get('stock_name'), 'wholesale_price_update', 0, updates['wholesale'])
+                        if 'company_price' in updates:
+                            log_stock_change(stock_data.get('category'), stock_data.get('stock_name'), 'company_price_update', 0, updates['company_price'])
+                        if 'category' in updates:
+                            log_stock_change(updates['category'], stock_data.get('stock_name'), 'category_update', 0, stock_data.get('selling_price'))
+                        cache_cleared = clear_stock_cache_logic()
+                        print(f"[STOCK_ROUTE] update_price_and_category completed, cache cleared: {cache_cleared}")
+                        client_logs.append(f"update_price_and_category completed, cache cleared: {cache_cleared}")
+                    except ValueError:
+                        print("[STOCK_ROUTE] Error: Invalid numeric format in update_price_and_category")
+                        client_logs.append("Error: Invalid numeric format in update_price_and_category")
+                        return "Invalid numeric format", 400
+                else:
+                    print(f"[STOCK_ROUTE] Error: Stock ID '{stock_id}' not found")
+                    client_logs.append(f"Error: Stock ID '{stock_id}' not found")
+                    return f"Stock ID '{stock_id}' not found", 404
 
         # Log cache clearing result
         if cache_cleared:
             print(f"[STOCK_ROUTE] Cache cleared successfully after {action}")
-            client_logs.append(f"Cache cleared successfully after {action}")  # Client-side log
+            client_logs.append(f"Cache cleared successfully after {action}")
         else:
             print(f"[STOCK_ROUTE] Cache clearing failed after {action}")
-            client_logs.append(f"Cache clearing failed after {action}")  # Client-side log
+            client_logs.append(f"Cache clearing failed after {action}")
 
     # GET: Render stock page
     stock_items = [doc.to_dict() | {'id': doc.id} for doc in db.collection('stock').order_by('stock_name').get()]
     
-    # Remove duplicates by stock_name (based on screenshot observation)
+    # Remove duplicates by stock_name
     seen = set()
     unique_stock_items = []
     for item in stock_items:
@@ -876,9 +973,8 @@ def stock():
     ]
 
     print("[STOCK_ROUTE] Rendering stock.html with stock_items and recent_activity")
-    client_logs.append("Rendering stock.html with stock_items and recent_activity")  # Client-side log
+    client_logs.append("Rendering stock.html with stock_items and recent_activity")
     return render_template('stock.html', stock_items=stock_items, recent_activity=recent_activity, client_logs=client_logs)
-    
 @app.route('/logout')
 def logout():
     session.pop('user', None)

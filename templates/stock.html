@@ -17,7 +17,7 @@
         </button>
         <div id="add-stock-form" class="hidden mt-6 p-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
             <h3 class="text-xl font-semibold mb-6 text-gray-900 dark:text-white border-b pb-3 dark:border-gray-700">Add New Stock Item</h3>
-            <form method="POST">
+            <form method="POST" action="/stock">
                 <input type="hidden" name="action" value="add_stock">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -180,7 +180,7 @@
             </div>
             
             {% if session['user']['role'] == 'manager' %}
-            <form method="POST" class="mt-4 space-y-3">
+            <form method="POST" action="/stock" class="mt-4 space-y-3">
                 <input type="hidden" name="stock_id" value="{{ item.id }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 
@@ -236,7 +236,7 @@
 <div id="edit-stock-name-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden">
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-md">
         <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Edit Stock Name</h3>
-        <form id="edit-stock-name-form" method="POST">
+        <form id="edit-stock-name-form" method="POST" action="/stock">
             <input type="hidden" name="action" value="edit_stock_name">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="stock_id" id="edit-stock-id">
@@ -346,7 +346,7 @@
             e.preventDefault();
             const formData = new FormData(editStockNameForm);
             try {
-                const response = await fetch('/stock_data', {
+                const response = await fetch('/stock', {
                     method: 'POST',
                     headers: { 'X-CSRFToken': formData.get('csrf_token') },
                     body: formData
@@ -461,7 +461,6 @@
     }
     
     function sendNotificationToServer(type, items) {
-        // Placeholder for your notification endpoint
         const notificationEndpoint = '/api/notifications';
         
         fetch(notificationEndpoint, {
@@ -490,7 +489,7 @@
         checkExpiryDates();
     });
     
-    // For demo purposes, check periodically (every 30 minutes)
+    // Check periodically (every 30 minutes)
     setInterval(checkExpiryDates, 1800000);
 
     // Client-side logging for server-side actions
