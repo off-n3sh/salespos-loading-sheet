@@ -34,6 +34,7 @@ async function fetchStockData() {
             });
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
+            if (!data.items) throw new Error('No items in stock data response');
             preloadedStockData = data.items;
             currentVersion = data.version;
             console.log('Fetched new stock data (version:', data.version, ')');
@@ -43,6 +44,7 @@ async function fetchStockData() {
         return preloadedStockData;
     } catch (error) {
         console.error('Error fetching stock data:', error);
+        showModalError('edit-order', `Failed to load stock data: ${error.message}`);
         throw error;
     }
 }
@@ -95,7 +97,6 @@ async function editOrder(receiptId) {
         console.log('Stock data loaded:', stockItems.length, 'items');
     } catch (error) {
         console.error('Failed to fetch stock data:', error);
-        showModalError('edit-order', 'Failed to load stock data.');
         return;
     }
 
