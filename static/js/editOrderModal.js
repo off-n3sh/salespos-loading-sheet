@@ -7,7 +7,6 @@ const editAmountPaid = document.getElementById('edit-amount-paid');
 const editOrderChange = document.getElementById('edit-order-change');
 let eventListeners = [];
 const preloadedStockData = Object.freeze([]); // Read-only empty array
-let currentVersion = null;
 
 async function fetchOrderData(receiptId) {
     try {
@@ -62,10 +61,11 @@ async function editOrder(receiptId) {
     const existingBalance = parseFloat(balance) || 0;
     document.getElementById('edit-order-total').textContent = existingBalance.toFixed(2);
 
-    // Load stock data with version check
-    console.log('Loading stock data with version check...');
+    // Load stock data
+    console.log('Loading stock data...');
+    let stockItems;
     try {
-        const stockItems = await fetchStockData();
+        stockItems = await fetchStockData();
         console.log('Stock data loaded:', stockItems.length, 'items');
     } catch (error) {
         console.error('Failed to fetch stock data:', error);
@@ -92,8 +92,7 @@ async function editOrder(receiptId) {
         return;
     }
 
-    // Populate existing items (read-only)
-    const stockItems = await fetchStockData();
+    // Populate existing items (read-only, no remove button)
     itemsList.forEach(item => {
         const div = document.createElement('div');
         div.className = 'grid grid-cols-6 gap-2 item-row';
@@ -109,7 +108,7 @@ async function editOrder(receiptId) {
             <input name="unit_prices[]" type="number" value="${price.toFixed(2)}" class="price-display p-2 border rounded-lg text-center w-full" step="0.01" readonly>
             <input type="number" value="${stock}" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
             <input type="number" value="${(price * quantity).toFixed(2)}" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-            <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
+            <div class="action-placeholder"></div>
         `;
         const addBtn = editContainer.querySelector('.add-item-btn');
         editContainer.insertBefore(div, addBtn);
@@ -121,14 +120,6 @@ async function editOrder(receiptId) {
             selected: stock.stock_name === item.name
         }));
         choices.setChoices(choicesData, 'value', 'label', true);
-        div.querySelector('.remove-item').addEventListener('click', () => {
-            div.remove();
-            updateSubtotal(editContainer, existingBalance);
-        });
-        eventListeners.push({ element: div.querySelector('.remove-item'), type: 'click', handler: () => {
-            div.remove();
-            updateSubtotal(editContainer, existingBalance);
-        } });
     });
 
     updateSubtotal(editContainer, existingBalance);
