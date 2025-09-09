@@ -61,7 +61,7 @@ async function editOrder(receiptId) {
     const existingBalance = parseFloat(balance) || 0;
     document.getElementById('edit-order-total').textContent = existingBalance.toFixed(2);
 
-    // Load stock data
+    // Load stock data once
     console.log('Loading stock data...');
     let stockItems;
     try {
@@ -69,6 +69,7 @@ async function editOrder(receiptId) {
         console.log('Stock data loaded:', stockItems.length, 'items');
     } catch (error) {
         console.error('Failed to fetch stock data:', error);
+        showModalError('edit-order', `Failed to load stock data: ${error.message}`);
         return;
     }
 
