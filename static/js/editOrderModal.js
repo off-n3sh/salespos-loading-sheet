@@ -1,4 +1,4 @@
-import { fetchStockData, showModalError } from './utils.js';
+import { showModalError, fetchStockData } from './utils.js';
 
 const editModal = document.getElementById('edit-order-modal');
 const closeEdit = document.getElementById('close-edit-modal');
@@ -6,7 +6,8 @@ const editContainer = document.getElementById('edit-items-container');
 const editAmountPaid = document.getElementById('edit-amount-paid');
 const editOrderChange = document.getElementById('edit-order-change');
 let eventListeners = [];
-let preloadedStockData = null; // Cache stock data
+const preloadedStockData = Object.freeze([]); // Read-only empty array
+let currentVersion = null;
 
 async function fetchOrderData(receiptId) {
     try {
@@ -64,15 +65,10 @@ async function editOrder(receiptId) {
     // Load stock data with version check
     console.log('Loading stock data with version check...');
     try {
-        if (!preloadedStockData) {
-            preloadedStockData = await fetchStockData(false);
-            console.log('Stock data loaded:', preloadedStockData.length, 'items');
-        } else {
-            console.log('Using pre-loaded stock data:', preloadedStockData.length, 'items');
-        }
+        const stockItems = await fetchStockData();
+        console.log('Stock data loaded:', stockItems.length, 'items');
     } catch (error) {
         console.error('Failed to fetch stock data:', error);
-        showModalError('edit-order', 'Failed to load stock data.');
         return;
     }
 
@@ -97,7 +93,7 @@ async function editOrder(receiptId) {
     }
 
     // Populate existing items (read-only)
-    const stockItems = preloadedStockData;
+    const stockItems = await fetchStockData();
     itemsList.forEach(item => {
         const div = document.createElement('div');
         div.className = 'grid grid-cols-6 gap-2 item-row';
@@ -158,7 +154,7 @@ const addItemHandler = async () => {
     editContainer.insertBefore(div, addBtn);
     const select = div.querySelector('.product-select');
     const choices = new Choices(select, { searchEnabled: true, searchChoices: true, itemSelectText: '' });
-    const stockItems = preloadedStockData || await fetchStockData(false);
+    const stockItems = await fetchStockData();
     const choicesData = stockItems.map(stock => ({
         value: `product|${stock.stock_name}|quantity|0|price|${stock.wholesale}|stock|${stock.stock_quantity}|uom|${stock.uom}`,
         label: `${stock.stock_name} (${stock.uom})`
@@ -319,7 +315,6 @@ if (form) {
                 console.log('Form submitted successfully, reloading page');
                 editModal.classList.add('hidden');
                 showSuccessMessage(result.message);
-                preloadedStockData = null; // Reset cache
                 setTimeout(() => window.location.reload(), 2000);
             } else {
                 console.error('Form submission failed:', result.error || text);
