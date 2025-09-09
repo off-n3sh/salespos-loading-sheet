@@ -1,4 +1,4 @@
-import { fetchStockData, showModalError, preloadedStockData, setPreloadedStockData } from './utils.js';
+import { fetchStockData, showModalError } from './utils.js';
 
 const editModal = document.getElementById('edit-order-modal');
 const closeEdit = document.getElementById('close-edit-modal');
@@ -6,6 +6,7 @@ const editContainer = document.getElementById('edit-items-container');
 const editAmountPaid = document.getElementById('edit-amount-paid');
 const editOrderChange = document.getElementById('edit-order-change');
 let eventListeners = [];
+let preloadedStockData = null; // Cache stock data
 
 async function fetchOrderData(receiptId) {
     try {
@@ -65,7 +66,6 @@ async function editOrder(receiptId) {
     try {
         if (!preloadedStockData) {
             preloadedStockData = await fetchStockData(false);
-            setPreloadedStockData(preloadedStockData);
             console.log('Stock data loaded:', preloadedStockData.length, 'items');
         } else {
             console.log('Using pre-loaded stock data:', preloadedStockData.length, 'items');
@@ -236,23 +236,6 @@ if (editAmountPaid) {
     eventListeners.push({ element: editAmountPaid, type: 'input', handler: amountPaidHandler });
 }
 
-// Edit order button listener
-function attachEditOrderListeners() {
-    const editButtons = document.querySelectorAll('.edit-order-btn');
-    editButtons.forEach(btn => {
-        const handler = () => {
-            const receiptId = btn.dataset.receiptId;
-            console.log('Edit order button clicked, receiptId:', receiptId);
-            editOrder(receiptId);
-        };
-        btn.removeEventListener('click', handler);
-        btn.addEventListener('click', handler);
-        eventListeners.push({ element: btn, type: 'click', handler });
-    });
-}
-document.addEventListener('DOMContentLoaded', attachEditOrderListeners);
-document.addEventListener('modal:open', attachEditOrderListeners); // Re-attach after modal opens
-
 // Form submission
 const form = document.getElementById('edit-order-form');
 if (form) {
@@ -336,7 +319,7 @@ if (form) {
                 console.log('Form submitted successfully, reloading page');
                 editModal.classList.add('hidden');
                 showSuccessMessage(result.message);
-                setPreloadedStockData(null); // Reset cache
+                preloadedStockData = null; // Reset cache
                 setTimeout(() => window.location.reload(), 2000);
             } else {
                 console.error('Form submission failed:', result.error || text);
