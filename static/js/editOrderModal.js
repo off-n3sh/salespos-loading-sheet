@@ -7,6 +7,7 @@ const editAmountPaid = document.getElementById('edit-amount-paid');
 const editOrderChange = document.getElementById('edit-order-change');
 let eventListeners = [];
 const preloadedStockData = Object.freeze([]); // Read-only empty array
+let isEditOrderRunning = false; // Guardrail flag
 
 async function fetchOrderData(receiptId) {
     try {
@@ -45,86 +46,95 @@ function updateSubtotal(container, existingBalance = 0) {
 }
 
 async function editOrder(receiptId) {
-    const orderData = await fetchOrderData(receiptId);
-    if (!orderData) return;
-
-    const { items, balance, order_type } = orderData;
-    document.querySelectorAll('.modal').forEach(modal => modal.classList.add('hidden'));
-    editModal.classList.remove('hidden');
-    document.getElementById('edit-order-id').textContent = receiptId;
-    document.getElementById('edit-order-type').value = order_type || 'wholesale';
-    const form = document.getElementById('edit-order-form');
-    form.action = `/edit_order/${receiptId}`;
-    resetModal(editContainer);
-
-    // Set subtotal to existing balance
-    const existingBalance = parseFloat(balance) || 0;
-    document.getElementById('edit-order-total').textContent = existingBalance.toFixed(2);
-
-    // Load stock data once
-    console.log('Loading stock data...');
-    let stockItems;
-    try {
-        stockItems = await fetchStockData();
-        console.log('Stock data loaded:', stockItems.length, 'items');
-    } catch (error) {
-        console.error('Failed to fetch stock data:', error);
-        showModalError('edit-order', `Failed to load stock data: ${error.message}`);
+    if (isEditOrderRunning) {
+        console.log('editOrder already running, skipping...');
         return;
     }
-
-    // Parse items
-    let itemsList = [];
+    isEditOrderRunning = true; // Set guardrail
     try {
-        if (Array.isArray(items)) {
-            for (let i = 0; i < items.length; i += 6) {
-                if (items[i] === 'product' && items[i+2] === 'quantity' && items[i+4] === 'price') {
-                    itemsList.push({
-                        name: items[i+1],
-                        quantity: parseFloat(items[i+3]) || 0,
-                        price: parseFloat(items[i+5]) || 0
-                    });
+        const orderData = await fetchOrderData(receiptId);
+        if (!orderData) return;
+
+        const { items, balance, order_type } = orderData;
+        document.querySelectorAll('.modal').forEach(modal => modal.classList.add('hidden'));
+        editModal.classList.remove('hidden');
+        document.getElementById('edit-order-id').textContent = receiptId;
+        document.getElementById('edit-order-type').value = order_type || 'wholesale';
+        const form = document.getElementById('edit-order-form');
+        form.action = `/edit_order/${receiptId}`;
+        resetModal(editContainer);
+
+        // Set subtotal to existing balance
+        const existingBalance = parseFloat(balance) || 0;
+        document.getElementById('edit-order-total').textContent = existingBalance.toFixed(2);
+
+        // Load stock data once
+        console.log('Loading stock data...');
+        let stockItems;
+        try {
+            stockItems = await fetchStockData();
+            console.log('Stock data loaded:', stockItems.length, 'items');
+        } catch (error) {
+            console.error('Failed to fetch stock data:', error);
+            showModalError('edit-order', `Failed to load stock data: ${error.message}`);
+            return;
+        }
+
+        // Parse items
+        let itemsList = [];
+        try {
+            if (Array.isArray(items)) {
+                for (let i = 0; i < items.length; i += 6) {
+                    if (items[i] === 'product' && items[i+2] === 'quantity' && items[i+4] === 'price') {
+                        itemsList.push({
+                            name: items[i+1],
+                            quantity: parseFloat(items[i+3]) || 0,
+                            price: parseFloat(items[i+5]) || 0
+                        });
+                    }
                 }
             }
+        } catch (e) {
+            console.error('Error parsing items:', e);
+            showModalError('edit-order', 'Invalid order items data.');
+            return;
         }
-    } catch (e) {
-        console.error('Error parsing items:', e);
-        showModalError('edit-order', 'Invalid order items data.');
-        return;
+
+        // Populate existing items (read-only, no remove button)
+        itemsList.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'grid grid-cols-6 gap-2 item-row';
+            div.dataset.existing = 'true';
+            const price = parseFloat(item.price) || 0;
+            const quantity = parseInt(item.quantity) || 0;
+            const stock = stockItems.find(stock => stock.stock_name === item.name)?.stock_quantity || 0;
+            div.innerHTML = `
+                <select name="items[]" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-select w-full" disabled>
+                    <option value="">Select Item</option>
+                </select>
+                <input name="quantities[]" type="number" value="${quantity}" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="1" readonly>
+                <input name="unit_prices[]" type="number" value="${price.toFixed(2)}" class="price-display p-2 border rounded-lg text-center w-full" step="0.01" readonly>
+                <input type="number" value="${stock}" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+                <input type="number" value="${(price * quantity).toFixed(2)}" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+                <div class="action-placeholder"></div>
+            `;
+            const addBtn = editContainer.querySelector('.add-item-btn');
+            editContainer.insertBefore(div, addBtn);
+            const select = div.querySelector('.product-select');
+            const choices = new Choices(select, { searchEnabled: true, searchChoices: true, itemSelectText: '' });
+            const choicesData = stockItems.map(stock => ({
+                value: `product|${stock.stock_name}|quantity|0|price|${stock.wholesale}|stock|${stock.stock_quantity}|uom|${stock.uom}`,
+                label: `${stock.stock_name} (${stock.uom})`,
+                selected: stock.stock_name === item.name
+            }));
+            choices.setChoices(choicesData, 'value', 'label', true);
+        });
+
+        updateSubtotal(editContainer, existingBalance);
+        editModal.dispatchEvent(new Event('modal:open'));
+    } finally {
+        isEditOrderRunning = false; // Reset guardrail
     }
-
-    // Populate existing items (read-only, no remove button)
-    itemsList.forEach(item => {
-        const div = document.createElement('div');
-        div.className = 'grid grid-cols-6 gap-2 item-row';
-        div.dataset.existing = 'true';
-        const price = parseFloat(item.price) || 0;
-        const quantity = parseInt(item.quantity) || 0;
-        const stock = stockItems.find(stock => stock.stock_name === item.name)?.stock_quantity || 0;
-        div.innerHTML = `
-            <select name="items[]" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-select w-full" disabled>
-                <option value="">Select Item</option>
-            </select>
-            <input name="quantities[]" type="number" value="${quantity}" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="1" readonly>
-            <input name="unit_prices[]" type="number" value="${price.toFixed(2)}" class="price-display p-2 border rounded-lg text-center w-full" step="0.01" readonly>
-            <input type="number" value="${stock}" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-            <input type="number" value="${(price * quantity).toFixed(2)}" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-            <div class="action-placeholder"></div>
-        `;
-        const addBtn = editContainer.querySelector('.add-item-btn');
-        editContainer.insertBefore(div, addBtn);
-        const select = div.querySelector('.product-select');
-        const choices = new Choices(select, { searchEnabled: true, searchChoices: true, itemSelectText: '' });
-        const choicesData = stockItems.map(stock => ({
-            value: `product|${stock.stock_name}|quantity|0|price|${stock.wholesale}|stock|${stock.stock_quantity}|uom|${stock.uom}`,
-            label: `${stock.stock_name} (${stock.uom})`,
-            selected: stock.stock_name === item.name
-        }));
-        choices.setChoices(choicesData, 'value', 'label', true);
-    });
-
-    updateSubtotal(editContainer, existingBalance);
-    editModal.dispatchEvent(new Event('modal:open'));
 }
 
 // Add item
@@ -352,7 +362,14 @@ if (closeEdit) {
         editModal.classList.add('hidden');
         eventListeners.forEach(({ element, type, handler }) => element?.removeEventListener(type, handler));
         eventListeners = [];
+        isEditOrderRunning = false; // Reset guardrail on close
     });
 }
+
+// Initialize stock data on page load
+document.addEventListener('DOMContentLoaded', async () => {
+    console.log('Initializing stock data on page load...');
+    await fetchStockData(); // Preload stock data
+});
 
 export { editOrder, resetModal, attachPriceListener };
