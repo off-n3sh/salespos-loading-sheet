@@ -2597,21 +2597,32 @@ def edit_order(order_id):
         client_logs.append(f"Received {len(items_raw)} items, amount_paid={amount_paid}")
 
         new_items_list = []
-        for i in range(len(items_raw)):
-            try:
-                product_data = items_raw[i].split('|')
-                product_name = product_data[1] if len(product_data) > 1 else items_raw[i]
-                quantity = int(quantities[i]) if i < len(quantities) and quantities[i] else 0
-                price = float(unit_prices[i]) if i < len(unit_prices) and unit_prices[i] else float(product_data[5]) if len(product_data) > 5 else 0.0
-                if quantity > 0:
-                    new_items_list.append({'name': product_name, 'quantity': quantity, 'price': price})
-            except (IndexError, ValueError) as e:
-                logger.error(f"[EDIT_ORDER] Error processing item {items_raw[i]}: {str(e)}")
-                client_logs.append(f"Error processing item {items_raw[i]}: {str(e)}")
-                continue
-        logger.info(f"[EDIT_ORDER] Parsed {len(new_items_list)} new items: {new_items_list}")
-        client_logs.append(f"Parsed {len(new_items_list)} new items")
+	for i in range(len(items_raw)):
+        	try:
+        	    product_data = items_raw[i].split('|')
+                    product_name = product_data[1] if len(product_data) > 1 else items_raw[i]
 
+        	    # Safe quantity parsing
+        	    quantity_str = quantities[i] if i < len(quantities) else '0'
+        	    quantity = int(quantity_str) if quantity_str.isdigit() else 0
+
+                    # Safe price parsing
+                    price_str = unit_prices[i] if i < len(unit_prices) else ''
+                    try:
+                        price = float(price_str)
+                    except ValueError:
+                        price = float(product_data[5]) if len(product_data) > 5 and product_data[5].replace('.', '', 1).isdigit() else 0.0
+                    if quantity > 0:
+                        new_items_list.append({
+                	    'name': product_name,
+                	    'quantity': quantity,
+                	    'price': price
+                        })
+               except (IndexError, ValueError) as e:
+                    logger.error(f"[EDIT_ORDER] Error processing item {items_raw[i]}: {str(e)}")
+                    client_logs.append(f"Error processing item {items_raw[i]}: {str(e)}")
+                    continue
+                
         # Combine items (replace existing with new, keep unchanged old items)
         combined_items_list = []
         for new_item in new_items_list:
