@@ -2543,7 +2543,7 @@ def get_order(order_id):
 @app.route('/edit_order/<order_id>', methods=['POST'])
 @login_required
 def edit_order(order_id):
-    client_logs = []  # Collect logs for client-side display
+    client_logs = []
     logger.info(f"[EDIT_ORDER] Starting edit for order {order_id}, user: {session['user']['email']}")
     client_logs.append(f"Starting edit for order {order_id}")
 
@@ -2572,7 +2572,7 @@ def edit_order(order_id):
         current_user_name = f"{session['user']['firstName']} {session['user']['lastName']}"
         if session['user']['role'] != 'manager' and current_user_name != order_data.get('salesperson_name'):
             logger.warning(f"[EDIT_ORDER] Unauthorized: user {current_user_name} (role: {session['user']['role']}) attempted to edit order {order_id}")
-            client_logs.append(f"Unauthorized: Only the order creator or a manager can edit this order")
+            client_logs.append("Unauthorized: Only the order creator or a manager can edit this order")
             return jsonify({"error": "Unauthorized: Only the order creator or a manager can edit this order", "client_logs": client_logs}), 403
 
         # Parse existing items
@@ -2580,9 +2580,9 @@ def edit_order(order_id):
         for i in range(0, len(order_data.get('items', [])), 6):
             if order_data['items'][i] == 'product':
                 old_items_list.append({
-                    'name': order_data['items'][i+1],
-                    'quantity': int(order_data['items'][i+3]),
-                    'price': float(order_data['items'][i+5])
+                    'name': order_data['items'][i + 1],
+                    'quantity': int(order_data['items'][i + 3]),
+                    'price': float(order_data['items'][i + 5])
                 })
         logger.info(f"[EDIT_ORDER] Parsed {len(old_items_list)} existing items: {old_items_list}")
         client_logs.append(f"Parsed {len(old_items_list)} existing items")
@@ -2596,37 +2596,38 @@ def edit_order(order_id):
         logger.info(f"[EDIT_ORDER] Form data: {len(items_raw)} items, amount_paid={amount_paid}, total_payments={total_payments_form}")
         client_logs.append(f"Received {len(items_raw)} items, amount_paid={amount_paid}")
 
+        # Parse new items safely
         new_items_list = []
-	for i in range(len(items_raw)):
-        	try:
-        	    product_data = items_raw[i].split('|')
-                    product_name = product_data[1] if len(product_data) > 1 else items_raw[i]
+        for i in range(len(items_raw)):
+            try:
+                product_data = items_raw[i].split('|')
+                product_name = product_data[1] if len(product_data) > 1 else items_raw[i]
 
-        	    # Safe quantity parsing
-        	    quantity_str = quantities[i] if i < len(quantities) else '0'
-        	    quantity = int(quantity_str) if quantity_str.isdigit() else 0
+                quantity_str = quantities[i] if i < len(quantities) else '0'
+                quantity = int(quantity_str) if quantity_str.isdigit() else 0
 
-                    # Safe price parsing
-                    price_str = unit_prices[i] if i < len(unit_prices) else ''
-                    try:
-                        price = float(price_str)
-                    except ValueError:
-                        price = float(product_data[5]) if len(product_data) > 5 and product_data[5].replace('.', '', 1).isdigit() else 0.0
-                    if quantity > 0:
-                        new_items_list.append({
-                	    'name': product_name,
-                	    'quantity': quantity,
-                	    'price': price
-                        })
-               except (IndexError, ValueError) as e:
-                    logger.error(f"[EDIT_ORDER] Error processing item {items_raw[i]}: {str(e)}")
-                    client_logs.append(f"Error processing item {items_raw[i]}: {str(e)}")
-                    continue
-                
-        # Combine items (replace existing with new, keep unchanged old items)
-        combined_items_list = []
-        for new_item in new_items_list:
-            combined_items_list.append({'name': new_item['name'], 'quantity': new_item['quantity'], 'price': new_item['price']})
+                price_str = unit_prices[i] if i < len(unit_prices) else ''
+                try:
+                    price = float(price_str)
+                except ValueError:
+                    price = float(product_data[5]) if len(product_data) > 5 and product_data[5].replace('.', '', 1).isdigit() else 0.0
+
+                if quantity > 0:
+                    new_items_list.append({
+                        'name': product_name,
+                        'quantity': quantity,
+                        'price': price
+                    })
+            except (IndexError, ValueError) as e:
+                logger.error(f"[EDIT_ORDER] Error processing item {items_raw[i]}: {str(e)}")
+                client_logs.append(f"Error processing item {items_raw[i]}: {str(e)}")
+                continue
+
+        logger.info(f"[EDIT_ORDER] Parsed {len(new_items_list)} new items: {new_items_list}")
+        client_logs.append(f"Parsed {len(new_items_list)} new items")
+
+        # Combine items
+        combined_items_list = new_items_list.copy()
         for old_item in old_items_list:
             if not any(item['name'] == old_item['name'] for item in new_items_list):
                 combined_items_list.append(old_item)
@@ -2645,7 +2646,7 @@ def edit_order(order_id):
         logger.info(f"[EDIT_ORDER] Subtotal: {subtotal}, Total items: {total_items}")
         client_logs.append(f"Subtotal: {subtotal}, Total items: {total_items}")
 
-        # Update stock for wholesale orders
+        # Stock update for wholesale
         if order_data.get('order_type') == 'wholesale':
             for item in combined_items_list:
                 old_item = next((oi for oi in old_items_list if oi['name'] == item['name']), None)
@@ -2675,17 +2676,17 @@ def edit_order(order_id):
             logger.info(f"[EDIT_ORDER] Added payment: amount={amount_paid}, date={datetime.now(NAIROBI_TZ)}")
             client_logs.append(f"Added payment: amount={amount_paid}")
 
-        # Calculate total payments (existing + new)
+        # Calculate total payments
         total_payments = sum(float(p['amount']) for p in payment_history) if payment_history else 0
         if total_payments_form > 0 and abs(total_payments - total_payments_form) > 0.01:
             logger.warning(f"[EDIT_ORDER] Mismatch in total_payments: form={total_payments_form}, calculated={total_payments}")
-            client_logs.append(f"Warning: Payment mismatch detected")
+            client_logs.append("Warning: Payment mismatch detected")
         logger.info(f"[EDIT_ORDER] Total payments: {total_payments}")
         client_logs.append(f"Total payments: {total_payments}")
 
         # Calculate balance
         new_balance = subtotal - total_payments
-        logger.info(f"[EDIT_ORDER] Calculated balance: subtotal={subtotal} - total_payments={total_payments} = {new_balance}")
+        logger.info(f"[EDIT_ORDER] Calculated balance: {new_balance}")
         client_logs.append(f"Calculated balance: {new_balance}")
 
         # Prepare updated order
@@ -2694,7 +2695,7 @@ def edit_order(order_id):
             'items_list': combined_items_list,
             'total_items': total_items,
             'subtotal': subtotal,
-            'payment': total_payments,  # Update to total payments
+            'payment': total_payments,
             'balance': max(new_balance, 0),
             'shop_name': order_data.get('shop_name', ''),
             'salesperson_name': order_data.get('salesperson_name', ''),
@@ -2704,8 +2705,9 @@ def edit_order(order_id):
             'closed_date': datetime.now(NAIROBI_TZ) if new_balance <= 0 else order_data.get('closed_date'),
             'payment_history': payment_history
         }
+
         order_ref.set(updated_order)
-        logger.info(f"[EDIT_ORDER] Updated order {order_id}: {updated_order}")
+        logger.info(f"[EDIT_ORDER] Updated order {order_id}")
         client_logs.append(f"Order {order_id} updated successfully")
 
         log_user_action('Updated Order', f"Updated order {order_id} with {total_items} items")
@@ -2721,6 +2723,7 @@ def edit_order(order_id):
         logger.error(f"[EDIT_ORDER] Failed to update order {order_id}: {str(e)}")
         client_logs.append(f"Failed to update order: {str(e)}")
         return jsonify({"error": f"Failed to update order: {str(e)}", "client_logs": client_logs}), 500
+
 
 @app.route('/receipt/<receipt_id>', methods=['GET'])
 @login_required
