@@ -1898,22 +1898,10 @@ def mark_paid(receipt_id):
     except Exception as e:
         return jsonify({"error": f"Error updating order: {str(e)}"}), 500
         
-@app.route('/receipts')
-@no_cache
-@login_required
-def receipts():
-    try:
-        orders = [doc.to_dict() for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).get()]
-        for order in orders:
-            order['date'] = process_date(order.get('date'))
-        return render_template('receipts.html', orders=orders)
-    except Exception as e:
-        return f"Error loading receipts: {str(e)}", 500
 @app.route('/receipt/<order_id>')
 @no_cache
 @login_required
 def receipt(order_id):
-    """Display a specific receipt."""
     try:
         db = firestore.Client()
         orders_ref = db.collection('orders').where('receipt_id', '==', order_id).limit(1).stream()
@@ -1923,16 +1911,15 @@ def receipt(order_id):
         order_dict = order_doc.to_dict()
         items_raw = order_dict.get('items', [])
         items_list = []
-        subtotal_amount = 0  # This will be our subtotal
+        subtotal_amount = 0
 
         # Process items_raw based on order_type
         if order_dict.get('order_type') == 'app' and isinstance(items_raw, list) and items_raw and isinstance(items_raw[0], dict):
-            # App order: items is a list of maps
             for item in items_raw:
-                quantity = int(item.get('quantity', '0'))
+                quantity = float(item.get('quantity', '0'))  # Use float for app orders
                 price = float(item.get('price', '0.0'))
                 amount = quantity * price
-                subtotal_amount += amount  # Accumulate subtotal
+                subtotal_amount += amount
                 items_list.append({
                     'name': item.get('product', 'Unknown'),
                     'quantity': quantity,
@@ -1947,10 +1934,14 @@ def receipt(order_id):
                     product_name = items_raw[i + 1]
                     quantity_str = str(items_raw[i + 3]) if i + 2 < len(items_raw) and items_raw[i + 2] == 'quantity' else '0'
                     price_str = str(items_raw[i + 5]) if i + 4 < len(items_raw) and items_raw[i + 4] == 'price' else '0'
-                    quantity = int(quantity_str) if quantity_str.isdigit() else 0
+                    try:
+                        quantity = float(quantity_str) if quantity_str.replace('.', '').replace('-', '').isdigit() else 0.0
+                    except ValueError:
+                        logger.error(f"Invalid quantity format for {product_name}: {quantity_str}")
+                        quantity = 0.0
                     price = float(price_str) if price_str.replace('.', '').replace('-', '').isdigit() else 0.0
                     amount = quantity * price
-                    subtotal_amount += amount  # Accumulate subtotal
+                    subtotal_amount += amount
                     items_list.append({
                         'name': product_name,
                         'quantity': quantity,
@@ -1975,8 +1966,8 @@ def receipt(order_id):
             'shop_address': shop_address,
             'items_list': items_list,
             'total_items': process_items(order_dict.get('items')),
-            'subtotal': subtotal_amount,  # Pass the calculated subtotal
-            'total_amount': subtotal_amount,  # Keep this for compatibility
+            'subtotal': subtotal_amount,
+            'total_amount': subtotal_amount,
             'payment': order_dict.get('payment', 0),
             'balance': order_dict.get('balance', 0),
             'date': process_date(order_dict.get('date')),
