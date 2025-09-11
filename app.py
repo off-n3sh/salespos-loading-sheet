@@ -34,6 +34,51 @@ if not app.secret_key:
 csrf = CSRFProtect(app)
 app.jinja_env.globals['csrf_token'] = lambda: session.get('_csrf_token', '')
 
+CLEAR_COLLECTIONS_RUN = False
+def clear_firestore_collection(collection_name):
+    """Delete all documents in the specified Firestore collection."""
+    try:
+        db = firestore.Client()
+        client_logs = [f"Starting deletion of all documents in '{collection_name}' collection"]
+        logger.info(f"[CLEAR_COLLECTION] Starting deletion for collection: {collection_name}")
+
+        # Get all documents in the collection
+        collection_ref = db.collection(collection_name)
+        docs = collection_ref.stream()
+        deleted_count = 0
+
+        # Delete documents in batches to handle large collections
+        batch = db.batch()
+        batch_size = 0
+        max_batch_size = 500  # Firestore batch limit
+
+        for doc in docs:
+            batch.delete(doc.reference)
+            batch_size += 1
+            deleted_count += 1
+
+            if batch_size >= max_batch_size:
+                batch.commit()
+                client_logs.append(f"Committed batch deletion of {batch_size} documents")
+                logger.info(f"[CLEAR_COLLECTION] Committed batch deletion of {batch_size} documents in {collection_name}")
+                batch = db.batch()
+                batch_size = 0
+
+        # Commit any remaining documents
+        if batch_size > 0:
+            batch.commit()
+            client_logs.append(f"Committed final batch deletion of {batch_size} documents")
+            logger.info(f"[CLEAR_COLLECTION] Committed final batch deletion of {batch_size} documents in {collection_name}")
+
+        client_logs.append(f"Successfully deleted {deleted_count} documents from '{collection_name}'")
+        logger.info(f"[CLEAR_COLLECTION] Successfully deleted {deleted_count} documents from {collection_name}")
+        return {"status": "success", "message": f"Deleted {deleted_count} documents from {collection_name}", "client_logs": client_logs}
+
+    except Exception as e:
+        client_logs = [f"Error deleting documents in '{collection_name}': {str(e)}"]
+        logger.error(f"[CLEAR_COLLECTION] Error deleting documents in {collection_name}: {str(e)}")
+        return {"status": "error", "message": f"Failed to delete documents: {str(e)}", "client_logs": client_logs}
+
 stock_cache = {'data': None, 'version': None, 'timestamp': None, 'timeout': timedelta(hours=1)}
 def update_stock_version():
     """Increment the stock version in Firestore with detailed logging."""
@@ -568,6 +613,40 @@ def group_orders(filtered_orders, time_filter, today_start, today_end, now):
         grouped_orders = [{'label': 'All Orders', 'rows': filtered_orders, 'total': total, 'debt': debt}]
     return grouped_orders
     
+@app.route('/clear_collections', methods=['POST'])
+def clear_collections():
+    """Clear specified Firestore collections on first run after deployment."""
+    global CLEAR_COLLECTIONS_RUN
+    client_logs = []
+
+    if CLEAR_COLLECTIONS_RUN:
+        client_logs.append("Collection clearing already executed in this deployment")
+        logger.info("[CLEAR_COLLECTIONS] Skipping: Already executed in this deployment")
+        return jsonify({"status": "skipped", "message": "Collections already cleared in this deployment", "client_logs": client_logs}), 200
+
+    try:
+        # Default to clearing 'orders' collection; allow others via request body
+        collections_to_clear = request.json.get('collections', ['orders']) if request.is_json else ['orders']
+        results = []
+
+        for collection in collections_to_clear:
+            result = clear_firestore_collection(collection)
+            results.append(result)
+            client_logs.extend(result.get("client_logs", []))
+
+        CLEAR_COLLECTIONS_RUN = True  # Set flag to prevent re-running
+        logger.info("[CLEAR_COLLECTIONS] Completed clearing collections: {}".format(collections_to_clear))
+        client_logs.append(f"Completed clearing collections: {collections_to_clear}")
+
+        # Aggregate status
+        status = "success" if all(r["status"] == "success" for r in results) else "error"
+        message = "All collections cleared successfully" if status == "success" else "Some collections failed to clear"
+        return jsonify({"status": status, "message": message, "results": results, "client_logs": client_logs}), 200
+
+    except Exception as e:
+        client_logs.append(f"Error processing clear_collections: {str(e)}")
+        logger.error(f"[CLEAR_COLLECTIONS] Error: {str(e)}")
+        return jsonify({"status": "error", "message": f"Failed to clear collections: {str(e)}", "client_logs": client_logs}), 500
 @app.route('/clear_stock_cache', methods=['POST'])
 @login_required
 def clear_stock_cache():

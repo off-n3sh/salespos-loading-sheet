@@ -21,7 +21,6 @@
             <div class="font-bold" style="font-size: 16px;">DREAMLAND DISTRIBUTORS</div>
             <div style="font-size: 12px;">P.O Box 123-00200 Nairobi</div>
             <div style="font-size: 12px;">Phone: 0725 530632</div>
-            <div style="font-size: 12px;">Paybill: 529914 | Acc: 20860</div>
             <div style="font-size: 12px;">PIN: P051472913X</div>
         </div>
 
@@ -31,7 +30,7 @@
                 <div><strong>Receipt #:</strong> {{ order.receipt_id }}</div>
                 <div><strong>Sale Type:</strong> 
                     {% if order.balance and order.balance > 0 %}
-                        Debt Sale
+                        Credit Sale
                     {% else %}
                         Cash Sale
                     {% endif %}
@@ -40,6 +39,10 @@
             <div class="flex justify-between mb-1">
                 <div><strong>Date:</strong> {{ order.date.strftime('%d/%m/%Y') if order.date else 'N/A' }}</div>
                 <div><strong>Time:</strong> {{ order.date.strftime('%H:%M:%S') if order.date else 'N/A' }}</div>
+            </div>
+            <div class="flex justify-between mb-1">
+                <div><strong>Paybill:</strong> 529914</div>
+                <div><strong>Account:</strong> 20860</div>
             </div>
             <div><strong>Customer:</strong> 
                 {% if order.order_type == 'app' %}
@@ -63,8 +66,9 @@
                 </thead>
                 <tbody>
                     {% if order.items_list is iterable and order.items_list is not string %}
-                        {% for item in order.items_list | sort(attribute='name') %}
-                            <tr style="border-bottom: 1px solid #333;">
+                        {% set items = order.items_list | sort(attribute='name') %}
+                        {% for item in items %}
+                            <tr {% if not loop.last %}style="border-bottom: 1px solid #333;"{% endif %}>
                                 <td style="text-align: left; padding: 5px 2px; color: #000;">{{ item.name | default('Unknown') }}</td>
                                 <td style="text-align: center; padding: 5px 2px; color: #000; font-weight: bold;">{{ item.quantity | default(0) }}</td>
                                 <td style="text-align: right; padding: 5px 2px; color: #000; font-weight: bold;">{{ item.price | default(0) }}</td>
@@ -86,7 +90,7 @@
             </div>
             <div class="flex justify-between mb-1">
                 <div><strong>VAT (16%):</strong></div>
-                <div style="font-weight: bold;">{{ ((order.subtotal * 0.16) / 1.16) | round(2) if order.subtotal else 0 }}</div>
+                <div style="font-weight: bold;">0.00</div>
             </div>
             <div class="flex justify-between mb-2" style="font-size: 14px;">
                 <div><strong>Subtotal:</strong></div>

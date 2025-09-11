@@ -1,5 +1,5 @@
-let stockDataCache = null;
-let currentStockVersion = null;
+let stockDataCache = localStorage.getItem('stockDataCache') ? JSON.parse(localStorage.getItem('stockDataCache')) : null;
+let currentStockVersion = localStorage.getItem('currentStockVersion') || null;
 
 export async function fetchStockData() {
     try {
@@ -9,7 +9,10 @@ export async function fetchStockData() {
             headers: { 'X-CSRFToken': document.querySelector('[name=csrf_token]').value }
         });
         if (!versionResponse.ok) throw new Error(`HTTP ${versionResponse.status}`);
-        const { version } = await versionResponse.json();
+        const { version, client_logs } = await versionResponse.json();
+        if (client_logs) {
+            client_logs.forEach(log => console.log(`[STOCK_DATA] ${log}`));
+        }
         
         if (stockDataCache && currentStockVersion === version) {
             console.log(`Using cached stock data (version: ${currentStockVersion})`);
@@ -23,8 +26,12 @@ export async function fetchStockData() {
             headers: { 'X-CSRFToken': document.querySelector('[name=csrf_token]').value }
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const { version: newVersion, data } = await response.json();
+        const { version: newVersion, data, client_logs } = await response.json();
         if (!Array.isArray(data)) throw new Error('Invalid response format: Expected an array');
+
+        if (client_logs) {
+            client_logs.forEach(log => console.log(`[STOCK_DATA] ${log}`));
+        }
 
         stockDataCache = data.map(item => ({
             id: item.id,
@@ -35,7 +42,10 @@ export async function fetchStockData() {
             uom: item.uom || 'Unit'
         }));
         currentStockVersion = newVersion;
-        console.log(`Fetched new stock data (version: ${newVersion})`);
+        // Persist to localStorage
+        localStorage.setItem('stockDataCache', JSON.stringify(stockDataCache));
+        localStorage.setItem('currentStockVersion', newVersion);
+        console.log(`Fetched stock data (version: ${newVersion}, ${stockDataCache.length} items)`);
         return stockDataCache;
     } catch (error) {
         console.error('Error fetching stock data from /stock_data:', error);
@@ -47,11 +57,14 @@ export function invalidateStockCache() {
     console.log('Invalidating stock cache');
     stockDataCache = null;
     currentStockVersion = null;
+    localStorage.removeItem('stockDataCache');
+    localStorage.removeItem('currentStockVersion');
 }
-// initialize stockdata on page load
+
+// Initialize stock data on page load
 document.addEventListener('DOMContentLoaded', async () => {
-	console.log('Init Stock Data on page load')
-	await fetchStockData();
+    console.log('Initializing stock data on page load...');
+    await fetchStockData();
 });
 
 export function updateSubtotal(container) {
