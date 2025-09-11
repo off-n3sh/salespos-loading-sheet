@@ -1,4 +1,4 @@
-import { showModalError} from './utils.js';
+import { showModalError, fetchStockData } from './utils.js';
 
 const editModal = document.getElementById('edit-order-modal');
 const closeEdit = document.getElementById('close-edit-modal');
@@ -6,76 +6,8 @@ const editContainer = document.getElementById('edit-items-container');
 const editAmountPaid = document.getElementById('edit-amount-paid');
 const editOrderChange = document.getElementById('edit-order-change');
 let eventListeners = [];
-let isEditOrderRunning = false;
-
-let stockDataCache = localStorage.getItem('stockDataCache') ? JSON.parse(localStorage.getItem('stockDataCache')) : null;
-let currentStockVersion = localStorage.getItem('currentStockVersion') || null;
-
-export async function fetchStockData() {
-    try {
-        console.log('Checking stock data version...');
-        const versionResponse = await fetch('/stock_data?version_only=true', {
-            credentials: 'include',
-            headers: { 'X-CSRFToken': document.querySelector('[name=csrf_token]').value }
-        });
-        if (!versionResponse.ok) throw new Error(`HTTP ${versionResponse.status}`);
-        const { version, client_logs } = await versionResponse.json();
-        if (client_logs) {
-            client_logs.forEach(log => console.log(`[STOCK_DATA] ${log}`));
-        }
-        
-        if (stockDataCache && currentStockVersion === version) {
-            console.log(`Using cached stock data (version: ${currentStockVersion})`);
-            return stockDataCache;
-        }
-        
-        console.log(`Version mismatch or no cache (cache: ${currentStockVersion}, server: ${version}). Fetching new data.`);
-        const response = await fetch('/stock_data', {
-            credentials: 'include',
-            cache: 'no-cache',
-            headers: { 'X-CSRFToken': document.querySelector('[name=csrf_token]').value }
-        });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const { version: newVersion, data, client_logs } = await response.json();
-        if (!Array.isArray(data)) throw new Error('Invalid response format: Expected an array');
-
-        if (client_logs) {
-            client_logs.forEach(log => console.log(`[STOCK_DATA] ${log}`));
-        }
-
-        stockDataCache = data.map(item => ({
-            id: item.id,
-            stock_name: item.stock_name,
-            selling_price: parseFloat(item.selling_price) || 0,
-            wholesale: parseFloat(item.wholesale) || 0,
-            stock_quantity: parseFloat(item.stock_quantity) || 0,
-            uom: item.uom || 'Unit'
-        }));
-        currentStockVersion = newVersion;
-        // Persist to localStorage
-        localStorage.setItem('stockDataCache', JSON.stringify(stockDataCache));
-        localStorage.setItem('currentStockVersion', newVersion);
-        console.log(`Fetched stock data (version: ${newVersion}, ${stockDataCache.length} items)`);
-        return stockDataCache;
-    } catch (error) {
-        console.error('Error fetching stock data from /stock_data:', error);
-        return stockDataCache || [];
-    }
-}
-
-export function invalidateStockCache() {
-    console.log('Invalidating stock cache');
-    stockDataCache = null;
-    currentStockVersion = null;
-    localStorage.removeItem('stockDataCache');
-    localStorage.removeItem('currentStockVersion');
-}
-
-// Initialize stock data on page load
-document.addEventListener('DOMContentLoaded', async () => {
-    console.log('Initializing stock data on page load...');
-    await fetchStockData();
-});
+const preloadedStockData = Object.freeze([]); // Read-only empty array
+let isEditOrderRunning = false; // Guardrail flag
 
 async function fetchOrderData(receiptId) {
     try {
@@ -118,7 +50,7 @@ async function editOrder(receiptId) {
         console.log('editOrder already running, skipping...');
         return;
     }
-    isEditOrderRunning = true;
+    isEditOrderRunning = true; // Set guardrail
     try {
         const orderData = await fetchOrderData(receiptId);
         if (!orderData) return;
@@ -132,9 +64,11 @@ async function editOrder(receiptId) {
         form.action = `/edit_order/${receiptId}`;
         resetModal(editContainer);
 
+        // Set subtotal to existing balance
         const existingBalance = parseFloat(balance) || 0;
         document.getElementById('edit-order-total').textContent = existingBalance.toFixed(2);
 
+        // Load stock data once
         console.log('Loading stock data...');
         let stockItems;
         try {
@@ -146,6 +80,7 @@ async function editOrder(receiptId) {
             return;
         }
 
+        // Parse items
         let itemsList = [];
         try {
             if (Array.isArray(items)) {
@@ -165,6 +100,7 @@ async function editOrder(receiptId) {
             return;
         }
 
+        // Populate existing items (read-only, no remove button)
         itemsList.forEach(item => {
             const div = document.createElement('div');
             div.className = 'grid grid-cols-6 gap-2 item-row';
@@ -197,10 +133,11 @@ async function editOrder(receiptId) {
         updateSubtotal(editContainer, existingBalance);
         editModal.dispatchEvent(new Event('modal:open'));
     } finally {
-        isEditOrderRunning = false;
+        isEditOrderRunning = false; // Reset guardrail
     }
 }
 
+// Add item
 const addItemBtn = editContainer?.querySelector('.add-item-btn');
 const addItemHandler = async () => {
     const div = document.createElement('div');
@@ -252,6 +189,7 @@ if (addItemBtn) {
     eventListeners.push({ element: addItemBtn, type: 'click', handler: addItemHandler });
 }
 
+// Manual item
 const addManualBtn = document.getElementById('add-edit-manual');
 const addManualHandler = () => {
     const div = document.createElement('div');
@@ -283,6 +221,7 @@ if (addManualBtn) {
     eventListeners.push({ element: addManualBtn, type: 'click', handler: addManualHandler });
 }
 
+// Update change
 const amountPaidHandler = () => {
     const subtotal = parseFloat(document.getElementById('edit-order-total').textContent) || 0;
     const amountPaid = parseFloat(editAmountPaid.value) || 0;
@@ -295,6 +234,7 @@ if (editAmountPaid) {
     eventListeners.push({ element: editAmountPaid, type: 'input', handler: amountPaidHandler });
 }
 
+// Form submission
 const form = document.getElementById('edit-order-form');
 if (form) {
     form.onsubmit = async function(e) {
@@ -315,7 +255,7 @@ if (form) {
                 const values = select.value.split('|');
                 const qty = parseFloat(qtyInput.value) || 0;
                 const stock = parseFloat(stockDisplay.value) || 0;
-                if (qty > stock && !row.dataset.existing) {
+                if (qty > stock) {
                     showModalError('edit-order', `Cannot order more than ${stock} units of ${values[1]}.`);
                     submitBtn.classList.remove('processing');
                     submitBtn.disabled = false;
@@ -328,11 +268,7 @@ if (form) {
                     submitBtn.disabled = false;
                     return;
                 }
-                items.push({
-                    itemStr: `product|${values[1]}|quantity|${qty}|price|${price.toFixed(2)}`,
-                    qty: qty,
-                    price: price.toFixed(2)
-                });
+                items.push(`product|${values[1]}|quantity|${qty}|price|${price.toFixed(2)}`);
             } else if (row.querySelector('.product-input')?.value && qtyInput.value) {
                 const price = parseFloat(priceInput.value) || 0;
                 if (price <= 0) {
@@ -341,11 +277,7 @@ if (form) {
                     submitBtn.disabled = false;
                     return;
                 }
-                items.push({
-                    itemStr: `product|${row.querySelector('.product-input').value}|quantity|${qtyInput.value}|price|${price.toFixed(2)}`,
-                    qty: qtyInput.value,
-                    price: price.toFixed(2)
-                });
+                items.push(`product|${row.querySelector('.product-input').value}|quantity|${qtyInput.value}|price|${price.toFixed(2)}`);
             }
         });
         if (!items.length) {
@@ -357,11 +289,7 @@ if (form) {
         formData.delete('items[]');
         formData.delete('quantities[]');
         formData.delete('unit_prices[]');
-        items.forEach(({ itemStr, qty, price }) => {
-            formData.append('items[]', itemStr);
-            formData.append('quantities[]', qty);
-            formData.append('unit_prices[]', price);
-        });
+        items.forEach(item => formData.append('items[]', item));
 
         console.log('Form data entries:');
         for (let [key, value] of formData.entries()) {
@@ -384,9 +312,6 @@ if (form) {
                 submitBtn.classList.remove('processing');
                 submitBtn.disabled = false;
                 return;
-            }
-            if (result.client_logs) {
-                result.client_logs.forEach(log => console.log(`[EDIT_ORDER] ${log}`));
             }
             if (response.ok && result.status === 'success') {
                 console.log('Form submitted successfully, reloading page');
@@ -437,13 +362,14 @@ if (closeEdit) {
         editModal.classList.add('hidden');
         eventListeners.forEach(({ element, type, handler }) => element?.removeEventListener(type, handler));
         eventListeners = [];
-        isEditOrderRunning = false;
+        isEditOrderRunning = false; // Reset guardrail on close
     });
 }
 
+// Initialize stock data on page load
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('Initializing stock data on page load...');
-    await fetchStockData();
+    await fetchStockData(); // Preload stock data
 });
 
-export { editOrder, resetModal, attachPriceListener};
+export { editOrder, resetModal, attachPriceListener };
