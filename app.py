@@ -1897,7 +1897,18 @@ def mark_paid(receipt_id):
         return jsonify({"success": True, "message": "Payment processed successfully", "new_balance": new_balance}), 200
     except Exception as e:
         return jsonify({"error": f"Error updating order: {str(e)}"}), 500
-        
+
+@app.route('/receipts')
+@no_cache
+@login_required
+def receipts():
+    try:
+        orders = [doc.to_dict() for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).get()]
+        for order in orders:
+            order['date'] = process_date(order.get('date'))
+        return render_template('receipts.html', orders=orders)
+    except Exception as e:
+        return f"Error loading receipts: {str(e)}", 500       
 @app.route('/receipt/<order_id>')
 @no_cache
 @login_required
