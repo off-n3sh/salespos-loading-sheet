@@ -1,47 +1,34 @@
-import { showModalError, fetchStockData } from './utils.js';
-
-const editModal = document.getElementById('edit-order-modal');
-const closeEdit = document.getElementById('close-edit-modal');
-const editContainer = document.getElementById('edit-items-container');
-const editAmountPaid = document.getElementById('edit-amount-paid');
-const editOrderChange = document.getElementById('edit-order-change');
-let eventListeners = [];
-const preloadedStockData = Object.freeze([]); // Read-only empty array
-let isEditOrderRunning = false; // Guardrail flag
-
 let stockDataCache = null;
 let currentStockVersion = null;
 
-export async function fetchStockData() {
+async function fetchStockData(forceRefresh = false) {
+    if (forceRefresh) {
+        console.log('Force refresh requested - bypassing cache');
+        stockDataCache = null;
+        currentStockVersion = null;
+    }
+    
+    if (stockDataCache && currentStockVersion !== null && !forceRefresh) {
+        try {
+            const versionResponse = await fetch('/stock_data?version_only=true', { credentials: 'include' });
+            if (!versionResponse.ok) throw new Error(`HTTP error: ${versionResponse.status}`);
+            const { version } = await versionResponse.json();
+            if (version === currentStockVersion) {
+                console.log('Using cached stock data (version: ' + currentStockVersion + ')');
+                return stockDataCache;
+            }
+            console.log('Version mismatch (cache: ' + currentStockVersion + ', server: ' + version + '). Fetching new data.');
+        } catch (error) {
+            console.error('Error checking stock version:', error);
+        }
+    }
+    
     try {
-        console.log('Checking stock data version...');
-        const versionResponse = await fetch('/stock_data?version_only=true', {
-            credentials: 'include',
-            headers: { 'X-CSRFToken': document.querySelector('[name=csrf_token]').value }
-        });
-        if (!versionResponse.ok) throw new Error(`HTTP ${versionResponse.status}`);
-        const { version } = await versionResponse.json();
-        
-        if (stockDataCache && currentStockVersion === version) {
-            console.log(`Using cached stock data (version: ${currentStockVersion})`);
-            return stockDataCache;
-        }
-        
-        console.log(`Version mismatch or no cache (cache: ${currentStockVersion}, server: ${version}). Fetching new data.`);
-        const response = await fetch('/stock_data', {
-            credentials: 'include',
-            cache: 'no-cache',
-            headers: { 'X-CSRFToken': document.querySelector('[name=csrf_token]').value }
-        });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const { version: newVersion, data, client_logs } = await response.json();
+        const response = await fetch('/stock_data', { credentials: 'include', cache: 'no-cache' });
+        if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+        const { version, data } = await response.json();
         if (!Array.isArray(data)) throw new Error('Invalid response format: Expected an array');
-
-        // Log server-side client_logs if present
-        if (client_logs) {
-            client_logs.forEach(log => console.log(`[STOCK_DATA] ${log}`));
-        }
-
+        
         stockDataCache = data.map(item => ({
             id: item.id,
             stock_name: item.stock_name,
@@ -50,387 +37,249 @@ export async function fetchStockData() {
             stock_quantity: parseFloat(item.stock_quantity) || 0,
             uom: item.uom || 'Unit'
         }));
-        currentStockVersion = newVersion;
-        console.log(`Fetched new stock data (version: ${newVersion}, ${stockDataCache.length} items)`);
+        currentStockVersion = version;
+        console.log('Fetched new stock data (version: ' + version + ')');
         return stockDataCache;
     } catch (error) {
         console.error('Error fetching stock data from /stock_data:', error);
-        return stockDataCache || [];
+        return [];
     }
 }
 
-export function invalidateStockCache() {
+function invalidateStockCache() {
     console.log('Invalidating stock cache');
     stockDataCache = null;
     currentStockVersion = null;
 }
 
-// Initialize stock data on page load
-document.addEventListener('DOMContentLoaded', async () => {
-    console.log('Initializing stock data on page load...');
-    await fetchStockData();
-});
-async function fetchOrderData(receiptId) {
-    try {
-        const response = await fetch(`/order/${receiptId}`, { headers: { 'Accept': 'application/json' } });
-        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        return await response.json();
-    } catch (error) {
-        console.error('Fetch order error:', error);
-        showModalError('edit-order', `Failed to fetch order: ${error.message}`);
-        return null;
+async function refreshStockData() {
+    return await fetchStockData(true);
+}
+
+function updateSubtotal(container) {
+    let subtotal = 0;
+    const rows = container.querySelectorAll('.item-row');
+    rows.forEach(row => {
+        const totalDisplay = row.querySelector('.total-display');
+        if (totalDisplay && totalDisplay.value) subtotal += parseFloat(totalDisplay.value) || 0;
+    });
+    const totalSpan = container.parentElement.querySelector('[id$="-order-total"]');
+    if (totalSpan) totalSpan.textContent = subtotal.toFixed(2);
+    updateChange(container);
+}
+
+function updateChange(container) {
+    const modalId = container.id.split('-')[0];
+    const amountPaidInput = document.getElementById(`${modalId}-amount-paid`);
+    const changeSpan = document.getElementById(`${modalId}-order-change`);
+    const totalSpan = container.parentElement.querySelector('[id$="-order-total"]');
+    const subtotal = parseFloat(totalSpan.textContent) || 0;
+    const amountPaid = parseFloat(amountPaidInput.value) || 0;
+    const change = amountPaid - subtotal;
+    changeSpan.textContent = change >= 0 ? change.toFixed(2) : '0.00';
+    changeSpan.parentElement.classList.toggle('text-green-600', change >= 0);
+    changeSpan.parentElement.classList.toggle('text-red-600', change < 0);
+}
+
+function showModalError(modalId, message) {
+    const errorDiv = document.getElementById(`${modalId}-error`);
+    if (errorDiv) {
+        errorDiv.textContent = message;
+        errorDiv.classList.remove('hidden');
+        setTimeout(() => errorDiv.classList.add('hidden'), 5000);
+    } else {
+        console.warn(`Error div for ${modalId} not found. Message: ${message}`);
+        alert(message);
     }
 }
 
-function resetModal(container) {
-    const header = container.querySelector('.item-row-header');
-    const initialAddBtn = container.querySelector('.add-item-btn');
-    container.innerHTML = '';
-    container.appendChild(header);
-    container.appendChild(initialAddBtn);
-    updateSubtotal(container);
-    editAmountPaid.value = '';
-    editOrderChange.textContent = '0.00';
+async function populateClients(inputElement, debtElement) {
+    try {
+        const response = await fetch('/clients_data');
+        const clients = await response.json();
+        const choices = new Choices(inputElement, {
+            searchEnabled: true,
+            allowHTML: false,
+            placeholderValue: 'Search or type a client name',
+            noResultsText: 'No clients found - type to add a new client',
+            addItems: true,
+            removeItemButton: true,
+            maxItemCount: 1,
+            duplicateItemsAllowed: false,
+            choices: clients.map(client => ({
+                value: client.shop_name,
+                label: `${client.shop_name} (Debt: KSh ${client.debt.toFixed(2)})`
+            })),
+            searchFloor: 1,
+            searchResultLimit: 10,
+            shouldSort: false,
+        });
+
+        inputElement.closest('.modal').addEventListener('modal:open', () => {
+            choices.clearInput();
+            choices.removeActiveItems();
+            debtElement.textContent = '';
+            debtElement.classList.add('hidden');
+        });
+
+        inputElement.addEventListener('change', () => {
+            const value = choices.getValue(true);
+            const selectedClient = clients.find(c => c.shop_name === value);
+            if (selectedClient) {
+                debtElement.textContent = `Debt: KSh ${selectedClient.debt.toFixed(2)}`;
+                debtElement.classList.remove('hidden');
+            } else if (value) {
+                debtElement.textContent = 'Debt: KSh 0.00 (New Client)';
+                debtElement.classList.remove('hidden');
+                if (!choices.getChoiceByValue(value)) {
+                    choices.setChoices([{ value: value, label: value }], 'value', 'label', false);
+                    choices.setChoiceByValue(value);
+                }
+            } else {
+                debtElement.textContent = '';
+                debtElement.classList.add('hidden');
+            }
+        });
+
+        inputElement.addEventListener('search', (event) => {
+            const searchTerm = event.detail.value.toLowerCase();
+            const filteredClients = clients.filter(client => 
+                client.shop_name.toLowerCase().includes(searchTerm)
+            );
+            choices.setChoices(
+                filteredClients.map(client => ({
+                    value: client.shop_name,
+                    label: `${client.shop_name} (Debt: KSh ${client.debt.toFixed(2)})`
+                })),
+                'value',
+                'label',
+                true
+            );
+            if (searchTerm && !filteredClients.some(c => c.shop_name.toLowerCase() === searchTerm)) {
+                choices.setChoices([{ value: searchTerm, label: `${searchTerm} (New)` }], 'value', 'label', false);
+            }
+        });
+    } catch (error) {
+        console.error('Error loading clients:', error);
+        showModalError(inputElement.closest('form').id.replace('-form', ''), 'Failed to load clients.');
+    }
 }
 
-function updateSubtotal(container, existingBalance = 0) {
-    const rows = container.querySelectorAll('.item-row:not([data-existing="true"])');
-    let additionalSubtotal = 0;
-    rows.forEach(row => {
-        const qty = parseInt(row.querySelector('.qty-input')?.value) || 0;
-        const price = parseFloat(row.querySelector('.price-display')?.value) || 0;
-        additionalSubtotal += qty * price;
-    });
-    const totalSubtotal = existingBalance + additionalSubtotal;
-    const totalSpan = document.getElementById('edit-order-total');
-    if (totalSpan) totalSpan.textContent = totalSubtotal.toFixed(2);
-}
-
-async function editOrder(receiptId) {
-    if (isEditOrderRunning) {
-        console.log('editOrder already running, skipping...');
+function addManualItem(container, modal) {
+    if (!container || !modal || modal.classList.contains('hidden')) {
+        console.warn('Skipping addManualItem: container or modal not found or modal is hidden');
         return;
     }
-    isEditOrderRunning = true; // Set guardrail
-    try {
-        const orderData = await fetchOrderData(receiptId);
-        if (!orderData) return;
+    console.log('Adding manual item to container:', container.id);
 
-        const { items, balance, order_type } = orderData;
-        document.querySelectorAll('.modal').forEach(modal => modal.classList.add('hidden'));
-        editModal.classList.remove('hidden');
-        document.getElementById('edit-order-id').textContent = receiptId;
-        document.getElementById('edit-order-type').value = order_type || 'wholesale';
-        const form = document.getElementById('edit-order-form');
-        form.action = `/edit_order/${receiptId}`;
-        resetModal(editContainer);
-
-        // Set subtotal to existing balance
-        const existingBalance = parseFloat(balance) || 0;
-        document.getElementById('edit-order-total').textContent = existingBalance.toFixed(2);
-
-        // Load stock data once
-        console.log('Loading stock data...');
-        let stockItems;
-        try {
-            stockItems = await fetchStockData();
-            console.log('Stock data loaded:', stockItems.length, 'items');
-        } catch (error) {
-            console.error('Failed to fetch stock data:', error);
-            showModalError('edit-order', `Failed to load stock data: ${error.message}`);
-            return;
-        }
-
-        // Parse items
-        let itemsList = [];
-        try {
-            if (Array.isArray(items)) {
-                for (let i = 0; i < items.length; i += 6) {
-                    if (items[i] === 'product' && items[i+2] === 'quantity' && items[i+4] === 'price') {
-                        itemsList.push({
-                            name: items[i+1],
-                            quantity: parseFloat(items[i+3]) || 0,
-                            price: parseFloat(items[i+5]) || 0
-                        });
-                    }
-                }
-            }
-        } catch (e) {
-            console.error('Error parsing items:', e);
-            showModalError('edit-order', 'Invalid order items data.');
-            return;
-        }
-
-        // Populate existing items (read-only, no remove button)
-        itemsList.forEach(item => {
-            const div = document.createElement('div');
-            div.className = 'grid grid-cols-6 gap-2 item-row';
-            div.dataset.existing = 'true';
-            const price = parseFloat(item.price) || 0;
-            const quantity = parseInt(item.quantity) || 0;
-            const stock = stockItems.find(stock => stock.stock_name === item.name)?.stock_quantity || 0;
-            div.innerHTML = `
-                <select name="items[]" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-select w-full" disabled>
-                    <option value="">Select Item</option>
-                </select>
-                <input name="quantities[]" type="number" value="${quantity}" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="1" readonly>
-                <input name="unit_prices[]" type="number" value="${price.toFixed(2)}" class="price-display p-2 border rounded-lg text-center w-full" step="0.01" readonly>
-                <input type="number" value="${stock}" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-                <input type="number" value="${(price * quantity).toFixed(2)}" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-                <div class="action-placeholder"></div>
-            `;
-            const addBtn = editContainer.querySelector('.add-item-btn');
-            editContainer.insertBefore(div, addBtn);
-            const select = div.querySelector('.product-select');
-            const choices = new Choices(select, { searchEnabled: true, searchChoices: true, itemSelectText: '' });
-            const choicesData = stockItems.map(stock => ({
-                value: `product|${stock.stock_name}|quantity|0|price|${stock.wholesale}|stock|${stock.stock_quantity}|uom|${stock.uom}`,
-                label: `${stock.stock_name} (${stock.uom})`,
-                selected: stock.stock_name === item.name
-            }));
-            choices.setChoices(choicesData, 'value', 'label', true);
-        });
-
-        updateSubtotal(editContainer, existingBalance);
-        editModal.dispatchEvent(new Event('modal:open'));
-    } finally {
-        isEditOrderRunning = false; // Reset guardrail
+    const div = document.createElement('div');
+    div.className = 'grid grid-cols-6 gap-2 item-row';
+    div.dataset.manual = 'true';
+    div.innerHTML = `
+        <input name="items[]" type="text" placeholder="Manual Item Name" class="col-span-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-input w-full" required>
+        <input name="quantities[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="0.01">
+        <input name="unit_prices[]" type="number" placeholder="Price" class="price-display p-2 border rounded-lg text-center w-full" step="0.01" min="0">
+        <input type="number" value="" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly disabled>
+        <input type="number" value="0" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
+        <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
+    `;
+    const addBtn = container.querySelector('.add-item-btn');
+    if (!addBtn) {
+        console.error('Add item button not found in container');
+        return;
     }
+    container.insertBefore(div, addBtn);
+    console.log('Manual item row added');
+
+    const removeHandler = () => {
+        console.log('Removing manual item row');
+        div.remove();
+        updateSubtotal(container);
+    };
+    div.querySelector('.remove-item').addEventListener('click', removeHandler);
+
+    attachPriceListener(div, modal);
+    updateSubtotal(container);
 }
 
-// Add item
-const addItemBtn = editContainer?.querySelector('.add-item-btn');
-const addItemHandler = async () => {
-    const div = document.createElement('div');
-    div.className = 'grid grid-cols-6 gap-2 item-row';
-    div.innerHTML = `
-        <select name="items[]" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-select w-full">
-            <option value="">Select Item</option>
-        </select>
-        <input name="quantities[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="1">
-        <input name="unit_prices[]" type="number" placeholder="Price" class="price-display p-2 border rounded-lg text-center w-full" step="0.01" ${window.userRole === 'manager' ? '' : 'readonly'}>
-        <input type="number" value="0" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-        <input type="number" value="0" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-        <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
-    `;
-    const addBtn = editContainer.querySelector('.add-item-btn');
-    editContainer.insertBefore(div, addBtn);
-    const select = div.querySelector('.product-select');
-    const choices = new Choices(select, { searchEnabled: true, searchChoices: true, itemSelectText: '' });
-    const stockItems = await fetchStockData();
-    const choicesData = stockItems.map(stock => ({
-        value: `product|${stock.stock_name}|quantity|0|price|${stock.wholesale}|stock|${stock.stock_quantity}|uom|${stock.uom}`,
-        label: `${stock.stock_name} (${stock.uom})`
-    }));
-    choices.setChoices(choicesData, 'value', 'label', true);
-    attachPriceListener(div, parseFloat(document.getElementById('edit-order-total').textContent) || 0);
-    div.querySelector('.remove-item').addEventListener('click', () => {
-        div.remove();
-        updateSubtotal(editContainer, parseFloat(document.getElementById('edit-order-total').textContent) || 0);
-    });
-    eventListeners.push({ element: div.querySelector('.remove-item'), type: 'click', handler: () => {
-        div.remove();
-        updateSubtotal(editContainer, parseFloat(document.getElementById('edit-order-total').textContent) || 0);
-    } });
-    div.querySelector('.product-select').addEventListener('change', (e) => {
-        const values = e.target.value.split('|');
-        const stock = values[7] ? parseFloat(values[7]) : 0;
-        const price = values[5] ? parseFloat(values[5]) : 0;
-        div.querySelector('.stock-display').value = stock.toFixed(2);
-        div.querySelector('.price-display').value = price.toFixed(2);
-        div.querySelector('.qty-input').max = stock;
-        if (stock === 0) showModalError('edit-order', `No stock available for ${values[1]}.`);
-        updateSubtotal(editContainer, parseFloat(document.getElementById('edit-order-total').textContent) || 0);
-    });
-    updateSubtotal(editContainer, parseFloat(document.getElementById('edit-order-total').textContent) || 0);
-};
-if (addItemBtn) {
-    addItemBtn.removeEventListener('click', addItemHandler);
-    addItemBtn.addEventListener('click', addItemHandler);
-    eventListeners.push({ element: addItemBtn, type: 'click', handler: addItemHandler });
-}
+function attachPriceListener(row, modal) {
+    if (!row || !modal || modal.classList.contains('hidden')) {
+        console.warn('Skipping attachPriceListener: row or modal not found or modal is hidden');
+        return;
+    }
+    const select = row.querySelector('.product-select');
+    const productInput = row.querySelector('.product-input');
+    const priceDisplay = row.querySelector('.price-display');
+    const stockDisplay = row.querySelector('.stock-display');
+    const totalDisplay = row.querySelector('.total-display');
+    const qtyInput = row.querySelector('.qty-input');
+    let basePrice = 0;
+    let maxStock = 0;
 
-// Manual item
-const addManualBtn = document.getElementById('add-edit-manual');
-const addManualHandler = () => {
-    const div = document.createElement('div');
-    div.className = 'grid grid-cols-6 gap-2 item-row';
-    div.innerHTML = `
-        <input name="items[]" type="text" placeholder="Manual Item" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-input w-full">
-        <input name="quantities[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="1">
-        <input name="unit_prices[]" type="number" placeholder="Price" class="price-display p-2 border rounded-lg text-center w-full" step="0.01" ${window.userRole === 'manager' ? '' : 'readonly'}>
-        <input type="number" value="0" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-        <input type="number" value="0" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-        <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
-    `;
-    const addBtn = editContainer.querySelector('.add-item-btn');
-    editContainer.insertBefore(div, addBtn);
-    attachPriceListener(div, parseFloat(document.getElementById('edit-order-total').textContent) || 0);
-    div.querySelector('.remove-item').addEventListener('click', () => {
-        div.remove();
-        updateSubtotal(editContainer, parseFloat(document.getElementById('edit-order-total').textContent) || 0);
-    });
-    eventListeners.push({ element: div.querySelector('.remove-item'), type: 'click', handler: () => {
-        div.remove();
-        updateSubtotal(editContainer, parseFloat(document.getElementById('edit-order-total').textContent) || 0);
-    } });
-    updateSubtotal(editContainer, parseFloat(document.getElementById('edit-order-total').textContent) || 0);
-};
-if (addManualBtn) {
-    addManualBtn.removeEventListener('click', addManualHandler);
-    addManualBtn.addEventListener('click', addManualHandler);
-    eventListeners.push({ element: addManualBtn, type: 'click', handler: addManualHandler });
-}
-
-// Update change
-const amountPaidHandler = () => {
-    const subtotal = parseFloat(document.getElementById('edit-order-total').textContent) || 0;
-    const amountPaid = parseFloat(editAmountPaid.value) || 0;
-    const change = amountPaid > subtotal ? amountPaid - subtotal : 0;
-    editOrderChange.textContent = change.toFixed(2);
-};
-if (editAmountPaid) {
-    editAmountPaid.removeEventListener('input', amountPaidHandler);
-    editAmountPaid.addEventListener('input', amountPaidHandler);
-    eventListeners.push({ element: editAmountPaid, type: 'input', handler: amountPaidHandler });
-}
-
-// Form submission
-const form = document.getElementById('edit-order-form');
-if (form) {
-    form.onsubmit = async function(e) {
-        e.preventDefault();
-        const submitBtn = form.querySelector('.submit-btn');
-        submitBtn.classList.add('processing');
-        submitBtn.disabled = true;
-
-        const formData = new FormData(this);
-        const itemRows = editContainer.querySelectorAll('.item-row');
-        const items = [];
-        itemRows.forEach(row => {
-            const select = row.querySelector('.product-select');
-            const qtyInput = row.querySelector('.qty-input');
-            const priceInput = row.querySelector('.price-display');
-            const stockDisplay = row.querySelector('.stock-display');
-            if (select && select.value && qtyInput.value) {
-                const values = select.value.split('|');
-                const qty = parseFloat(qtyInput.value) || 0;
-                const stock = parseFloat(stockDisplay.value) || 0;
-                if (qty > stock) {
-                    showModalError('edit-order', `Cannot order more than ${stock} units of ${values[1]}.`);
-                    submitBtn.classList.remove('processing');
-                    submitBtn.disabled = false;
-                    return;
-                }
-                const price = parseFloat(priceInput.value) || parseFloat(values[5]) || 0;
-                if (price <= 0) {
-                    showModalError('edit-order', `Invalid price for ${values[1]}.`);
-                    submitBtn.classList.remove('processing');
-                    submitBtn.disabled = false;
-                    return;
-                }
-                items.push(`product|${values[1]}|quantity|${qty}|price|${price.toFixed(2)}`);
-            } else if (row.querySelector('.product-input')?.value && qtyInput.value) {
-                const price = parseFloat(priceInput.value) || 0;
-                if (price <= 0) {
-                    showModalError('edit-order', `Invalid price for ${row.querySelector('.product-input').value}.`);
-                    submitBtn.classList.remove('processing');
-                    submitBtn.disabled = false;
-                    return;
-                }
-                items.push(`product|${row.querySelector('.product-input').value}|quantity|${qtyInput.value}|price|${price.toFixed(2)}`);
-            }
-        });
-        if (!items.length) {
-            showModalError('edit-order', 'No valid items in order.');
-            submitBtn.classList.remove('processing');
-            submitBtn.disabled = false;
+    const selectHandler = () => {
+        if (!modal || modal.classList.contains('hidden')) {
+            console.warn('Skipping selectHandler: modal is hidden');
             return;
         }
-        formData.delete('items[]');
-        formData.delete('quantities[]');
-        formData.delete('unit_prices[]');
-        items.forEach(item => formData.append('items[]', item));
-
-        console.log('Form data entries:');
-        for (let [key, value] of formData.entries()) {
-            console.log(`${key}: ${value}`);
-        }
-
-        try {
-            const response = await fetch(this.action, {
-                method: 'POST',
-                body: formData,
-                headers: { 'X-CSRFToken': form.querySelector('[name=csrf_token]').value }
-            });
-            const text = await response.text();
-            let result;
-            try {
-                result = JSON.parse(text);
-            } catch (error) {
-                console.error('JSON parse error:', text);
-                showModalError('edit-order', 'Invalid server response.');
-                submitBtn.classList.remove('processing');
-                submitBtn.disabled = false;
-                return;
+        const selectedOption = select.options[select.selectedIndex];
+        if (selectedOption.value) {
+            const values = selectedOption.value.split('|');
+            basePrice = parseFloat(values[5]) || 0;
+            maxStock = parseFloat(values[7]) || 0;
+            priceDisplay.value = basePrice.toFixed(2);
+            stockDisplay.value = maxStock.toFixed(2);
+            qtyInput.max = maxStock;
+            qtyInput.disabled = false;
+            const qty = parseFloat(qtyInput.value) || 0;
+            if (maxStock !== undefined && qty > maxStock) {
+                qtyInput.value = maxStock;
+                showModalError(row.closest('.modal').id.split('-')[0], `Cannot order more than ${maxStock} units of ${values[1]}.`);
             }
-            if (response.ok && result.status === 'success') {
-                console.log('Form submitted successfully, reloading page');
-                editModal.classList.add('hidden');
-                showSuccessMessage(result.message);
-                setTimeout(() => window.location.reload(), 2000);
-            } else {
-                console.error('Form submission failed:', result.error || text);
-                showModalError('edit-order', `Error updating order: ${result.error || 'Unknown error'}`);
-            }
-        } catch (error) {
-            console.error('Form submission error:', error);
-            showModalError('edit-order', `An error occurred: ${error.message}`);
-        } finally {
-            submitBtn.classList.remove('processing');
-            submitBtn.disabled = false;
+            totalDisplay.value = (basePrice * qty).toFixed(2);
+            updateSubtotal(row.closest('.space-y-4'));
+        } else {
+            basePrice = 0;
+            maxStock = 0;
+            priceDisplay.value = '';
+            stockDisplay.value = '';
+            totalDisplay.value = '';
+            qtyInput.max = '';
+            qtyInput.disabled = true;
+            qtyInput.value = '';
+            updateSubtotal(row.closest('.space-y-4'));
         }
     };
-}
+    if (select) {
+        select.addEventListener('change', selectHandler);
+    }
 
-function showSuccessMessage(message) {
-    const div = document.createElement('div');
-    div.className = 'fixed top-4 right-4 bg-green-500 text-white p-4 rounded-lg shadow-lg z-50';
-    div.textContent = message;
-    document.body.appendChild(div);
-    setTimeout(() => div.remove(), 3000);
-}
-
-function attachPriceListener(row, existingBalance) {
-    const qtyInput = row.querySelector('.qty-input');
-    const priceInput = row.querySelector('.price-display');
-    const updateTotal = () => {
-        const qty = parseInt(qtyInput.value) || 0;
-        const price = parseFloat(priceInput.value) || 0;
-        const total = qty * price;
-        row.querySelector('.total-display').value = total.toFixed(2);
-        updateSubtotal(row.closest('#edit-items-container'), existingBalance);
+    const qtyHandler = () => {
+        if (!modal || modal.classList.contains('hidden')) {
+            console.warn('Skipping qtyHandler: modal is hidden');
+            return;
+        }
+        const qty = parseFloat(qtyInput.value) || 0;
+        if (maxStock !== undefined && qty > maxStock && !row.dataset.manual) {
+            qtyInput.value = maxStock;
+            showModalError(row.closest('.modal').id.split('-')[0], `Cannot order more than ${maxStock} units.`);
+        }
+        const currentPrice = parseFloat(priceDisplay.value) || basePrice;
+        totalDisplay.value = (currentPrice * qty).toFixed(2);
+        updateSubtotal(row.closest('.space-y-4'));
     };
-    if (!qtyInput.readonly) qtyInput.addEventListener('input', updateTotal);
-    if (!priceInput.readonly) priceInput.addEventListener('input', updateTotal);
-    eventListeners.push({ element: qtyInput, type: 'input', handler: updateTotal });
-    eventListeners.push({ element: priceInput, type: 'input', handler: updateTotal });
+    qtyInput.addEventListener('input', qtyHandler);
+
+    const priceHandler = () => {
+        if (!modal || modal.classList.contains('hidden')) {
+            console.warn('Skipping priceHandler: modal is hidden');
+            return;
+        }
+        const qty = parseFloat(qtyInput.value) || 0;
+        const newPrice = parseFloat(priceDisplay.value) || 0;
+        totalDisplay.value = (newPrice * qty).toFixed(2);
+        updateSubtotal(row.closest('.space-y-4'));
+    };
+    priceDisplay.addEventListener('input', priceHandler);
 }
 
-if (closeEdit) {
-    closeEdit.addEventListener('click', () => {
-        resetModal(editContainer);
-        editModal.classList.add('hidden');
-        eventListeners.forEach(({ element, type, handler }) => element?.removeEventListener(type, handler));
-        eventListeners = [];
-        isEditOrderRunning = false; // Reset guardrail on close
-    });
-}
-
-// Initialize stock data on page load
-document.addEventListener('DOMContentLoaded', async () => {
-    console.log('Initializing stock data on page load...');
-    await fetchStockData(); // Preload stock data
-});
-
-export { editOrder, resetModal, attachPriceListener };
+export { fetchStockData, updateSubtotal, updateChange, showModalError, populateClients, addManualItem, attachPriceListener };
