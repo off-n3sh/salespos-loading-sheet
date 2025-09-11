@@ -282,11 +282,6 @@
 <!-- External CSS and JavaScript -->
 <script>
     window.userRole = '{{ session["user"]["role"] }}';
-    {% if client_logs %}
-        {% for log in client_logs %}
-            console.log('[STOCK_ROUTE] {{ log | safe }}');
-        {% endfor %}
-    {% endif %}
 </script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
 <link rel="stylesheet" href="/static/css/styles.css" />
