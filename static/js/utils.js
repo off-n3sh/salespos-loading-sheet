@@ -1,38 +1,50 @@
-let stockDataCache = localStorage.getItem('stockDataCache') ? JSON.parse(localStorage.getItem('stockDataCache')) : null;
-let currentStockVersion = localStorage.getItem('currentStockVersion') || null;
+// static/js/utils.js
 
-export async function fetchStockData() {
+let stockDataCache = null;
+let currentStockVersion = null;
+
+async function fetchStockData(forceRefresh = false) {
+    // If forceRefresh is true, bypass cache entirely
+    if (forceRefresh) {
+        console.log('Force refresh requested - bypassing cache');
+        stockDataCache = null;
+        currentStockVersion = null;
+    }
+    
+    // Check server version if cache exists
+    if (stockDataCache && currentStockVersion !== null && !forceRefresh) {
+        try {
+            const versionResponse = await fetch('/stock_data?version_only=true', {
+                credentials: 'include'
+            });
+            if (!versionResponse.ok) {
+                throw new Error(`HTTP error: ${versionResponse.status}`);
+            }
+            const { version } = await versionResponse.json();
+            if (version === currentStockVersion) {
+                console.log('Using cached stock data (version: ' + currentStockVersion + ')');
+                return stockDataCache;
+            }
+            console.log('Version mismatch (cache: ' + currentStockVersion + ', server: ' + version + '). Fetching new data.');
+        } catch (error) {
+            console.error('Error checking stock version:', error);
+            // Proceed to fetch new data on version check failure
+        }
+    }
+    
     try {
-        console.log('Checking stock data version...');
-        const versionResponse = await fetch('/stock_data?version_only=true', {
-            credentials: 'include',
-            headers: { 'X-CSRFToken': document.querySelector('[name=csrf_token]').value }
-        });
-        if (!versionResponse.ok) throw new Error(`HTTP ${versionResponse.status}`);
-        const { version, client_logs } = await versionResponse.json();
-        if (client_logs) {
-            client_logs.forEach(log => console.log(`[STOCK_DATA] ${log}`));
-        }
-        
-        if (stockDataCache && currentStockVersion === version) {
-            console.log(`Using cached stock data (version: ${currentStockVersion})`);
-            return stockDataCache;
-        }
-        
-        console.log(`Version mismatch or no cache (cache: ${currentStockVersion}, server: ${version}). Fetching new data.`);
         const response = await fetch('/stock_data', {
             credentials: 'include',
-            cache: 'no-cache',
-            headers: { 'X-CSRFToken': document.querySelector('[name=csrf_token]').value }
+            cache: 'no-cache'  // Ensure fresh fetch from server
         });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const { version: newVersion, data, client_logs } = await response.json();
-        if (!Array.isArray(data)) throw new Error('Invalid response format: Expected an array');
-
-        if (client_logs) {
-            client_logs.forEach(log => console.log(`[STOCK_DATA] ${log}`));
+        if (!response.ok) {
+            throw new Error(`HTTP error: ${response.status}`);
         }
-
+        const { version, data } = await response.json();
+        if (!Array.isArray(data)) {
+            throw new Error('Invalid response format: Expected an array');
+        }
+        
         stockDataCache = data.map(item => ({
             id: item.id,
             stock_name: item.stock_name,
@@ -41,33 +53,39 @@ export async function fetchStockData() {
             stock_quantity: parseFloat(item.stock_quantity) || 0,
             uom: item.uom || 'Unit'
         }));
-        currentStockVersion = newVersion;
-        // Persist to localStorage
-        localStorage.setItem('stockDataCache', JSON.stringify(stockDataCache));
-        localStorage.setItem('currentStockVersion', newVersion);
-        console.log(`Fetched stock data (version: ${newVersion}, ${stockDataCache.length} items)`);
+        currentStockVersion = version;
+        
+        if (!stockDataCache.length) {
+            console.warn('No stock items returned from /stock_data');
+        }
+        console.log('Fetched new stock data (version: ' + version + ')');
         return stockDataCache;
     } catch (error) {
         console.error('Error fetching stock data from /stock_data:', error);
-        return stockDataCache || [];
+        return [];
     }
 }
 
-export function invalidateStockCache() {
+// Function to invalidate cache and fetch fresh data
+function invalidateStockCache() {
     console.log('Invalidating stock cache');
     stockDataCache = null;
     currentStockVersion = null;
-    localStorage.removeItem('stockDataCache');
-    localStorage.removeItem('currentStockVersion');
 }
 
-// Initialize stock data on page load
-document.addEventListener('DOMContentLoaded', async () => {
-    console.log('Initializing stock data on page load...');
-    await fetchStockData();
-});
+// Function to refresh stock data after operations
+async function refreshStockData() {
+    return await fetchStockData(true);
+}
 
-export function updateSubtotal(container) {
+// Example usage after form submissions or stock operations:
+// After adding stock, restocking, or updating prices, call:
+// refreshStockData().then(data => {
+//     // Update your UI with fresh data
+//     console.log('Stock data refreshed:', data);
+// });
+
+function updateSubtotal(container) {
     let subtotal = 0;
     const rows = container.querySelectorAll('.item-row');
     rows.forEach(row => {
@@ -79,7 +97,7 @@ export function updateSubtotal(container) {
     updateChange(container);
 }
 
-export function updateChange(container) {
+function updateChange(container) {
     const modalId = container.id.split('-')[0];
     const amountPaidInput = document.getElementById(`${modalId}-amount-paid`);
     const changeSpan = document.getElementById(`${modalId}-order-change`);
@@ -92,7 +110,7 @@ export function updateChange(container) {
     changeSpan.parentElement.classList.toggle('text-red-600', change < 0);
 }
 
-export function showModalError(modalId, message) {
+function showModalError(modalId, message) {
     const errorDiv = document.getElementById(`${modalId}-error`);
     if (errorDiv) {
         errorDiv.textContent = message;
@@ -104,7 +122,7 @@ export function showModalError(modalId, message) {
     }
 }
 
-export async function populateClients(inputElement, debtElement) {
+async function populateClients(inputElement, debtElement) {
     try {
         const response = await fetch('/clients_data');
         const clients = await response.json();
@@ -176,119 +194,4 @@ export async function populateClients(inputElement, debtElement) {
     }
 }
 
-export function addManualItem(container, modal) {
-    if (!container || !modal || modal.classList.contains('hidden')) {
-        console.warn('Skipping addManualItem: container or modal not found or modal is hidden');
-        return;
-    }
-    console.log('Adding manual item to container:', container.id);
-
-    const div = document.createElement('div');
-    div.className = 'grid grid-cols-6 gap-2 item-row';
-    div.dataset.manual = 'true';
-    div.innerHTML = `
-        <input name="items[]" type="text" placeholder="Manual Item Name" class="col-span-1 p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 product-input w-full" required>
-        <input name="quantities[]" type="number" placeholder="Qty" class="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 qty-input text-center w-full" min="0" step="0.01">
-        <input name="unit_prices[]" type="number" placeholder="Price" class="price-display p-2 border rounded-lg text-center w-full" step="0.01" min="0">
-        <input type="number" value="" class="stock-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly disabled>
-        <input type="number" value="0" class="total-display p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-center w-full" readonly>
-        <button type="button" class="remove-item bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">X</button>
-    `;
-    const addBtn = container.querySelector('.add-item-btn');
-    if (!addBtn) {
-        console.error('Add item button not found in container');
-        return;
-    }
-    container.insertBefore(div, addBtn);
-    console.log('Manual item row added');
-
-    const removeHandler = () => {
-        console.log('Removing manual item row');
-        div.remove();
-        updateSubtotal(container);
-    };
-    div.querySelector('.remove-item').addEventListener('click', removeHandler);
-
-    attachPriceListener(div, modal);
-    updateSubtotal(container);
-}
-
-export function attachPriceListener(row, modal) {
-    if (!row || !modal || modal.classList.contains('hidden')) {
-        console.warn('Skipping attachPriceListener: row or modal not found or modal is hidden');
-        return;
-    }
-    const select = row.querySelector('.product-select');
-    const productInput = row.querySelector('.product-input');
-    const priceDisplay = row.querySelector('.price-display');
-    const stockDisplay = row.querySelector('.stock-display');
-    const totalDisplay = row.querySelector('.total-display');
-    const qtyInput = row.querySelector('.qty-input');
-    let basePrice = 0;
-    let maxStock = 0;
-
-    const selectHandler = () => {
-        if (!modal || modal.classList.contains('hidden')) {
-            console.warn('Skipping selectHandler: modal is hidden');
-            return;
-        }
-        const selectedOption = select.options[select.selectedIndex];
-        if (selectedOption.value) {
-            const values = selectedOption.value.split('|');
-            basePrice = parseFloat(values[5]) || 0;
-            maxStock = parseFloat(values[7]) || 0;
-            priceDisplay.value = basePrice.toFixed(2);
-            stockDisplay.value = maxStock.toFixed(2);
-            qtyInput.max = maxStock;
-            qtyInput.disabled = false;
-            const qty = parseFloat(qtyInput.value) || 0;
-            if (maxStock !== undefined && qty > maxStock) {
-                qtyInput.value = maxStock;
-                showModalError(row.closest('.modal').id.split('-')[0], `Cannot order more than ${maxStock} units of ${values[1]}.`);
-            }
-            totalDisplay.value = (basePrice * qty).toFixed(2);
-            updateSubtotal(row.closest('.space-y-4'));
-        } else {
-            basePrice = 0;
-            maxStock = 0;
-            priceDisplay.value = '';
-            stockDisplay.value = '';
-            totalDisplay.value = '';
-            qtyInput.max = '';
-            qtyInput.disabled = true;
-            qtyInput.value = '';
-            updateSubtotal(row.closest('.space-y-4'));
-        }
-    };
-    if (select) {
-        select.addEventListener('change', selectHandler);
-    }
-
-    const qtyHandler = () => {
-        if (!modal || modal.classList.contains('hidden')) {
-            console.warn('Skipping qtyHandler: modal is hidden');
-            return;
-        }
-        const qty = parseFloat(qtyInput.value) || 0;
-        if (maxStock !== undefined && qty > maxStock && !row.dataset.manual) {
-            qtyInput.value = maxStock;
-            showModalError(row.closest('.modal').id.split('-')[0], `Cannot order more than ${maxStock} units.`);
-        }
-        const currentPrice = parseFloat(priceDisplay.value) || basePrice;
-        totalDisplay.value = (currentPrice * qty).toFixed(2);
-        updateSubtotal(row.closest('.space-y-4'));
-    };
-    qtyInput.addEventListener('input', qtyHandler);
-
-    const priceHandler = () => {
-        if (!modal || modal.classList.contains('hidden')) {
-            console.warn('Skipping priceHandler: modal is hidden');
-            return;
-        }
-        const qty = parseFloat(qtyInput.value) || 0;
-        const newPrice = parseFloat(priceDisplay.value) || 0;
-        totalDisplay.value = (newPrice * qty).toFixed(2);
-        updateSubtotal(row.closest('.space-y-4'));
-    };
-    priceDisplay.addEventListener('input', priceHandler);
-}
+export { fetchStockData, updateSubtotal, updateChange, showModalError, populateClients };
