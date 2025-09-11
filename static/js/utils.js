@@ -446,4 +446,4 @@ document.addEventListener('DOMContentLoaded', async () => {
     await fetchStockData();
 });
 
-export { editOrder, resetModal, attachPriceListener, fetchStockData,};
+export { editOrder, resetModal, attachPriceListener};
