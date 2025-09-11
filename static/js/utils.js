@@ -1,4 +1,4 @@
-import { showModalError} from './utils.js';
+import { showModalError } from './utils.js';
 
 const editModal = document.getElementById('edit-order-modal');
 const closeEdit = document.getElementById('close-edit-modal');
@@ -14,15 +14,15 @@ let currentStockVersion = localStorage.getItem('currentStockVersion') || null;
 export async function fetchStockData() {
     try {
         console.log('Checking stock data version...');
+        const csrfToken = document.querySelector('[name=csrf_token]')?.value;
+        if (!csrfToken) throw new Error('CSRF token not found. Ensure <input name="csrf_token"> exists.');
         const versionResponse = await fetch('/stock_data?version_only=true', {
             credentials: 'include',
-            headers: { 'X-CSRFToken': document.querySelector('[name=csrf_token]').value }
+            headers: { 'X-CSRFToken': csrfToken }
         });
         if (!versionResponse.ok) throw new Error(`HTTP ${versionResponse.status}`);
         const { version, client_logs } = await versionResponse.json();
-        if (client_logs) {
-            client_logs.forEach(log => console.log(`[STOCK_DATA] ${log}`));
-        }
+        if (client_logs) client_logs.forEach(log => console.log(`[STOCK_DATA] ${log}`));
         
         if (stockDataCache && currentStockVersion === version) {
             console.log(`Using cached stock data (version: ${currentStockVersion})`);
@@ -33,15 +33,13 @@ export async function fetchStockData() {
         const response = await fetch('/stock_data', {
             credentials: 'include',
             cache: 'no-cache',
-            headers: { 'X-CSRFToken': document.querySelector('[name=csrf_token]').value }
+            headers: { 'X-CSRFToken': csrfToken }
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const { version: newVersion, data, client_logs } = await response.json();
-        if (!Array.isArray(data)) throw new Error('Invalid response format: Expected an array');
+        if (!Array.isArray(data)) throw new Error('Invalid response format');
 
-        if (client_logs) {
-            client_logs.forEach(log => console.log(`[STOCK_DATA] ${log}`));
-        }
+        if (client_logs) client_logs.forEach(log => console.log(`[STOCK_DATA] ${log}`));
 
         stockDataCache = data.map(item => ({
             id: item.id,
@@ -52,13 +50,13 @@ export async function fetchStockData() {
             uom: item.uom || 'Unit'
         }));
         currentStockVersion = newVersion;
-        // Persist to localStorage
         localStorage.setItem('stockDataCache', JSON.stringify(stockDataCache));
         localStorage.setItem('currentStockVersion', newVersion);
         console.log(`Fetched stock data (version: ${newVersion}, ${stockDataCache.length} items)`);
         return stockDataCache;
     } catch (error) {
-        console.error('Error fetching stock data from /stock_data:', error);
+        console.error('Error fetching stock data:', error);
+        showModalError('edit-order', `Failed to fetch stock data: ${error.message}`);
         return stockDataCache || [];
     }
 }
@@ -70,12 +68,6 @@ export function invalidateStockCache() {
     localStorage.removeItem('stockDataCache');
     localStorage.removeItem('currentStockVersion');
 }
-
-// Initialize stock data on page load
-document.addEventListener('DOMContentLoaded', async () => {
-    console.log('Initializing stock data on page load...');
-    await fetchStockData();
-});
 
 async function fetchOrderData(receiptId) {
     try {
@@ -136,15 +128,8 @@ async function editOrder(receiptId) {
         document.getElementById('edit-order-total').textContent = existingBalance.toFixed(2);
 
         console.log('Loading stock data...');
-        let stockItems;
-        try {
-            stockItems = await fetchStockData();
-            console.log('Stock data loaded:', stockItems.length, 'items');
-        } catch (error) {
-            console.error('Failed to fetch stock data:', error);
-            showModalError('edit-order', `Failed to load stock data: ${error.message}`);
-            return;
-        }
+        const stockItems = await fetchStockData();
+        console.log('Stock data loaded:', stockItems.length, 'items');
 
         let itemsList = [];
         try {
@@ -369,10 +354,12 @@ if (form) {
         }
 
         try {
+            const csrfToken = form.querySelector('[name=csrf_token]')?.value;
+            if (!csrfToken) throw new Error('CSRF token not found. Ensure <input name="csrf_token"> exists.');
             const response = await fetch(this.action, {
                 method: 'POST',
                 body: formData,
-                headers: { 'X-CSRFToken': form.querySelector('[name=csrf_token]').value }
+                headers: { 'X-CSRFToken': csrfToken }
             });
             const text = await response.text();
             let result;
@@ -446,4 +433,4 @@ document.addEventListener('DOMContentLoaded', async () => {
     await fetchStockData();
 });
 
-export { editOrder, resetModal, attachPriceListener};
+export { editOrder, resetModal, attachPriceListener };
