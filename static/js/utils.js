@@ -1,4 +1,4 @@
-import { showModalError } from './utils.js';
+import { showModalError } from './utils.js'; // Adjust path if needed
 
 const editModal = document.getElementById('edit-order-modal');
 const closeEdit = document.getElementById('close-edit-modal');
@@ -12,6 +12,7 @@ let stockDataCache = localStorage.getItem('stockDataCache') ? JSON.parse(localSt
 let currentStockVersion = localStorage.getItem('currentStockVersion') || null;
 
 export async function fetchStockData() {
+    let client_logs = []; // Declare once at function scope
     try {
         console.log('Checking stock data version...');
         const csrfToken = document.querySelector('[name=csrf_token]')?.value;
@@ -21,8 +22,11 @@ export async function fetchStockData() {
             headers: { 'X-CSRFToken': csrfToken }
         });
         if (!versionResponse.ok) throw new Error(`HTTP ${versionResponse.status}`);
-        const { version, client_logs } = await versionResponse.json();
-        if (client_logs) client_logs.forEach(log => console.log(`[STOCK_DATA] ${log}`));
+        const { version, logs: responseLogs } = await versionResponse.json(); // Rename to avoid conflict
+        if (responseLogs) {
+            client_logs = responseLogs; // Assign to existing client_logs
+            client_logs.forEach(log => console.log(`[STOCK_DATA] ${log}`));
+        }
         
         if (stockDataCache && currentStockVersion === version) {
             console.log(`Using cached stock data (version: ${currentStockVersion})`);
@@ -36,10 +40,13 @@ export async function fetchStockData() {
             headers: { 'X-CSRFToken': csrfToken }
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const { version: newVersion, data, client_logs } = await response.json();
+        const { version: newVersion, data, logs: responseLogs2 } = await response.json(); // Rename again
         if (!Array.isArray(data)) throw new Error('Invalid response format');
 
-        if (client_logs) client_logs.forEach(log => console.log(`[STOCK_DATA] ${log}`));
+        if (responseLogs2) {
+            client_logs = responseLogs2; // Assign to existing client_logs
+            client_logs.forEach(log => console.log(`[STOCK_DATA] ${log}`));
+        }
 
         stockDataCache = data.map(item => ({
             id: item.id,
@@ -291,6 +298,7 @@ if (form) {
         const formData = new FormData(this);
         const itemRows = editContainer.querySelectorAll('.item-row');
         const items = [];
+        let client_logs = []; // Declare once at function scope
         itemRows.forEach(row => {
             const select = row.querySelector('.product-select');
             const qtyInput = row.querySelector('.qty-input');
@@ -372,8 +380,9 @@ if (form) {
                 submitBtn.disabled = false;
                 return;
             }
-            if (result.client_logs) {
-                result.client_logs.forEach(log => console.log(`[EDIT_ORDER] ${log}`));
+            if (result.logs) { // Guardrail for response logs
+                client_logs = result.logs; // Assign to existing client_logs
+                client_logs.forEach(log => console.log(`[EDIT_ORDER] ${log}`));
             }
             if (response.ok && result.status === 'success') {
                 console.log('Form submitted successfully, reloading page');
