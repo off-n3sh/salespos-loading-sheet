@@ -1,4 +1,4 @@
-import { showModalError, fetchStockData } from './utils.js';
+import { showModalError} from './utils.js';
 
 const editModal = document.getElementById('edit-order-modal');
 const closeEdit = document.getElementById('close-edit-modal');
