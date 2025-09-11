@@ -1685,7 +1685,12 @@ def orders():
                     if len(product_data) >= 6 and product_data[0] == 'product':
                         product_name = product_data[1]
                         qty_str = items_raw[i + 1] if i + 1 < len(items_raw) else '0'
-                        quantity = int(qty_str) if qty_str.isdigit() else 0
+                        # Parse quantity as float instead of int
+                        try:
+                            quantity = float(qty_str) if qty_str.replace('.', '').replace('-', '').isdigit() else 0.0
+                        except ValueError:
+                            logger.error(f"Invalid quantity format for {product_name}: {qty_str}")
+                            continue
                         price = float(product_data[5])
                         amount = quantity * price
                         if quantity > 0:
@@ -1694,7 +1699,7 @@ def orders():
                             stock_ref = db.collection('stock').where('stock_name', '==', product_name).limit(1).get()
                             if stock_ref:
                                 stock_doc = stock_ref[0]
-                                current_quantity = stock_doc.to_dict().get('stock_quantity', 0)
+                                current_quantity = float(stock_doc.to_dict().get('stock_quantity', 0))
                                 if current_quantity >= quantity:
                                     db.collection('stock').document(stock_doc.id).update({'stock_quantity': firestore.Increment(-quantity)})
                                     log_stock_change(stock_doc.to_dict().get('category', 'Unknown'), product_name, 'order_reduction', -quantity, price)
@@ -1756,7 +1761,7 @@ def orders():
             logger.error(f"Error creating order: {e}")
             return jsonify({'error': str(e)}), 500
 
-    # GET method
+    # GET method (unchanged)
     try:
         orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).stream()
         orders = []
@@ -1782,8 +1787,8 @@ def orders():
                         product_name = items_raw[i + 1]
                         quantity_str = str(items_raw[i + 3]) if i + 2 < len(items_raw) and items_raw[i + 2] == 'quantity' else '0'
                         price_str = str(items_raw[i + 5]) if i + 4 < len(items_raw) and items_raw[i + 4] == 'price' else '0'
-                        quantity = int(quantity_str) if quantity_str.isdigit() else 0
-                        price = float(price_str) if price_str.replace('.', '').isdigit() or price_str.replace('.', '').replace('-', '').isdigit() else 0.0
+                        quantity = float(quantity_str) if quantity_str.replace('.', '').replace('-', '').isdigit() else 0.0
+                        price = float(price_str) if price_str.replace('.', '').replace('-', '').isdigit() or price_str.replace('.', '').replace('-', '').isdigit() else 0.0
                         items_list.append({
                             'name': product_name,
                             'quantity': quantity,
