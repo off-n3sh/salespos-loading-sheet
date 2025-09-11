@@ -255,7 +255,7 @@ if (form) {
                 const values = select.value.split('|');
                 const qty = parseFloat(qtyInput.value) || 0;
                 const stock = parseFloat(stockDisplay.value) || 0;
-                if (qty > stock) {
+                if (qty > stock && !row.dataset.existing) { // Only check stock for new items
                     showModalError('edit-order', `Cannot order more than ${stock} units of ${values[1]}.`);
                     submitBtn.classList.remove('processing');
                     submitBtn.disabled = false;
@@ -268,7 +268,11 @@ if (form) {
                     submitBtn.disabled = false;
                     return;
                 }
-                items.push(`product|${values[1]}|quantity|${qty}|price|${price.toFixed(2)}`);
+                items.push({
+                    itemStr: `product|${values[1]}|quantity|${qty}|price|${price.toFixed(2)}`,
+                    qty: qty,
+                    price: price.toFixed(2)
+                });
             } else if (row.querySelector('.product-input')?.value && qtyInput.value) {
                 const price = parseFloat(priceInput.value) || 0;
                 if (price <= 0) {
@@ -277,7 +281,11 @@ if (form) {
                     submitBtn.disabled = false;
                     return;
                 }
-                items.push(`product|${row.querySelector('.product-input').value}|quantity|${qtyInput.value}|price|${price.toFixed(2)}`);
+                items.push({
+                    itemStr: `product|${row.querySelector('.product-input').value}|quantity|${qtyInput.value}|price|${price.toFixed(2)}`,
+                    qty: qtyInput.value,
+                    price: price.toFixed(2)
+                });
             }
         });
         if (!items.length) {
@@ -286,10 +294,16 @@ if (form) {
             submitBtn.disabled = false;
             return;
         }
+        // Clear existing form data arrays
         formData.delete('items[]');
         formData.delete('quantities[]');
         formData.delete('unit_prices[]');
-        items.forEach(item => formData.append('items[]', item));
+        // Append all items, quantities, and unit prices
+        items.forEach(({ itemStr, qty, price }) => {
+            formData.append('items[]', itemStr);
+            formData.append('quantities[]', qty);
+            formData.append('unit_prices[]', price);
+        });
 
         console.log('Form data entries:');
         for (let [key, value] of formData.entries()) {
@@ -312,6 +326,10 @@ if (form) {
                 submitBtn.classList.remove('processing');
                 submitBtn.disabled = false;
                 return;
+            }
+            // Log server-side client_logs
+            if (result.client_logs) {
+                result.client_logs.forEach(log => console.log(`[EDIT_ORDER] ${log}`));
             }
             if (response.ok && result.status === 'success') {
                 console.log('Form submitted successfully, reloading page');
