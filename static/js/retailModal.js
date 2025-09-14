@@ -203,21 +203,19 @@ if (retailAmountPaid) {
 if (retailPaymentType) {
     const paymentTypeHandler = () => {
         const amountPaidContainer = document.getElementById('retail-amount-paid-container');
-        const totalSpan = retailContainer.parentElement.querySelector('[id$="-order-total"]');
-        const subtotal = parseFloat(totalSpan.textContent) || 0;
-        if (['credit', 'mpesa', 'bank_transfer'].includes(retailPaymentType.value)) {
+        if (retailPaymentType.value === 'credit') {
             amountPaidContainer.style.display = 'none';
-            retailAmountPaid.value = subtotal.toFixed(2); // Set to subtotal for non-cash
-            updateChange(retailContainer); // Update change (will be 0 for non-cash)
+            retailAmountPaid.value = '0.00'; // Set to 0 for credit
+            updateChange(retailContainer);
         } else {
             amountPaidContainer.style.display = 'block';
-            retailAmountPaid.value = ''; // Clear for manual input
+            retailAmountPaid.value = ''; // Clear input for manual entry
+            retailAmountPaid.removeAttribute('readonly'); // Ensure editable
         }
     };
     retailPaymentType.addEventListener('change', paymentTypeHandler);
     eventListeners.push({ element: retailPaymentType, type: 'change', handler: paymentTypeHandler });
-    // Initialize with amount paid hidden
-    paymentTypeHandler();
+    paymentTypeHandler(); // Initialize on load
 }
 
 const retailForm = document.getElementById('retail-form');
