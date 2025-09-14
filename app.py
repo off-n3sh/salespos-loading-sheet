@@ -327,11 +327,13 @@ def group_orders(filtered_orders, time_filter, today_start, today_end, now):
                     'rows': [],
                     'total': 0,
                     'debt': 0,
-                    'expenses': 0  # Added expenses
+                    'expenses': 0,
+                    'expenses_list': []
                 }
             days[day_key]['rows'].append(order)
             if order.get('is_expense'):
                 days[day_key]['expenses'] += order['amount']
+                days[day_key]['expenses_list'].append(order)
             else:
                 days[day_key]['total'] += order['payment'] + order['balance']
                 days[day_key]['debt'] += order['balance']
@@ -349,11 +351,13 @@ def group_orders(filtered_orders, time_filter, today_start, today_end, now):
                     'rows': [],
                     'total': 0,
                     'debt': 0,
-                    'expenses': 0  # Added expenses
+                    'expenses': 0,
+                    'expenses_list': []
                 }
             weeks[week_key]['rows'].append(order)
             if order.get('is_expense'):
                 weeks[week_key]['expenses'] += order['amount']
+                weeks[week_key]['expenses_list'].append(order)
             else:
                 weeks[week_key]['total'] += order['payment'] + order['balance']
                 weeks[week_key]['debt'] += order['balance']
@@ -369,11 +373,13 @@ def group_orders(filtered_orders, time_filter, today_start, today_end, now):
                     'rows': [],
                     'total': 0,
                     'debt': 0,
-                    'expenses': 0  # Added expenses
+                    'expenses': 0,
+                    'expenses_list': []
                 }
             months[month_key]['rows'].append(order)
             if order.get('is_expense'):
                 months[month_key]['expenses'] += order['amount']
+                months[month_key]['expenses_list'].append(order)
             else:
                 months[month_key]['total'] += order['payment'] + order['balance']
                 months[month_key]['debt'] += order['balance']
@@ -389,11 +395,13 @@ def group_orders(filtered_orders, time_filter, today_start, today_end, now):
                     'rows': [],
                     'total': 0,
                     'debt': 0,
-                    'expenses': 0  # Added expenses
+                    'expenses': 0,
+                    'expenses_list': []
                 }
             years[year_key]['rows'].append(order)
             if order.get('is_expense'):
                 years[year_key]['expenses'] += order['amount']
+                years[year_key]['expenses_list'].append(order)
             else:
                 years[year_key]['total'] += order['payment'] + order['balance']
                 years[year_key]['debt'] += order['balance']
@@ -402,7 +410,15 @@ def group_orders(filtered_orders, time_filter, today_start, today_end, now):
         total = sum((order['payment'] + order['balance']) for order in filtered_orders if not order.get('is_expense'))
         debt = sum(order['balance'] for order in filtered_orders if not order.get('is_expense'))
         expenses = sum(order['amount'] for order in filtered_orders if order.get('is_expense'))
-        grouped_orders = [{'label': 'All Orders', 'rows': filtered_orders, 'total': total, 'debt': debt, 'expenses': expenses}]
+        expenses_list = [order for order in filtered_orders if order.get('is_expense')]
+        grouped_orders = [{
+            'label': 'All Orders', 
+            'rows': filtered_orders, 
+            'total': total, 
+            'debt': debt, 
+            'expenses': expenses,
+            'expenses_list': expenses_list
+        }]
     return grouped_orders
 
 # Initialize Firebase
@@ -1556,8 +1572,6 @@ def dashboard():
         orders_ref = orders_ref.where(filter=FieldFilter('balance', '>', 0))
     elif status_filter == 'completed':
         orders_ref = orders_ref.where(filter=FieldFilter('balance', '>=', -0.001)).where(filter=FieldFilter('balance', '<=', 0.001))
-    elif status_filter == 'mpesa':
-        orders_ref = orders_ref.where(filter=FieldFilter('payment_type', 'in', ['mpesa', 'bank_transfer']))
 
     # Apply search query
     filtered_orders = []
@@ -1576,8 +1590,61 @@ def dashboard():
         for doc in orders_ref.stream():
             filtered_orders.append(process_order(doc))
 
+    # Process gateway payments for the gateway filter
+    gateway_payments = []
+    gateway_count = 0
+    if status_filter == 'gateway':
+        gateway_orders = []
+        for doc in db.collection('orders').stream():
+            order = process_order(doc)
+            for payment_entry in order.get('payment_history', []):
+                if payment_entry.get('payment_type') in ['mpesa', 'bank_transfer']:
+                    gateway_payments.append({
+                        'receipt_id': order['receipt_id'],
+                        'salesperson_name': order['salesperson_name'],
+                        'shop_name': order['shop_name'],
+                        'payment_type': payment_entry['payment_type'],
+                        'payment': payment_entry['amount'],
+                        'date': payment_entry['date'],
+                        'balance': order['balance']
+                    })
+        gateway_count = len(gateway_payments)
+        
+        # Apply time filter to gateway payments
+        if time_filter == 'day':
+            gateway_payments = [
+                gp for gp in gateway_payments
+                if gp['date'].strftime('%Y-%m-%d') == now.strftime('%Y-%m-%d')
+            ]
+        elif time_filter == 'week':
+            week_start = now - timedelta(days=now.weekday())
+            week_end = week_start + timedelta(days=7)
+            gateway_payments = [
+                gp for gp in gateway_payments
+                if week_start <= gp['date'] < week_end
+            ]
+        elif time_filter == 'month':
+            month_start = now.replace(day=1)
+            if now.month == 12:
+                month_end = now.replace(year=now.year + 1, month=1, day=1)
+            else:
+                month_end = now.replace(month=now.month + 1, day=1)
+            gateway_payments = [
+                gp for gp in gateway_payments
+                if month_start <= gp['date'] < month_end
+            ]
+        elif time_filter == 'year':
+            year_start = now.replace(month=1, day=1)
+            year_end = now.replace(year=now.year + 1, month=1, day=1)
+            gateway_payments = [
+                gp for gp in gateway_payments
+                if year_start <= gp['date'] < year_end
+            ]
+        
+        gateway_count = len(gateway_payments)
+
     # Include orders and expenses for time_filter == 'day'
-    if time_filter == 'day' and status_filter not in ['expenses', 'mpesa']:
+    if time_filter == 'day' and status_filter not in ['expenses', 'gateway']:
         filtered_orders = [
             order for order in filtered_orders
             if order['date'].strftime('%Y-%m-%d') == now.strftime('%Y-%m-%d') or
@@ -1603,7 +1670,7 @@ def dashboard():
             if today_start <= e['date'] < today_end
         ]
         filtered_orders.extend(filtered_expenses)
-    elif status_filter not in ['expenses', 'mpesa']:
+    elif status_filter not in ['expenses', 'gateway']:
         filtered_expenses = [
             {
                 'receipt_id': doc.id,
@@ -1627,66 +1694,53 @@ def dashboard():
     grouped_sales_history = group_orders(filtered_orders, time_filter, today_start, today_end, now)
     for group in grouped_sales_history:
         group['expenses'] = sum(row['amount'] for row in group['rows'] if row.get('is_expense'))
-
-    # Group M-Pesa/Bank orders
-    mpesa_grouped_sales = []
-    mpesa_total = 0
-    mpesa_count = 0
-    if status_filter == 'mpesa':
-        mpesa_orders = [
-            order for order in filtered_orders
-            if order.get('payment_type') in ['mpesa', 'bank_transfer']
-        ]
-        if time_filter == 'day':
-            mpesa_orders = [
-                order for order in mpesa_orders
-                if order['date'].strftime('%Y-%m-%d') == now.strftime('%Y-%m-%d') or
-                any(today_start <= ph['date'] < today_end for ph in order['payment_history']) or
-                (order['closed_date'] and today_start <= order['closed_date'] < today_end and order['balance'] <= 0)
-            ]
-        mpesa_grouped_sales = group_orders(mpesa_orders, time_filter, today_start, today_end, now)
-        for group in mpesa_grouped_sales:
-            group['expenses'] = sum(row['amount'] for row in group['rows'] if row.get('is_expense'))
-        mpesa_count = sum(len(group['rows']) for group in mpesa_grouped_sales)
-        mpesa_total = sum(group['total'] - group['expenses'] for group in mpesa_grouped_sales)
+        group['expenses_list'] = [row for row in group['rows'] if row.get('is_expense')]
 
     # Pagination
     if status_filter == 'expenses':
         flat_orders = [(f"Day: {e['date'].strftime('%d %b %Y')}", e) for e in expenses]
         total_items = expenses_count
-    elif status_filter == 'mpesa':
-        flat_orders = [(group['label'], order) for group in mpesa_grouped_sales for order in group['rows']]
-        total_items = mpesa_count
+    elif status_filter == 'gateway':
+        flat_orders = [(f"Gateway: {gp['date'].strftime('%d %b %Y')}", gp) for gp in gateway_payments]
+        total_items = gateway_count
     else:
         flat_orders = [(group['label'], order) for group in grouped_sales_history for order in group['rows']]
         total_items = len(flat_orders)
+    
     total_pages = (total_items + per_page - 1) // per_page if total_items > 0 else 1
     start_idx = (page - 1) * per_page
     end_idx = start_idx + per_page
     paginated_orders = flat_orders[start_idx:end_idx]
 
-    # Prepare grouped sales history
+    # Prepare grouped sales history for non-gateway filters
     grouped_sales_history_paginated = []
-    current_group = None
-    for label, order in paginated_orders:
-        if not current_group or current_group['label'] != label:
-            current_group = {
-                'label': label,
-                'rows': [],
-                'total': next((group['total'] for group in grouped_sales_history if group['label'] == label), 0),
-                'debt': next((group['debt'] for group in grouped_sales_history if group['label'] == label), 0),
-                'expenses': next((group['expenses'] for group in grouped_sales_history if group['label'] == label), 0),
-                'is_new': label.startswith(f"Day: {now.strftime('%d %b %Y')}")
-            }
-            grouped_sales_history_paginated.append(current_group)
-        order_copy = order.copy()
-        if not order_copy.get('is_expense'):
-            order_copy['highlight'] = (
-                any(today_start <= ph['date'] < today_end for ph in order['payment_history']) or
-                order['date'] >= today_start or
-                (order['closed_date'] and today_start <= order['closed_date'] < today_end)
-            )
-        current_group['rows'].append(order_copy)
+    if status_filter != 'gateway':
+        current_group = None
+        for label, order in paginated_orders:
+            if not current_group or current_group['label'] != label:
+                current_group = {
+                    'label': label,
+                    'rows': [],
+                    'total': next((group['total'] for group in grouped_sales_history if group['label'] == label), 0),
+                    'debt': next((group['debt'] for group in grouped_sales_history if group['label'] == label), 0),
+                    'expenses': next((group['expenses'] for group in grouped_sales_history if group['label'] == label), 0),
+                    'expenses_list': next((group['expenses_list'] for group in grouped_sales_history if group['label'] == label), []),
+                    'is_new': label.startswith(f"Day: {now.strftime('%d %b %Y')}")
+                }
+                grouped_sales_history_paginated.append(current_group)
+            order_copy = order.copy()
+            if not order_copy.get('is_expense'):
+                order_copy['highlight'] = (
+                    any(today_start <= ph['date'] < today_end for ph in order['payment_history']) or
+                    order['date'] >= today_start or
+                    (order['closed_date'] and today_start <= order['closed_date'] < today_end)
+                )
+            current_group['rows'].append(order_copy)
+
+    # Paginate gateway payments for gateway filter
+    gateway_payments_paginated = []
+    if status_filter == 'gateway':
+        gateway_payments_paginated = [order for label, order in paginated_orders]
 
     # Fetch notifications
     user_id = session['user'].get('uid', '')
@@ -1706,11 +1760,10 @@ def dashboard():
     return render_template(
         'dashboard.html',
         user=session['user'],
-        grouped_sales_history=grouped_sales_history_paginated if status_filter not in ['expenses', 'mpesa'] else [],
+        grouped_sales_history=grouped_sales_history_paginated if status_filter not in ['expenses', 'gateway'] else [],
         expenses=expenses if status_filter == 'expenses' else [],
-        mpesa_grouped_sales=mpesa_grouped_sales if status_filter == 'mpesa' else [],
-        mpesa_total=mpesa_total,
-        mpesa_count=mpesa_count,
+        gateway_payments=gateway_payments_paginated if status_filter == 'gateway' else [],
+        gateway_count=gateway_count,
         expenses_count=expenses_count,
         total_sales_today=stats['total_sales_today'],
         retail_sales_today=stats['retail_sales_today'],
