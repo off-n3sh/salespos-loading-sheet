@@ -1592,11 +1592,14 @@ def dashboard():
             debug_logs.append(f"  Payment history entries: {len(payment_history)}")
             
             for i, payment_entry in enumerate(payment_history):
+                debug_logs.append(f"  Payment {i+1} full structure: {payment_entry}")
+                
                 payment_type_raw = payment_entry.get('payment_type', '')
                 payment_type = str(payment_type_raw).lower().strip()
                 payment_amount = float(payment_entry.get('amount', 0))
                 
                 debug_logs.append(f"  Payment {i+1}: type='{payment_type_raw}' -> '{payment_type}', amount={payment_amount}")
+                debug_logs.append(f"  Available keys: {list(payment_entry.keys())}")
                 
                 if payment_type in ['mpesa', 'bank_transfer'] and payment_amount > 0:
                     debug_logs.append(f"  ✓ GATEWAY PAYMENT FOUND!")
