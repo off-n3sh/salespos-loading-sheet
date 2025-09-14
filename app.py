@@ -1673,8 +1673,9 @@ def orders():
             shop_name = request.form.get('shop_name', 'Retail Direct')
             salesperson_name = request.form.get('salesperson_name', 'N/A')
             order_type = request.form.get('order_type', 'wholesale')
-            payment_type = request.form.get('payment_type', 'cash')  # Default to 'cash' if not provided
+            payment_type = request.form.get('payment_type', 'cash')
             amount_paid = float(request.form.get('amount_paid', '0') or 0)
+            change = float(request.form.get('change', '0') or 0)  # Get change from form
             items_raw = request.form.getlist('items[]')
 
             # Validate payment_type for restricted clients
@@ -1692,7 +1693,6 @@ def orders():
                     if len(product_data) >= 6 and product_data[0] == 'product':
                         product_name = product_data[1]
                         qty_str = items_raw[i + 1] if i + 1 < len(items_raw) else '0'
-                        # Parse quantity as float instead of int
                         try:
                             quantity = float(qty_str) if qty_str.replace('.', '').replace('-', '').isdigit() else 0.0
                         except ValueError:
@@ -1725,6 +1725,7 @@ def orders():
                 'amount': min(amount_paid, total_amount),
                 'date': datetime.now(NAIROBI_TZ)
             }] if amount_paid > 0 else []
+
             order_data = {
                 'receipt_id': receipt_id,
                 'salesperson_name': salesperson_name,
@@ -1738,7 +1739,8 @@ def orders():
                 'payment_history': payment_history,
                 'date': datetime.now(NAIROBI_TZ),
                 'order_type': order_type,
-                'payment_type': payment_type,  # Add payment_type to order_data
+                'payment_type': payment_type,
+                'change': change,  # Store change from form (e.g., 200 or 0)
                 'closed_date': datetime.now(NAIROBI_TZ) if balance == 0 else None,
                 'tracking': {
                     'status': 'pending',
@@ -1769,7 +1771,7 @@ def orders():
             logger.error(f"Error creating order: {e}")
             return jsonify({'error': str(e)}), 500
 
-    # GET method (unchanged)
+    # GET method (updated to include change in response)
     try:
         orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).stream()
         orders = []
@@ -1779,16 +1781,14 @@ def orders():
             items_list = []
 
             if order_dict.get('order_type') == 'app' and isinstance(items_raw, list) and items_raw and isinstance(items_raw[0], dict):
-                # App order: items is a list of maps
                 for item in items_raw:
                     items_list.append({
                         'name': item.get('product', 'Unknown'),
-                        'quantity': int(item.get('quantity', '0')),  # Ensure integer conversion
-                        'price': float(item.get('price', '0.0')),   # Ensure float conversion
+                        'quantity': int(item.get('quantity', '0')),
+                        'price': float(item.get('price', '0.0')),
                         'amount': int(item.get('quantity', '0')) * float(item.get('price', '0.0'))
                     })
             else:
-                # Web order: flat array
                 i = 0
                 while i < len(items_raw):
                     if items_raw[i] == 'product':
@@ -1796,7 +1796,7 @@ def orders():
                         quantity_str = str(items_raw[i + 3]) if i + 2 < len(items_raw) and items_raw[i + 2] == 'quantity' else '0'
                         price_str = str(items_raw[i + 5]) if i + 4 < len(items_raw) and items_raw[i + 4] == 'price' else '0'
                         quantity = float(quantity_str) if quantity_str.replace('.', '').replace('-', '').isdigit() else 0.0
-                        price = float(price_str) if price_str.replace('.', '').replace('-', '').isdigit() or price_str.replace('.', '').replace('-', '').isdigit() else 0.0
+                        price = float(price_str) if price_str.replace('.', '').replace('-', '').isdigit() else 0.0
                         items_list.append({
                             'name': product_name,
                             'quantity': quantity,
@@ -1819,7 +1819,8 @@ def orders():
                 'date': process_date(order_dict.get('date')),
                 'closed_date': process_date(order_dict.get('closed_date', None)) if order_dict.get('closed_date') else None,
                 'order_type': order_dict.get('order_type', 'wholesale'),
-                'payment_type': order_dict.get('payment_type', 'cash')  # Include payment_type in response
+                'payment_type': order_dict.get('payment_type', 'cash'),
+                'change': order_dict.get('change', 0)  # Include change in response
             })
 
         recent_activity = orders[:3]

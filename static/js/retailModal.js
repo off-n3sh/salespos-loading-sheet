@@ -230,6 +230,9 @@ if (retailForm) {
         submitBtn.classList.add('processing');
         submitBtn.disabled = true;
 
+        // Call updateChange to ensure change is calculated
+        updateChange(retailContainer);
+
         const formData = new FormData(this);
         const itemRows = retailContainer.querySelectorAll('.item-row');
         const items = [];
@@ -250,6 +253,11 @@ if (retailForm) {
         if (paymentType === 'credit') {
             formData.set('amount_paid', '0'); // Set amount_paid to 0 for credit
         }
+
+        // Add change to formData
+        const changeSpan = document.getElementById('retail-order-change');
+        const change = parseFloat(changeSpan.textContent) || 0;
+        formData.set('change', change.toFixed(2));
 
         itemRows.forEach(row => {
             const select = row.querySelector('.product-select');

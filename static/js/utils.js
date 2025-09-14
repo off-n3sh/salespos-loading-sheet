@@ -75,10 +75,17 @@ function updateChange(container) {
     const totalSpan = container.parentElement.querySelector('[id$="-order-total"]');
     const subtotal = parseFloat(totalSpan.textContent) || 0;
     const amountPaid = parseFloat(amountPaidInput.value) || 0;
+    
+    // Calculate change
     const change = amountPaid - subtotal;
+    
+    // Update change display
     changeSpan.textContent = change >= 0 ? change.toFixed(2) : '0.00';
     changeSpan.parentElement.classList.toggle('text-green-600', change >= 0);
     changeSpan.parentElement.classList.toggle('text-red-600', change < 0);
+    
+    // Set amount_paid to subtotal for submission (e.g., 300)
+    amountPaidInput.value = subtotal.toFixed(2);
 }
 
 function showModalError(modalId, message) {
