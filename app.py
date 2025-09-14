@@ -206,6 +206,10 @@ def calculate_dashboard_stats(orders, retail_collection, today_start, today_end)
     wholesale_open_orders = 0
     wholesale_closed_orders = 0
 
+    # Calculate expenses for today
+    expenses_ref = db.collection('expenses').where('date', '>=', today_start).where('date', '<', today_end)
+    total_expenses = sum(float(doc.to_dict().get('amount', 0)) for doc in expenses_ref.stream())
+
     for order in orders:
         order_dict = order.to_dict()
         order_date = process_date(order_dict.get('date'))
@@ -261,7 +265,7 @@ def calculate_dashboard_stats(orders, retail_collection, today_start, today_end)
         retail_sales_today += retail_collection_total
         logger.debug(f"Added {retail_collection_total} from retail collection to retail_sales_today")
 
-    total_sales_today = retail_sales_today + wholesale_sales_today
+    total_sales_today = retail_sales_today + wholesale_sales_today - total_expenses
 
     return {
         'total_sales_today': round(total_sales_today, 2),
@@ -276,6 +280,130 @@ def calculate_dashboard_stats(orders, retail_collection, today_start, today_end)
         'wholesale_closed_orders': wholesale_closed_orders
     }
 
+def process_order(doc):
+    order_dict = doc.to_dict()
+    balance = float(order_dict.get('balance', 0))
+    closed_date = process_date(order_dict.get('closed_date'))
+    status = order_dict.get('status', 'pending' if balance > 0 else 'completed')
+    if balance > 0:
+        closed_date = None
+    salesperson_name = resolve_salesperson_name(order_dict)
+    return {
+        'receipt_id': order_dict.get('receipt_id', doc.id),
+        'salesperson_name': salesperson_name,
+        'salesperson_name_lower': salesperson_name.lower(),
+        'shop_name': order_dict.get('shop_name', 'Unknown Shop'),
+        'shop_name_lower': order_dict.get('shop_name_lower', 'unknown shop'),
+        'items': json.dumps(order_dict.get('items', [])),
+        'photoUrl': order_dict.get('photoUrl', ''),
+        'payment': float(order_dict.get('payment', 0)),
+        'balance': balance,
+        'date': process_date(order_dict.get('date')),
+        'closed_date': closed_date,
+        'order_type': order_dict.get('order_type', 'wholesale'),
+        'payment_type': order_dict.get('payment_type', ''),  # Added payment_type
+        'payment_history': [
+            {'amount': float(ph.get('amount', 0)), 'date': process_date(ph.get('date')), 'payment_type': ph.get('payment_type', '')}
+            for ph in order_dict.get('payment_history', [])
+        ],
+        'notes': order_dict.get('notes', ''),
+        'status': status,
+        'user_id': order_dict.get('user_id', '')
+    }
+
+def group_orders(filtered_orders, time_filter, today_start, today_end, now):
+    grouped_orders = []
+    if time_filter == 'day':
+        days = {}
+        for order in filtered_orders:
+            # Use today's date for orders with payments or closure today
+            has_payment_today = any(today_start <= ph['date'] < today_end for ph in order['payment_history'])
+            is_closed_today = order['closed_date'] and today_start <= order['closed_date'] < today_end and order['balance'] <= 0
+            relevant_date = now if (has_payment_today or is_closed_today) else order['date']
+            day_key = relevant_date.strftime('%Y-%m-%d')
+            if day_key not in days:
+                days[day_key] = {
+                    'label': f"Day: {relevant_date.strftime('%d %b %Y')}",
+                    'rows': [],
+                    'total': 0,
+                    'debt': 0,
+                    'expenses': 0  # Added expenses
+                }
+            days[day_key]['rows'].append(order)
+            if order.get('is_expense'):
+                days[day_key]['expenses'] += order['amount']
+            else:
+                days[day_key]['total'] += order['payment'] + order['balance']
+                days[day_key]['debt'] += order['balance']
+        grouped_orders = sorted(days.values(), key=lambda x: x['rows'][0]['date'], reverse=True)
+    elif time_filter == 'week':
+        weeks = {}
+        for order in filtered_orders:
+            sale_date = order['date']
+            start_of_week = sale_date - timedelta(days=sale_date.weekday())
+            week_key = start_of_week.strftime('%Y-%m-%d')
+            if week_key not in weeks:
+                end_of_week = start_of_week + timedelta(days=6)
+                weeks[week_key] = {
+                    'label': f"Week: {start_of_week.strftime('%d %b')} – {end_of_week.strftime('%d %b %Y')}",
+                    'rows': [],
+                    'total': 0,
+                    'debt': 0,
+                    'expenses': 0  # Added expenses
+                }
+            weeks[week_key]['rows'].append(order)
+            if order.get('is_expense'):
+                weeks[week_key]['expenses'] += order['amount']
+            else:
+                weeks[week_key]['total'] += order['payment'] + order['balance']
+                weeks[week_key]['debt'] += order['balance']
+        grouped_orders = sorted(weeks.values(), key=lambda x: x['rows'][0]['date'], reverse=True)
+    elif time_filter == 'month':
+        months = {}
+        for order in filtered_orders:
+            sale_date = order['date']
+            month_key = sale_date.strftime('%Y-%m')
+            if month_key not in months:
+                months[month_key] = {
+                    'label': f"Month: {sale_date.strftime('%B %Y')}",
+                    'rows': [],
+                    'total': 0,
+                    'debt': 0,
+                    'expenses': 0  # Added expenses
+                }
+            months[month_key]['rows'].append(order)
+            if order.get('is_expense'):
+                months[month_key]['expenses'] += order['amount']
+            else:
+                months[month_key]['total'] += order['payment'] + order['balance']
+                months[month_key]['debt'] += order['balance']
+        grouped_orders = sorted(months.values(), key=lambda x: x['rows'][0]['date'], reverse=True)
+    elif time_filter == 'year':
+        years = {}
+        for order in filtered_orders:
+            sale_date = order['date']
+            year_key = sale_date.strftime('%Y')
+            if year_key not in years:
+                years[year_key] = {
+                    'label': f"Year: {year_key}",
+                    'rows': [],
+                    'total': 0,
+                    'debt': 0,
+                    'expenses': 0  # Added expenses
+                }
+            years[year_key]['rows'].append(order)
+            if order.get('is_expense'):
+                years[year_key]['expenses'] += order['amount']
+            else:
+                years[year_key]['total'] += order['payment'] + order['balance']
+                years[year_key]['debt'] += order['balance']
+        grouped_orders = sorted(years.values(), key=lambda x: x['rows'][0]['date'], reverse=True)
+    else:
+        total = sum((order['payment'] + order['balance']) for order in filtered_orders if not order.get('is_expense'))
+        debt = sum(order['balance'] for order in filtered_orders if not order.get('is_expense'))
+        expenses = sum(order['amount'] for order in filtered_orders if order.get('is_expense'))
+        grouped_orders = [{'label': 'All Orders', 'rows': filtered_orders, 'total': total, 'debt': debt, 'expenses': expenses}]
+    return grouped_orders
 
 # Initialize Firebase
 cred_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
@@ -506,112 +634,7 @@ def timeout(seconds):
         signal.alarm(0)
         signal.signal(signal.SIGALRM, old_handler)
 
-def process_order(doc):
-    order_dict = doc.to_dict()
-    balance = float(order_dict.get('balance', 0))
-    closed_date = process_date(order_dict.get('closed_date'))
-    status = order_dict.get('status', 'pending' if balance > 0 else 'completed')
-    if balance > 0:
-        closed_date = None
-    salesperson_name = resolve_salesperson_name(order_dict)
-    return {
-        'receipt_id': order_dict.get('receipt_id', doc.id),
-        'salesperson_name': salesperson_name,
-        'salesperson_name_lower': salesperson_name.lower(),
-        'shop_name': order_dict.get('shop_name', 'Unknown Shop'),
-        'shop_name_lower': order_dict.get('shop_name_lower', 'unknown shop'),
-        'items': json.dumps(order_dict.get('items', [])),
-        'photoUrl': order_dict.get('photoUrl', ''),
-        'payment': float(order_dict.get('payment', 0)),
-        'balance': balance,
-        'date': process_date(order_dict.get('date')),
-        'closed_date': closed_date,
-        'order_type': order_dict.get('order_type', 'wholesale'),
-        'payment_history': [
-            {'amount': float(ph.get('amount', 0)), 'date': process_date(ph.get('date'))}
-            for ph in order_dict.get('payment_history', [])
-        ],
-        'notes': order_dict.get('notes', ''),
-        'status': status,
-        'user_id': order_dict.get('user_id', '')
-    }
 
-def group_orders(filtered_orders, time_filter, today_start, today_end, now):
-    grouped_orders = []
-    if time_filter == 'day':
-        days = {}
-        for order in filtered_orders:
-            # Use today's date for orders with payments or closure today
-            has_payment_today = any(today_start <= ph['date'] < today_end for ph in order['payment_history'])
-            is_closed_today = order['closed_date'] and today_start <= order['closed_date'] < today_end and order['balance'] <= 0
-            relevant_date = now if (has_payment_today or is_closed_today) else order['date']
-            day_key = relevant_date.strftime('%Y-%m-%d')
-            if day_key not in days:
-                days[day_key] = {
-                    'label': f"Day: {relevant_date.strftime('%d %b %Y')}",
-                    'rows': [],
-                    'total': 0,
-                    'debt': 0
-                }
-            days[day_key]['rows'].append(order)
-            days[day_key]['total'] += order['payment'] + order['balance']
-            days[day_key]['debt'] += order['balance']
-        grouped_orders = sorted(days.values(), key=lambda x: x['rows'][0]['date'], reverse=True)
-    elif time_filter == 'week':
-        weeks = {}
-        for order in filtered_orders:
-            sale_date = order['date']
-            start_of_week = sale_date - timedelta(days=sale_date.weekday())
-            week_key = start_of_week.strftime('%Y-%m-%d')
-            if week_key not in weeks:
-                end_of_week = start_of_week + timedelta(days=6)
-                weeks[week_key] = {
-                    'label': f"Week: {start_of_week.strftime('%d %b')} – {end_of_week.strftime('%d %b %Y')}",
-                    'rows': [],
-                    'total': 0,
-                    'debt': 0
-                }
-            weeks[week_key]['rows'].append(order)
-            weeks[week_key]['total'] += order['payment'] + order['balance']
-            weeks[week_key]['debt'] += order['balance']
-        grouped_orders = sorted(weeks.values(), key=lambda x: x['rows'][0]['date'], reverse=True)
-    elif time_filter == 'month':
-        months = {}
-        for order in filtered_orders:
-            sale_date = order['date']
-            month_key = sale_date.strftime('%Y-%m')
-            if month_key not in months:
-                months[month_key] = {
-                    'label': f"Month: {sale_date.strftime('%B %Y')}",
-                    'rows': [],
-                    'total': 0,
-                    'debt': 0
-                }
-            months[month_key]['rows'].append(order)
-            months[month_key]['total'] += order['payment'] + order['balance']
-            months[month_key]['debt'] += order['balance']
-        grouped_orders = sorted(months.values(), key=lambda x: x['rows'][0]['date'], reverse=True)
-    elif time_filter == 'year':
-        years = {}
-        for order in filtered_orders:
-            sale_date = order['date']
-            year_key = sale_date.strftime('%Y')
-            if year_key not in years:
-                years[year_key] = {
-                    'label': f"Year: {year_key}",
-                    'rows': [],
-                    'total': 0,
-                    'debt': 0
-                }
-            years[year_key]['rows'].append(order)
-            years[year_key]['total'] += order['payment'] + order['balance']
-            years[year_key]['debt'] += order['balance']
-        grouped_orders = sorted(years.values(), key=lambda x: x['rows'][0]['date'], reverse=True)
-    else:
-        total = sum(order['payment'] + order['balance'] for order in filtered_orders)
-        debt = sum(order['balance'] for order in filtered_orders)
-        grouped_orders = [{'label': 'All Orders', 'rows': filtered_orders, 'total': total, 'debt': debt}]
-    return grouped_orders
     
 @app.route('/clear_collections', methods=['POST'])
 def clear_collections():
@@ -1505,6 +1528,22 @@ def dashboard():
     # Fetch retail collection for today
     retail_collection = db.collection('retail').where('date', '==', now.strftime('%Y-%m-%d')).stream()
 
+    # Fetch expenses
+    expenses_ref = db.collection('expenses').order_by('date', direction=firestore.Query.DESCENDING)
+    expenses = [
+        {
+            'description': doc.to_dict().get('description', ''),
+            'amount': float(doc.to_dict().get('amount', 0)),
+            'category': doc.to_dict().get('category', ''),
+            'date': process_date(doc.to_dict().get('date')),
+            'salesperson_name': doc.to_dict().get('salesperson_name', 'N/A'),
+            'is_expense': True
+        }
+        for doc in expenses_ref.stream()
+    ]
+    total_expenses = sum(e['amount'] for e in expenses)
+    expenses_count = len(expenses)
+
     # Calculate stats
     stats = calculate_dashboard_stats(all_orders, retail_collection, today_start, today_end)
     total_orders = len(all_orders)
@@ -1517,6 +1556,8 @@ def dashboard():
         orders_ref = orders_ref.where(filter=FieldFilter('balance', '>', 0))
     elif status_filter == 'completed':
         orders_ref = orders_ref.where(filter=FieldFilter('balance', '>=', -0.001)).where(filter=FieldFilter('balance', '<=', 0.001))
+    elif status_filter == 'mpesa':
+        orders_ref = orders_ref.where(filter=FieldFilter('payment_type', 'in', ['mpesa', 'bank_transfer']))
 
     # Apply search query
     filtered_orders = []
@@ -1544,12 +1585,68 @@ def dashboard():
             (order['closed_date'] and today_start <= order['closed_date'] < today_end and order['balance'] <= 0)
         ]
 
-    # Group orders based on time filter
+    # Include expenses in sales history unless status_filter == 'expenses' or 'mpesa'
+    if status_filter not in ['expenses', 'mpesa']:
+        filtered_expenses = [
+            {
+                'receipt_id': doc.id,
+                'salesperson_name': e['salesperson_name'],
+                'description': e['description'],
+                'amount': e['amount'],
+                'date': e['date'],
+                'is_expense': True,
+                'order_type': 'expense',
+                'payment': 0,
+                'balance': 0,
+                'payment_history': [],
+                'notes': '',
+                'status': 'paid'
+            }
+            for doc, e in [(doc, doc.to_dict()) for doc in expenses_ref.stream()]
+        ]
+        if time_filter == 'day':
+            filtered_expenses = [e for e in filtered_expenses if today_start <= e['date'] < today_end]
+        filtered_orders.extend(filtered_expenses)
+
+    # Group orders and expenses
     grouped_orders = group_orders(filtered_orders, time_filter, today_start, today_end, now)
+    
+    # Calculate expenses per group
+    for group in grouped_orders:
+        group['expenses'] = sum(row['amount'] for row in group['rows'] if row.get('is_expense'))
+
+    # Fetch M-Pesa/Bank orders for mpesa filter
+    mpesa_sales = []
+    mpesa_total = 0
+    mpesa_count = 0
+    if status_filter == 'mpesa':
+        mpesa_orders = db.collection('orders').where(filter=FieldFilter('payment_type', 'in', ['mpesa', 'bank_transfer'])).order_by('date', direction=firestore.Query.DESCENDING).stream()
+        for doc in mpesa_orders:
+            order = process_order(doc)
+            if search_query:
+                search_lower = search_query.lower()
+                if not (search_lower in order['salesperson_name'].lower() or search_lower in order['shop_name'].lower()):
+                    continue
+            if time_filter == 'day' and not (
+                order['date'].strftime('%Y-%m-%d') == now.strftime('%Y-%m-%d') or
+                any(today_start <= ph['date'] < today_end for ph in order['payment_history']) or
+                (order['closed_date'] and today_start <= order['closed_date'] < today_end and order['balance'] <= 0)
+            ):
+                continue
+            mpesa_sales.append(order)
+            mpesa_total += order['payment']
+        mpesa_count = len(mpesa_sales)
 
     # Pagination
-    flat_orders = [(group['label'], order) for group in grouped_orders for order in group['rows']]
-    total_items = len(flat_orders) if status_filter != 'expenses' else 0
+    if status_filter == 'expenses':
+        flat_orders = [(f"Day: {e['date'].strftime('%d %b %Y')}", e) for e in expenses]
+        total_items = expenses_count
+    elif status_filter == 'mpesa':
+        flat_orders = [(f"Day: {order['date'].strftime('%d %b %Y')}", order) for order in mpesa_sales]
+        total_items = mpesa_count
+    else:
+        flat_orders = [(group['label'], order) for group in grouped_orders for order in group['rows']]
+        total_items = len(flat_orders)
     total_pages = (total_items + per_page - 1) // per_page if total_items > 0 else 1
     start_idx = (page - 1) * per_page
     end_idx = start_idx + per_page
@@ -1563,36 +1660,20 @@ def dashboard():
             current_group = {
                 'label': label,
                 'rows': [],
-                'total': next(group['total'] for group in grouped_orders if group['label'] == label),
-                'debt': next(group['debt'] for group in grouped_orders if group['label'] == label),
+                'total': next((group['total'] for group in grouped_orders if group['label'] == label), 0),
+                'debt': next((group['debt'] for group in grouped_orders if group['label'] == label), 0),
+                'expenses': next((group['expenses'] for group in grouped_orders if group['label'] == label), 0),
                 'is_new': label.startswith(f"Day: {now.strftime('%d %b %Y')}")
             }
             grouped_sales_history.append(current_group)
         order_copy = order.copy()
-        order_copy['highlight'] = (
-            any(today_start <= ph['date'] < today_end for ph in order['payment_history']) or
-            order['date'] >= today_start or
-            (order['closed_date'] and today_start <= order['closed_date'] < today_end)
-        )
+        if not order_copy.get('is_expense'):
+            order_copy['highlight'] = (
+                any(today_start <= ph['date'] < today_end for ph in order['payment_history']) or
+                order['date'] >= today_start or
+                (order['closed_date'] and today_start <= order['closed_date'] < today_end)
+            )
         current_group['rows'].append(order_copy)
-
-    # Fetch expenses
-    expenses_ref = db.collection('expenses').order_by('date', direction=firestore.Query.DESCENDING)
-    expenses = [
-        {
-            'description': doc.to_dict().get('description', ''),
-            'amount': float(doc.to_dict().get('amount', 0)),
-            'category': doc.to_dict().get('category', ''),
-            'date': process_date(doc.to_dict().get('date'))
-        }
-        for doc in expenses_ref.stream()
-    ]
-    total_expenses = sum(e['amount'] for e in expenses)
-    expenses_count = len(expenses)
-
-    if status_filter == 'expenses':
-        total_items = expenses_count
-        total_pages = (total_items + per_page - 1) // per_page if total_items > 0 else 1
 
     # Fetch notifications
     user_id = session['user'].get('uid', '')
@@ -1612,8 +1693,11 @@ def dashboard():
     return render_template(
         'dashboard.html',
         user=session['user'],
-        grouped_sales_history=grouped_sales_history if status_filter != 'expenses' else [],
+        grouped_sales_history=grouped_sales_history if status_filter not in ['expenses', 'mpesa'] else [],
         expenses=expenses if status_filter == 'expenses' else [],
+        mpesa_sales=mpesa_sales if status_filter == 'mpesa' else [],
+        mpesa_total=mpesa_total,
+        mpesa_count=mpesa_count,
         expenses_count=expenses_count,
         total_sales_today=stats['total_sales_today'],
         retail_sales_today=stats['retail_sales_today'],
