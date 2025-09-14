@@ -1526,7 +1526,7 @@ def dashboard():
     all_orders = list(all_orders_ref.stream())
 
     # Fetch retail collection for today
-    retail_collection = db.collection('retail').where('date', '==', now.strftime('%Y-%m-%d')).stream()
+    retail_collection = db.collection('retail').where(filter=FieldFilter('date', '==', now.strftime('%Y-%m-%d'))).stream()
 
     # Fetch expenses
     expenses_ref = db.collection('expenses').order_by('date', direction=firestore.Query.DESCENDING)
@@ -1535,8 +1535,8 @@ def dashboard():
             'description': doc.to_dict().get('description', ''),
             'amount': float(doc.to_dict().get('amount', 0)),
             'category': doc.to_dict().get('category', ''),
-            'date': process_date(doc.to_dict().get('date')),
-            'salesperson_name': doc.to_dict().get('salesperson_name', 'N/A'),
+            'date': process_date(doc.to_dict().get('date', datetime.now(NAIROBI_TZ))),
+            'salesperson_name': doc.to_dict().get('salesperson_name', 'N/A'),  # Default to 'N/A'
             'is_expense': True
         }
         for doc in expenses_ref.stream()
@@ -1565,7 +1565,7 @@ def dashboard():
         search_lower = search_query.lower()
         matching_order_ids = set()
         for field in ['salesperson_name_lower', 'shop_name_lower']:
-            query = orders_ref.where(field, '>=', search_lower).where(field, '<=', search_lower + '\uf8ff')
+            query = orders_ref.where(filter=FieldFilter(field, '>=', search_lower)).where(filter=FieldFilter(field, '<=', search_lower + '\uf8ff'))
             for doc in query.stream():
                 matching_order_ids.add(doc.id)
         for doc_id in matching_order_ids:
@@ -1590,7 +1590,7 @@ def dashboard():
         filtered_expenses = [
             {
                 'receipt_id': doc.id,
-                'salesperson_name': e['salesperson_name'],
+                'salesperson_name': e.get('salesperson_name', 'N/A'),  # Default to 'N/A'
                 'description': e['description'],
                 'amount': e['amount'],
                 'date': e['date'],
@@ -1677,12 +1677,12 @@ def dashboard():
 
     # Fetch notifications
     user_id = session['user'].get('uid', '')
-    notifications_ref = db.collection('notifications').where('recipient', '==', user_id).order_by('timestamp', direction=firestore.Query.DESCENDING).limit(10)
+    notifications_ref = db.collection('notifications').where(filter=FieldFilter('recipient', '==', user_id)).order_by('timestamp', direction=firestore.Query.DESCENDING).limit(10)
     notifications = [
         {
             'id': doc.id,
             'message': doc.to_dict().get('message', ''),
-            'timestamp': process_date(doc.to_dict().get('timestamp')),
+            'timestamp': process_date(doc.to_dict().get('timestamp', datetime.now(NAIROBI_TZ))),
             'order_id': doc.to_dict().get('order_id', ''),
             'read': doc.to_dict().get('read', False)
         }
