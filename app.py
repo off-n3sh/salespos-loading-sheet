@@ -1574,7 +1574,7 @@ def dashboard():
     gateway_count = 0
     filtered_orders = []
 
-    # Process gateway payments for the gateway filter
+    # Process gateway payments for the gateway filters
     if status_filter == 'gateway':
         debug_logs.append("=== GATEWAY PAYMENT PROCESSING STARTED ===")
         
