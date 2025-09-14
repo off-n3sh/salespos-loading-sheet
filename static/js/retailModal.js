@@ -4,6 +4,7 @@ const retailModal = document.getElementById('retail-modal');
 const closeRetail = document.getElementById('close-retail-modal');
 const retailContainer = document.getElementById('retail-items-container');
 const retailAmountPaid = document.getElementById('retail-amount-paid');
+const retailPaymentType = document.getElementById('retail-payment-type');
 let currentContainer = retailContainer;
 let eventListeners = [];
 
@@ -70,6 +71,11 @@ function resetModal(container) {
         debtElement.textContent = '';
         debtElement.classList.add('hidden');
         console.log(`Reset debt element for ${modalId}`);
+    }
+    // Reset payment type and hide amount paid by default
+    if (retailPaymentType) {
+        retailPaymentType.value = 'cash';
+        document.getElementById('retail-amount-paid-container').style.display = 'none';
     }
 }
 
@@ -193,6 +199,24 @@ if (retailAmountPaid) {
     eventListeners.push({ element: retailAmountPaid, type: 'input', handler: amountPaidHandler });
 }
 
+// Payment type toggle for amount paid visibility
+if (retailPaymentType) {
+    const paymentTypeHandler = () => {
+        const amountPaidContainer = document.getElementById('retail-amount-paid-container');
+        if (retailPaymentType.value === 'credit') {
+            amountPaidContainer.style.display = 'none';
+            retailAmountPaid.value = '0';
+        } else {
+            amountPaidContainer.style.display = 'block';
+            retailAmountPaid.value = ''; // Clear input when visible
+        }
+    };
+    retailPaymentType.addEventListener('change', paymentTypeHandler);
+    eventListeners.push({ element: retailPaymentType, type: 'change', handler: paymentTypeHandler });
+    // Initialize with amount paid hidden
+    paymentTypeHandler();
+}
+
 const retailForm = document.getElementById('retail-form');
 if (retailForm) {
     retailForm.addEventListener('submit', async function(e) {
@@ -209,6 +233,23 @@ if (retailForm) {
         const formData = new FormData(this);
         const itemRows = retailContainer.querySelectorAll('.item-row');
         const items = [];
+
+        // Handle payment type and amount paid for credit
+        const paymentType = formData.get('payment_type');
+        const shopName = formData.get('shop_name')?.toLowerCase();
+        const restrictedClients = ['client', 'clients', 'walk in', 'walkin'];
+
+        // Prevent submission for restricted clients with credit
+        if (paymentType === 'credit' && shopName && restrictedClients.includes(shopName)) {
+            showModalError('retail', 'Credit payment is not allowed for walk-in or unspecified clients.');
+            submitBtn.classList.remove('processing');
+            submitBtn.disabled = false;
+            return;
+        }
+
+        if (paymentType === 'credit') {
+            formData.set('amount_paid', '0'); // Set amount_paid to 0 for credit
+        }
 
         itemRows.forEach(row => {
             const select = row.querySelector('.product-select');

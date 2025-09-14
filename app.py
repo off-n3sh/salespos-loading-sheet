@@ -1673,8 +1673,15 @@ def orders():
             shop_name = request.form.get('shop_name', 'Retail Direct')
             salesperson_name = request.form.get('salesperson_name', 'N/A')
             order_type = request.form.get('order_type', 'wholesale')
+            payment_type = request.form.get('payment_type', 'cash')  # Default to 'cash' if not provided
             amount_paid = float(request.form.get('amount_paid', '0') or 0)
             items_raw = request.form.getlist('items[]')
+
+            # Validate payment_type for restricted clients
+            restricted_clients = ['client', 'clients', 'walk in', 'walkin']
+            if payment_type == 'credit' and shop_name.lower() in restricted_clients:
+                logger.error(f"Credit not allowed for client: {shop_name}")
+                return jsonify({'error': 'Credit payment is not allowed for walk-in or unspecified clients'}), 400
 
             items = []
             total_amount = 0
@@ -1731,6 +1738,7 @@ def orders():
                 'payment_history': payment_history,
                 'date': datetime.now(NAIROBI_TZ),
                 'order_type': order_type,
+                'payment_type': payment_type,  # Add payment_type to order_data
                 'closed_date': datetime.now(NAIROBI_TZ) if balance == 0 else None,
                 'tracking': {
                     'status': 'pending',
@@ -1810,7 +1818,8 @@ def orders():
                 'balance': order_dict.get('balance', 0),
                 'date': process_date(order_dict.get('date')),
                 'closed_date': process_date(order_dict.get('closed_date', None)) if order_dict.get('closed_date') else None,
-                'order_type': order_dict.get('order_type', 'wholesale')
+                'order_type': order_dict.get('order_type', 'wholesale'),
+                'payment_type': order_dict.get('payment_type', 'cash')  # Include payment_type in response
             })
 
         recent_activity = orders[:3]

@@ -175,3 +175,11 @@ th, td {
 .text-green-500 { color: #10b981; }
 .dark .text-blue-500 { color: #3b82f6; }
 .dark .text-green-500 { color: #10b981; }
+#retail-amount-paid-container {
+    transition: all 0.3s ease;
+}
+#retail-amount-paid-container[style*="display: none"] {
+    height: 0;
+    margin: 0;
+    overflow: hidden;
+}
