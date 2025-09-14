@@ -1537,6 +1537,9 @@ def dashboard():
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     today_end = today_start + timedelta(days=1)
 
+    # Debug logs for gateway payments
+    debug_logs = []
+    
     # Fetch all orders for stats calculation
     all_orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING)
     all_orders = list(all_orders_ref.stream())
@@ -1573,87 +1576,63 @@ def dashboard():
 
     # Process gateway payments for the gateway filter
     if status_filter == 'gateway':
-        # Get all orders and process their payment history
+        debug_logs.append("=== GATEWAY PAYMENT PROCESSING STARTED ===")
+        
         all_orders_for_gateway = db.collection('orders').stream()
+        order_processed = 0
         
         for doc in all_orders_for_gateway:
+            order_processed += 1
             order_data = doc.to_dict()
-            order_id = doc.id
+            receipt_id = order_data.get('receipt_id', doc.id)
             
-            # Get basic order info
-            receipt_id = order_data.get('receipt_id', order_id)
-            salesperson_name = resolve_salesperson_name(order_data)
-            shop_name = order_data.get('shop_name', 'Unknown')
-            balance = float(order_data.get('balance', 0))
+            debug_logs.append(f"Order {order_processed}: {receipt_id}")
             
-            # Process payment history for gateway payments
             payment_history = order_data.get('payment_history', [])
+            debug_logs.append(f"  Payment history entries: {len(payment_history)}")
             
-            for payment_entry in payment_history:
-                payment_type = payment_entry.get('payment_type', '').lower()
+            for i, payment_entry in enumerate(payment_history):
+                payment_type_raw = payment_entry.get('payment_type', '')
+                payment_type = str(payment_type_raw).lower().strip()
                 payment_amount = float(payment_entry.get('amount', 0))
-                payment_date = process_date(payment_entry.get('date'))
                 
-                # Check if this is a gateway payment (mpesa or bank_transfer)
+                debug_logs.append(f"  Payment {i+1}: type='{payment_type_raw}' -> '{payment_type}', amount={payment_amount}")
+                
                 if payment_type in ['mpesa', 'bank_transfer'] and payment_amount > 0:
+                    debug_logs.append(f"  ✓ GATEWAY PAYMENT FOUND!")
+                    
+                    # Simple date processing
+                    try:
+                        payment_date = payment_entry.get('date')
+                        if hasattr(payment_date, 'timestamp'):
+                            payment_date = payment_date.replace(tzinfo=None)
+                        debug_logs.append(f"  Date processed: {payment_date}")
+                    except Exception as e:
+                        debug_logs.append(f"  Date error: {e}")
+                        payment_date = datetime.now()
+                    
                     gateway_payment = {
                         'receipt_id': receipt_id,
-                        'salesperson_name': salesperson_name,
-                        'shop_name': shop_name,
+                        'salesperson_name': order_data.get('salesperson_name', 'Unknown'),
+                        'shop_name': order_data.get('shop_name', 'Unknown'),
                         'payment_type': payment_type,
                         'payment': payment_amount,
                         'date': payment_date,
-                        'balance': balance
+                        'balance': float(order_data.get('balance', 0))
                     }
                     gateway_payments.append(gateway_payment)
+                    debug_logs.append(f"  Added to list. Total gateway payments: {len(gateway_payments)}")
         
-        # Sort gateway payments by date (most recent first)
-        gateway_payments.sort(key=lambda x: x['date'], reverse=True)
+        debug_logs.append(f"=== PROCESSING COMPLETE ===")
+        debug_logs.append(f"Total orders processed: {order_processed}")
+        debug_logs.append(f"Gateway payments found: {len(gateway_payments)}")
+        
         gateway_count = len(gateway_payments)
         
-        # Apply time filter to gateway payments
-        if time_filter != 'all':
-            filtered_gateway_payments = []
-            
-            for gp in gateway_payments:
-                payment_date = gp['date']
-                include_payment = False
-                
-                if time_filter == 'day':
-                    if payment_date.strftime('%Y-%m-%d') == now.strftime('%Y-%m-%d'):
-                        include_payment = True
-                
-                elif time_filter == 'week':
-                    week_start = now - timedelta(days=now.weekday())
-                    week_end = week_start + timedelta(days=7)
-                    if week_start <= payment_date < week_end:
-                        include_payment = True
-                
-                elif time_filter == 'month':
-                    if (payment_date.year == now.year and 
-                        payment_date.month == now.month):
-                        include_payment = True
-                
-                elif time_filter == 'year':
-                    if payment_date.year == now.year:
-                        include_payment = True
-                
-                if include_payment:
-                    filtered_gateway_payments.append(gp)
-            
-            gateway_payments = filtered_gateway_payments
-            gateway_count = len(gateway_payments)
-
-        # Apply search filter to gateway payments if search query exists
-        if search_query:
-            search_lower = search_query.lower()
-            gateway_payments = [
-                gp for gp in gateway_payments 
-                if (search_lower in gp['salesperson_name'].lower() or 
-                    search_lower in gp['shop_name'].lower() or
-                    search_lower in gp['receipt_id'].lower())
-            ]
-            gateway_count = len(gateway_payments)
+        # Sort by date
+        if gateway_payments:
+            gateway_payments.sort(key=lambda x: x['date'], reverse=True)
+            debug_logs.append("Gateway payments sorted by date")
 
     # Process regular orders for non-gateway filters
     if status_filter != 'gateway':
@@ -1680,17 +1659,14 @@ def dashboard():
             for doc in orders_ref.stream():
                 filtered_orders.append(process_order(doc))
 
-        # Apply time filter to regular orders and include expenses
+        # Apply time filter and include expenses for non-gateway filters
         if time_filter == 'day':
-            # Filter orders for today or with payments/closures today
             filtered_orders = [
                 order for order in filtered_orders
                 if order['date'].strftime('%Y-%m-%d') == now.strftime('%Y-%m-%d') or
                 any(today_start <= ph['date'] < today_end for ph in order['payment_history']) or
                 (order['closed_date'] and today_start <= order['closed_date'] < today_end and order['balance'] <= 0)
             ]
-            
-            # Add today's expenses
             if status_filter not in ['expenses']:
                 filtered_expenses = [
                     {
@@ -1711,44 +1687,6 @@ def dashboard():
                     if today_start <= process_date(e.get('date', datetime.now(NAIROBI_TZ))) < today_end
                 ]
                 filtered_orders.extend(filtered_expenses)
-        elif time_filter == 'week':
-            week_start = now - timedelta(days=now.weekday())
-            week_end = week_start + timedelta(days=7)
-            filtered_orders = [
-                order for order in filtered_orders
-                if week_start <= order['date'] < week_end
-            ]
-        elif time_filter == 'month':
-            filtered_orders = [
-                order for order in filtered_orders
-                if order['date'].year == now.year and order['date'].month == now.month
-            ]
-        elif time_filter == 'year':
-            filtered_orders = [
-                order for order in filtered_orders
-                if order['date'].year == now.year
-            ]
-        else:
-            # For 'all' time filter, include all expenses
-            if status_filter not in ['expenses']:
-                filtered_expenses = [
-                    {
-                        'receipt_id': doc.id,
-                        'salesperson_name': e.get('salesperson_name', 'N/A'),
-                        'description': e['description'],
-                        'amount': e['amount'],
-                        'date': e['date'],
-                        'is_expense': True,
-                        'order_type': 'expense',
-                        'payment': 0,
-                        'balance': 0,
-                        'payment_history': [],
-                        'notes': '',
-                        'status': 'paid'
-                    }
-                    for doc, e in [(doc, doc.to_dict()) for doc in expenses_ref.stream()]
-                ]
-                filtered_orders.extend(filtered_expenses)
 
     # Group orders for sales history (only for non-gateway, non-expense filters)
     grouped_sales_history = []
@@ -1765,6 +1703,7 @@ def dashboard():
     elif status_filter == 'gateway':
         flat_orders = [(f"Gateway: {gp['date'].strftime('%d %b %Y')}", gp) for gp in gateway_payments]
         total_items = gateway_count
+        debug_logs.append(f"Final gateway payments for pagination: {len(gateway_payments)}")
     else:
         flat_orders = [(group['label'], order) for group in grouped_sales_history for order in group['rows']]
         total_items = len(flat_orders)
@@ -1805,6 +1744,7 @@ def dashboard():
     gateway_payments_paginated = []
     if status_filter == 'gateway':
         gateway_payments_paginated = [order for label, order in paginated_orders]
+        debug_logs.append(f"Paginated gateway payments: {len(gateway_payments_paginated)}")
 
     # Fetch notifications
     user_id = session['user'].get('uid', '')
@@ -1854,6 +1794,7 @@ def dashboard():
         unread_count=unread_count,
         today_start=today_start,
         today_end=today_end,
+        debug_logs=debug_logs if status_filter == 'gateway' else [],
         firebase_config={}
     )
  
