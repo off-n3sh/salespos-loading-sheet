@@ -1618,7 +1618,7 @@ def dashboard():
                         'receipt_id': receipt_id,
                         'salesperson_name': order_data.get('salesperson_name', 'Unknown'),
                         'shop_name': order_data.get('shop_name', 'Unknown'),
-                        'payment_type': payment_type,
+                        'payment_type': order_payment_type,  # Use order-level payment type
                         'payment': payment_amount,
                         'date': payment_date,
                         'balance': float(order_data.get('balance', 0))
