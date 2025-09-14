@@ -1594,7 +1594,7 @@ def dashboard():
             for i, payment_entry in enumerate(payment_history):
                 debug_logs.append(f"  Payment {i+1} full structure: {payment_entry}")
                 
-                payment_type_raw = payment_entry.get('payment_type', '')
+                payment_type_raw = order_data.get('payment_type', '')
                 payment_type = str(payment_type_raw).lower().strip()
                 payment_amount = float(payment_entry.get('amount', 0))
                 
