@@ -1521,6 +1521,7 @@ def login():
     response = make_response(render_template('auth.html', firebase_config=firebase_config))
     return response
 
+
 @app.route('/dashboard', methods=['GET'])
 @no_cache
 @login_required
@@ -1539,7 +1540,7 @@ def dashboard():
 
     # Debug logs for gateway payments
     debug_logs = []
-    
+
     # Fetch all orders for stats calculation
     all_orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING)
     all_orders = list(all_orders_ref.stream())
@@ -1575,69 +1576,65 @@ def dashboard():
     filtered_orders = []
 
     # Process gateway payments for the gateway filters
-    # Process gateway payments for the gateway filters
-if status_filter == 'gateway':
-    debug_logs.append("=== GATEWAY PAYMENT PROCESSING STARTED ===")
-    
-    all_orders_for_gateway = db.collection('orders').stream()
-    order_processed = 0
-    
-    for doc in all_orders_for_gateway:
-        order_processed += 1
-        order_data = doc.to_dict()
-        receipt_id = order_data.get('receipt_id', doc.id)
-        
-        debug_logs.append(f"Order {order_processed}: {receipt_id}")
-        
-        # CHECK ORDER-LEVEL PAYMENT TYPE FIRST
-        order_payment_type_raw = order_data.get('payment_type', '')
-        order_payment_type = str(order_payment_type_raw).lower().strip()
-        debug_logs.append(f"  Order payment_type: '{order_payment_type_raw}' -> '{order_payment_type}'")
-        
-        # Only process if this order has gateway payment type
-        if order_payment_type in ['mpesa', 'bank_transfer']:
-            debug_logs.append(f"  ✓ Order has gateway payment type!")
-            
-            payment_history = order_data.get('payment_history', [])
-            debug_logs.append(f"  Payment history entries: {len(payment_history)}")
-            
-            for i, payment_entry in enumerate(payment_history):
-                payment_amount = float(payment_entry.get('amount', 0))
-                debug_logs.append(f"    Payment {i+1}: amount={payment_amount}")
-                
-                if payment_amount > 0:
-                    debug_logs.append(f"    ✓ GATEWAY PAYMENT FOUND!")
-                    
-                    # Simple date processing
-                    try:
-                        payment_date = payment_entry.get('date')
-                        if hasattr(payment_date, 'timestamp'):
-                            payment_date = payment_date.replace(tzinfo=None)
-                        debug_logs.append(f"    Date processed: {payment_date}")
-                    except Exception as e:
-                        debug_logs.append(f"    Date error: {e}")
-                        payment_date = datetime.now()
-                    
-                    gateway_payment = {
-                        'receipt_id': receipt_id,
-                        'salesperson_name': order_data.get('salesperson_name', 'Unknown'),
-                        'shop_name': order_data.get('shop_name', 'Unknown'),
-                        'payment_type': order_payment_type,  # Use ORDER-level payment type
-                        'payment': payment_amount,
-                        'date': payment_date,
-                        'balance': float(order_data.get('balance', 0))
-                    }
-                    gateway_payments.append(gateway_payment)
-                    debug_logs.append(f"    Added to list. Total gateway payments: {len(gateway_payments)}")
-        else:
-            debug_logs.append(f"  Skipping - not gateway type ('{order_payment_type}')")
-    
-    debug_logs.append(f"=== PROCESSING COMPLETE ===")
-    debug_logs.append(f"Total orders processed: {order_processed}")
-    debug_logs.append(f"Gateway payments found: {len(gateway_payments)}")
-    
-    gateway_count = len(gateway_payments)
-        
+    if status_filter == 'gateway':
+        debug_logs.append("=== GATEWAY PAYMENT PROCESSING STARTED ===")
+        all_orders_for_gateway = db.collection('orders').stream()
+        order_processed = 0
+
+        for doc in all_orders_for_gateway:
+            order_processed += 1
+            order_data = doc.to_dict()
+            receipt_id = order_data.get('receipt_id', doc.id)
+
+            debug_logs.append(f"Order {order_processed}: {receipt_id}")
+
+            # CHECK ORDER-LEVEL PAYMENT TYPE FIRST
+            order_payment_type_raw = order_data.get('payment_type', '')
+            order_payment_type = str(order_payment_type_raw).lower().strip()
+            debug_logs.append(f"  Order payment_type: '{order_payment_type_raw}' -> '{order_payment_type}'")
+
+            # Only process if this order has gateway payment type
+            if order_payment_type in ['mpesa', 'bank_transfer']:
+                debug_logs.append(f"  ✓ Order has gateway payment type!")
+                payment_history = order_data.get('payment_history', [])
+                debug_logs.append(f"  Payment history entries: {len(payment_history)}")
+
+                for i, payment_entry in enumerate(payment_history):
+                    payment_amount = float(payment_entry.get('amount', 0))
+                    debug_logs.append(f"    Payment {i+1}: amount={payment_amount}")
+
+                    if payment_amount > 0:
+                        debug_logs.append(f"    ✓ GATEWAY PAYMENT FOUND!")
+
+                        # Simple date processing
+                        try:
+                            payment_date = payment_entry.get('date')
+                            if hasattr(payment_date, 'timestamp'):
+                                payment_date = payment_date.replace(tzinfo=None)
+                            debug_logs.append(f"    Date processed: {payment_date}")
+                        except Exception as e:
+                            debug_logs.append(f"    Date error: {e}")
+                            payment_date = datetime.now()
+
+                        gateway_payment = {
+                            'receipt_id': receipt_id,
+                            'salesperson_name': order_data.get('salesperson_name', 'Unknown'),
+                            'shop_name': order_data.get('shop_name', 'Unknown'),
+                            'payment_type': order_payment_type,
+                            'payment': payment_amount,
+                            'date': payment_date,
+                            'balance': float(order_data.get('balance', 0))
+                        }
+                        gateway_payments.append(gateway_payment)
+                        debug_logs.append(f"    Added to list. Total gateway payments: {len(gateway_payments)}")
+            else:
+                debug_logs.append(f"  Skipping - not gateway type ('{order_payment_type}')")
+
+        debug_logs.append(f"=== PROCESSING COMPLETE ===")
+        debug_logs.append(f"Total orders processed: {order_processed}")
+        debug_logs.append(f"Gateway payments found: {len(gateway_payments)}")
+        gateway_count = len(gateway_payments)
+
         # Sort by date
         if gateway_payments:
             gateway_payments.sort(key=lambda x: x['date'], reverse=True)
@@ -1716,7 +1713,7 @@ if status_filter == 'gateway':
     else:
         flat_orders = [(group['label'], order) for group in grouped_sales_history for order in group['rows']]
         total_items = len(flat_orders)
-    
+
     # Calculate pagination
     total_pages = (total_items + per_page - 1) // per_page if total_items > 0 else 1
     start_idx = (page - 1) * per_page
@@ -1739,7 +1736,7 @@ if status_filter == 'gateway':
                     'is_new': label.startswith(f"Day: {now.strftime('%d %b %Y')}")
                 }
                 grouped_sales_history_paginated.append(current_group)
-            
+
             order_copy = order.copy()
             if not order_copy.get('is_expense'):
                 order_copy['highlight'] = (
