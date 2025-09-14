@@ -203,12 +203,15 @@ if (retailAmountPaid) {
 if (retailPaymentType) {
     const paymentTypeHandler = () => {
         const amountPaidContainer = document.getElementById('retail-amount-paid-container');
-        if (retailPaymentType.value === 'credit') {
+        const totalSpan = retailContainer.parentElement.querySelector('[id$="-order-total"]');
+        const subtotal = parseFloat(totalSpan.textContent) || 0;
+        if (['credit', 'mpesa', 'bank_transfer'].includes(retailPaymentType.value)) {
             amountPaidContainer.style.display = 'none';
-            retailAmountPaid.value = '0';
+            retailAmountPaid.value = subtotal.toFixed(2); // Set to subtotal for non-cash
+            updateChange(retailContainer); // Update change (will be 0 for non-cash)
         } else {
             amountPaidContainer.style.display = 'block';
-            retailAmountPaid.value = ''; // Clear input when visible
+            retailAmountPaid.value = ''; // Clear for manual input
         }
     };
     retailPaymentType.addEventListener('change', paymentTypeHandler);
@@ -250,9 +253,7 @@ if (retailForm) {
             return;
         }
 
-        if (paymentType === 'credit') {
-            formData.set('amount_paid', '0'); // Set amount_paid to 0 for credit
-        }
+        // No need to set amount_paid to 0 for credit (handled in paymentTypeHandler)
 
         // Add change to formData
         const changeSpan = document.getElementById('retail-order-change');
