@@ -40,15 +40,7 @@
             </div>
         </div>
     </div>
-    <!-- Add this right after the Dashboard Header section in your template -->
-{% if debug_logs %}
-<div class="mb-6 bg-gray-800 text-green-400 p-4 rounded-lg font-mono text-sm overflow-auto max-h-96">
-    <h3 class="text-white font-bold mb-2">Gateway Debug Logs:</h3>
-    {% for log in debug_logs %}
-    <div>{{ log }}</div>
-    {% endfor %}
-</div>
-{% endif %}
+    
 
     <!-- Notification Modal -->
     <div id="notification-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
@@ -726,5 +718,25 @@
         }
 
         hideLoading();
+        
     </script>
+    <!-- Add this JavaScript at the end of your existing script section in dashboard.html -->
+<script>
+// Log debug info to browser console when gateway payments are being viewed
+{% if debug_logs %}
+console.log("=== GATEWAY PAYMENT DEBUG LOGS ===");
+{% for log in debug_logs %}
+console.log("{{ log | safe }}");
+{% endfor %}
+console.log("=== END DEBUG LOGS ===");
+{% endif %}
+</script><!-- Add this right after the Dashboard Header section in your template -->
+{% if debug_logs %}
+<div class="mb-6 bg-gray-800 text-green-400 p-4 rounded-lg font-mono text-sm overflow-auto max-h-96">
+    <h3 class="text-white font-bold mb-2">Gateway Debug Logs:</h3>
+    {% for log in debug_logs %}
+    <div>{{ log }}</div>
+    {% endfor %}
+</div>
+{% endif %}
 {% endblock %}
