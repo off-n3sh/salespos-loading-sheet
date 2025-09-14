@@ -160,19 +160,19 @@
         <!-- Filter Controls -->
         <div class="p-3 sm:p-4 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex flex-wrap gap-2 sm:gap-3 items-center">
             <div class="flex flex-wrap gap-2 sm:space-x-2">
-                <a href="{{ url_for('dashboard', page=1, per_page=per_page, time=time_filter, search=search, status='all') }}" id="all-btn" class="px-3 sm:px-4 py-1 sm:py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm sm:text-base font-medium flex items-center transition-colors">
+                <a href="{{ url_for('dashboard', page=1, per_page=per_page, time=time_filter, search=search, status='all') }}" id="all-btn" class="px-3 sm:px-4 py-1 sm:py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm sm:text-base font-medium flex items-center transition-colors {% if status_filter == 'all' %}bg-blue-800{% endif %}">
                     All <span class="ml-1 sm:ml-2 bg-white bg-opacity-20 px-1.5 sm:px-2 py-0.5 rounded-full text-xs">{{ total_orders }}</span>
                 </a>
-                <a href="{{ url_for('dashboard', page=1, per_page=per_page, time=time_filter, search=search, status='pending') }}" id="pending-btn" class="px-3 sm:px-4 py-1 sm:py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm sm:text-base font-medium flex items-center transition-colors">
+                <a href="{{ url_for('dashboard', page=1, per_page=per_page, time=time_filter, search=search, status='pending') }}" id="pending-btn" class="px-3 sm:px-4 py-1 sm:py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm sm:text-base font-medium flex items-center transition-colors {% if status_filter == 'pending' %}bg-red-800{% endif %}">
                     Pending <span class="ml-1 sm:ml-2 bg-white bg-opacity-20 px-1.5 sm:px-2 py-0.5 rounded-full text-xs">{{ pending_count }}</span>
                 </a>
-                <a href="{{ url_for('dashboard', page=1, per_page=per_page, time=time_filter, search=search, status='completed') }}" id="completed-btn" class="px-3 sm:px-4 py-1 sm:py-2 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm sm:text-base font-medium flex items-center transition-colors">
+                <a href="{{ url_for('dashboard', page=1, per_page=per_page, time=time_filter, search=search, status='completed') }}" id="completed-btn" class="px-3 sm:px-4 py-1 sm:py-2 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm sm:text-base font-medium flex items-center transition-colors {% if status_filter == 'completed' %}bg-green-800{% endif %}">
                     Completed <span class="ml-1 sm:ml-2 bg-white bg-opacity-20 px-1.5 sm:px-2 py-0.5 rounded-full text-xs">{{ completed_count }}</span>
                 </a>
-                <a href="{{ url_for('dashboard', page=1, per_page=per_page, time=time_filter, search=search, status='expenses') }}" id="expenses-btn" class="px-3 sm:px-4 py-1 sm:py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-sm sm:text-base font-medium flex items-center transition-colors">
+                <a href="{{ url_for('dashboard', page=1, per_page=per_page, time=time_filter, search=search, status='expenses') }}" id="expenses-btn" class="px-3 sm:px-4 py-1 sm:py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-sm sm:text-base font-medium flex items-center transition-colors {% if status_filter == 'expenses' %}bg-purple-800{% endif %}">
                     Expenses <span class="ml-1 sm:ml-2 bg-white bg-opacity-20 px-1.5 sm:px-2 py-0.5 rounded-full text-xs">{{ expenses_count }}</span>
                 </a>
-                <a href="{{ url_for('dashboard', page=1, per_page=per_page, time=time_filter, search=search, status='mpesa') }}" id="mpesa-btn" class="px-3 sm:px-4 py-1 sm:py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-md text-sm sm:text-base font-medium flex items-center transition-colors">
+                <a href="{{ url_for('dashboard', page=1, per_page=per_page, time=time_filter, search=search, status='mpesa') }}" id="mpesa-btn" class="px-3 sm:px-4 py-1 sm:py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-md text-sm sm:text-base font-medium flex items-center transition-colors {% if status_filter == 'mpesa' %}bg-teal-800{% endif %}">
                     M-Pesa/Bank <span class="ml-1 sm:ml-2 bg-white bg-opacity-20 px-1.5 sm:px-2 py-0.5 rounded-full text-xs">{{ mpesa_count }}</span>
                 </a>
             </div>
@@ -371,7 +371,6 @@
                                 </div>
                             </td>
                         </tr>
-                        {% endif %}
                         {% endfor %}
                     {% endfor %}
                 </tbody>
@@ -411,20 +410,27 @@
                     </tr>
                 </thead>
                 <tbody id="mpesa-body">
-                    {% if status_filter == 'mpesa' %}
-                    <tr class="bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white font-semibold">
-                        <td colspan="5" class="px-3 sm:px-6 py-2 text-sm sm:text-base text-gray-900 dark:text-white">Total: KSh {{ (mpesa_total - total_expenses) | round(2) }}</td>
+                    {% for group in mpesa_grouped_sales %}
+                        {% if time_filter != 'all' %}
+                        <tr class="bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white font-semibold">
+                            <td colspan="5" class="px-3 sm:px-6 py-2 text-sm sm:text-base text-gray-900 dark:text-white">{{ group.label }} (Total: KSh {{ (group.total - group.expenses) | round(2) }})</td>
+                        </tr>
+                        {% endif %}
+                        {% for sale in group.rows %}
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" data-date="{{ sale.date.strftime('%Y-%m-%d') }}" data-search="{{ sale.salesperson_name | lower }} {{ sale.shop_name | lower }}">
+                            <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-600 dark:text-gray-200">{{ sale.salesperson_name }}</td>
+                            <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-600 dark:text-gray-200">{{ sale.shop_name }}</td>
+                            <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-green-600 dark:text-green-300">KSh {{ sale.payment | round(2) }}</td>
+                            <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-600 dark:text-gray-200">{{ sale.payment_type | capitalize }}</td>
+                            <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-600 dark:text-gray-200">{{ sale.date.strftime('%d/%m/%Y') }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% endfor %}
+                    {% if mpesa_grouped_sales | length == 0 %}
+                    <tr>
+                        <td colspan="5" class="px-3 sm:px-6 py-3 sm:py-4 text-center text-xs sm:text-sm text-gray-600 dark:text-gray-200">No M-Pesa/Bank orders found.</td>
                     </tr>
                     {% endif %}
-                    {% for sale in mpesa_sales %}
-                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" data-date="{{ sale.date.strftime('%Y-%m-%d') }}" data-search="{{ sale.salesperson_name | lower }} {{ sale.shop_name | lower }}">
-                        <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-600 dark:text-gray-200">{{ sale.salesperson_name }}</td>
-                        <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-600 dark:text-gray-200">{{ sale.shop_name }}</td>
-                        <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-green-600 dark:text-green-300">KSh {{ sale.payment | round(2) }}</td>
-                        <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-600 dark:text-gray-200">{{ sale.payment_type | capitalize }}</td>
-                        <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-600 dark:text-gray-200">{{ sale.date.strftime('%d/%m/%Y') }}</td>
-                    </tr>
-                    {% endfor %}
                 </tbody>
             </table>
         </div>
@@ -455,7 +461,7 @@
         <!-- Pagination Controls -->
         <div class="p-3 sm:p-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-center gap-2">
             <span id="page-entries" class="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                Showing {{ (page - 1) * per_page + 1 }} to {{ (page - 1) * per_page + (expenses | length if status_filter == 'expenses' else mpesa_sales | length if status_filter == 'mpesa' else sales_history | length) }} of {{ total_items }} {% if status_filter == 'expenses' %}expenses{% elif status_filter == 'mpesa' %}M-Pesa/Bank orders{% else %}orders{% endif %}
+                Showing {{ (page - 1) * per_page + 1 }} to {{ (page - 1) * per_page + (expenses | length if status_filter == 'expenses' else mpesa_grouped_sales | sum(attribute='rows') | length if status_filter == 'mpesa' else grouped_sales_history | sum(attribute='rows') | length) }} of {{ total_items }} {% if status_filter == 'expenses' %}expenses{% elif status_filter == 'mpesa' %}M-Pesa/Bank orders{% else %}orders{% endif %}
             </span>
             <div class="flex items-center space-x-2">
                 <a id="prev-page" href="{{ url_for('dashboard', page=page-1, per_page=per_page, time=time_filter, search=search, status=status_filter) if page > 1 else '#' }}" class="px-3 sm:px-4 py-1 sm:py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 text-xs sm:text-sm {% if page <= 1 %}opacity-50 pointer-events-none{% endif %}">Previous</a>
@@ -535,7 +541,7 @@
                             notificationContent.appendChild(div);
                         });
                     } else {
-                        notificationContent.innerHTML = '<p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400">No notifications found.</p>';
+                        notificationContent.innerHTML = '<p class="text-xs sm:text-sm text-gray-600 dark:text-gray-400">No notifications found.</p>';
                     }
                     const unreadCount = data.filter(n => !n.read).length;
                     const badge = notificationBell.querySelector('span');
@@ -554,7 +560,7 @@
                 })
                 .catch(error => {
                     console.error('Error loading notifications:', error);
-                    notificationContent.innerHTML = '<p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Error loading notifications.</p>';
+                    notificationContent.innerHTML = '<p class="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Error loading notifications.</p>';
                 });
         }
 

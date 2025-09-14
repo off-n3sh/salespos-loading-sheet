@@ -1536,7 +1536,7 @@ def dashboard():
             'amount': float(doc.to_dict().get('amount', 0)),
             'category': doc.to_dict().get('category', ''),
             'date': process_date(doc.to_dict().get('date', datetime.now(NAIROBI_TZ))),
-            'salesperson_name': doc.to_dict().get('salesperson_name', 'N/A'),  # Default to 'N/A'
+            'salesperson_name': doc.to_dict().get('salesperson_name', 'N/A'),
             'is_expense': True
         }
         for doc in expenses_ref.stream()
@@ -1576,21 +1576,38 @@ def dashboard():
         for doc in orders_ref.stream():
             filtered_orders.append(process_order(doc))
 
-    # Include orders with today's payments or closure when time_filter == 'day'
-    if time_filter == 'day':
+    # Include orders and expenses for time_filter == 'day'
+    if time_filter == 'day' and status_filter not in ['expenses', 'mpesa']:
         filtered_orders = [
             order for order in filtered_orders
             if order['date'].strftime('%Y-%m-%d') == now.strftime('%Y-%m-%d') or
             any(today_start <= ph['date'] < today_end for ph in order['payment_history']) or
             (order['closed_date'] and today_start <= order['closed_date'] < today_end and order['balance'] <= 0)
         ]
-
-    # Include expenses in sales history unless status_filter == 'expenses' or 'mpesa'
-    if status_filter not in ['expenses', 'mpesa']:
         filtered_expenses = [
             {
                 'receipt_id': doc.id,
-                'salesperson_name': e.get('salesperson_name', 'N/A'),  # Default to 'N/A'
+                'salesperson_name': e.get('salesperson_name', 'N/A'),
+                'description': e['description'],
+                'amount': e['amount'],
+                'date': e['date'],
+                'is_expense': True,
+                'order_type': 'expense',
+                'payment': 0,
+                'balance': 0,
+                'payment_history': [],
+                'notes': '',
+                'status': 'paid'
+            }
+            for doc, e in [(doc, doc.to_dict()) for doc in expenses_ref.stream()]
+            if today_start <= e['date'] < today_end
+        ]
+        filtered_orders.extend(filtered_expenses)
+    elif status_filter not in ['expenses', 'mpesa']:
+        filtered_expenses = [
+            {
+                'receipt_id': doc.id,
+                'salesperson_name': e.get('salesperson_name', 'N/A'),
                 'description': e['description'],
                 'amount': e['amount'],
                 'date': e['date'],
@@ -1604,48 +1621,44 @@ def dashboard():
             }
             for doc, e in [(doc, doc.to_dict()) for doc in expenses_ref.stream()]
         ]
-        if time_filter == 'day':
-            filtered_expenses = [e for e in filtered_expenses if today_start <= e['date'] < today_end]
         filtered_orders.extend(filtered_expenses)
 
-    # Group orders and expenses
-    grouped_orders = group_orders(filtered_orders, time_filter, today_start, today_end, now)
-    
-    # Calculate expenses per group
-    for group in grouped_orders:
+    # Group orders and expenses for sales history
+    grouped_sales_history = group_orders(filtered_orders, time_filter, today_start, today_end, now)
+    for group in grouped_sales_history:
         group['expenses'] = sum(row['amount'] for row in group['rows'] if row.get('is_expense'))
 
-    # Fetch M-Pesa/Bank orders for mpesa filter
-    mpesa_sales = []
+    # Group M-Pesa/Bank orders
+    mpesa_grouped_sales = []
     mpesa_total = 0
     mpesa_count = 0
     if status_filter == 'mpesa':
-        mpesa_orders = db.collection('orders').where(filter=FieldFilter('payment_type', 'in', ['mpesa', 'bank_transfer'])).order_by('date', direction=firestore.Query.DESCENDING).stream()
-        for doc in mpesa_orders:
-            order = process_order(doc)
-            if search_query:
-                search_lower = search_query.lower()
-                if not (search_lower in order['salesperson_name'].lower() or search_lower in order['shop_name'].lower()):
-                    continue
-            if time_filter == 'day' and not (
-                order['date'].strftime('%Y-%m-%d') == now.strftime('%Y-%m-%d') or
+        mpesa_orders = [
+            order for order in filtered_orders
+            if order.get('payment_type') in ['mpesa', 'bank_transfer']
+        ]
+        if time_filter == 'day':
+            mpesa_orders = [
+                order for order in mpesa_orders
+                if order['date'].strftime('%Y-%m-%d') == now.strftime('%Y-%m-%d') or
                 any(today_start <= ph['date'] < today_end for ph in order['payment_history']) or
                 (order['closed_date'] and today_start <= order['closed_date'] < today_end and order['balance'] <= 0)
-            ):
-                continue
-            mpesa_sales.append(order)
-            mpesa_total += order['payment']
-        mpesa_count = len(mpesa_sales)
+            ]
+        mpesa_grouped_sales = group_orders(mpesa_orders, time_filter, today_start, today_end, now)
+        for group in mpesa_grouped_sales:
+            group['expenses'] = sum(row['amount'] for row in group['rows'] if row.get('is_expense'))
+        mpesa_count = sum(len(group['rows']) for group in mpesa_grouped_sales)
+        mpesa_total = sum(group['total'] - group['expenses'] for group in mpesa_grouped_sales)
 
     # Pagination
     if status_filter == 'expenses':
         flat_orders = [(f"Day: {e['date'].strftime('%d %b %Y')}", e) for e in expenses]
         total_items = expenses_count
     elif status_filter == 'mpesa':
-        flat_orders = [(f"Day: {order['date'].strftime('%d %b %Y')}", order) for order in mpesa_sales]
+        flat_orders = [(group['label'], order) for group in mpesa_grouped_sales for order in group['rows']]
         total_items = mpesa_count
     else:
-        flat_orders = [(group['label'], order) for group in grouped_orders for order in group['rows']]
+        flat_orders = [(group['label'], order) for group in grouped_sales_history for order in group['rows']]
         total_items = len(flat_orders)
     total_pages = (total_items + per_page - 1) // per_page if total_items > 0 else 1
     start_idx = (page - 1) * per_page
@@ -1653,19 +1666,19 @@ def dashboard():
     paginated_orders = flat_orders[start_idx:end_idx]
 
     # Prepare grouped sales history
-    grouped_sales_history = []
+    grouped_sales_history_paginated = []
     current_group = None
     for label, order in paginated_orders:
         if not current_group or current_group['label'] != label:
             current_group = {
                 'label': label,
                 'rows': [],
-                'total': next((group['total'] for group in grouped_orders if group['label'] == label), 0),
-                'debt': next((group['debt'] for group in grouped_orders if group['label'] == label), 0),
-                'expenses': next((group['expenses'] for group in grouped_orders if group['label'] == label), 0),
+                'total': next((group['total'] for group in grouped_sales_history if group['label'] == label), 0),
+                'debt': next((group['debt'] for group in grouped_sales_history if group['label'] == label), 0),
+                'expenses': next((group['expenses'] for group in grouped_sales_history if group['label'] == label), 0),
                 'is_new': label.startswith(f"Day: {now.strftime('%d %b %Y')}")
             }
-            grouped_sales_history.append(current_group)
+            grouped_sales_history_paginated.append(current_group)
         order_copy = order.copy()
         if not order_copy.get('is_expense'):
             order_copy['highlight'] = (
@@ -1693,9 +1706,9 @@ def dashboard():
     return render_template(
         'dashboard.html',
         user=session['user'],
-        grouped_sales_history=grouped_sales_history if status_filter not in ['expenses', 'mpesa'] else [],
+        grouped_sales_history=grouped_sales_history_paginated if status_filter not in ['expenses', 'mpesa'] else [],
         expenses=expenses if status_filter == 'expenses' else [],
-        mpesa_sales=mpesa_sales if status_filter == 'mpesa' else [],
+        mpesa_grouped_sales=mpesa_grouped_sales if status_filter == 'mpesa' else [],
         mpesa_total=mpesa_total,
         mpesa_count=mpesa_count,
         expenses_count=expenses_count,
