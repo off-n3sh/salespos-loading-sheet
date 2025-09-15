@@ -1,113 +1,215 @@
-@app.route('/daily_sales_report')
-@no_cache
-@login_required
-def daily_sales_report():
-    # Get today's date range
-    now = datetime.now(NAIROBI_TZ)
-    start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    end_of_day = now.replace(hour=23, minute=59, second=59, microsecond=999999)
-    
-    # Fetch today's orders
-    orders_ref = db.collection('orders').where('date', '>=', start_of_day).where('date', '<=', end_of_day).stream()
-    
-    today_orders = []
-    all_items = []
-    total_wholesale_revenue = 0
-    total_retail_revenue = 0
-    total_wholesale_paid = 0
-    total_retail_paid = 0
-    total_debt = 0
-    
-    for doc in orders_ref:
-        order_dict = doc.to_dict()
-        order_date = process_date(order_dict.get('date'))
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Sales Report - {{ date }}</title>
+    <style>
+        @media print {
+            body { margin: 0; padding: 10px; }
+            .no-print { display: none; }
+            .print-break { page-break-after: always; }
+        }
         
-        # Extract items from the order
-        items = order_dict.get('items', [])
+        body {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.2;
+            max-width: 300px;
+            margin: 0 auto;
+            padding: 10px;
+            background: white;
+        }
         
-        # Convert items array to proper format (assuming it's stored as [product, name, quantity, qty_val, price, price_val])
-        processed_items = []
-        if items and len(items) >= 6:
-            for i in range(0, len(items), 6):
-                if i + 5 < len(items):
-                    try:
-                        processed_items.append({
-                            'product': items[i + 1],
-                            'quantity': float(items[i + 3]),  # Convert to float
-                            'price': float(items[i + 5])      # Convert to float
-                        })
-                    except (ValueError, TypeError) as e:
-                        print(f"Invalid data for item at index {i} in order {doc.id}: quantity={items[i + 3]}, price={items[i + 5]}, error={e}")
-                        continue
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #333;
+            padding-bottom: 8px;
+            margin-bottom: 15px;
+        }
         
-        all_items.extend(processed_items)
+        .company-name {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 3px;
+        }
         
-        order_type = order_dict.get('order_type', 'wholesale')
-        payment = float(order_dict.get('payment', 0))  # Ensure payment is float
-        balance = float(order_dict.get('balance', 0))  # Ensure balance is float
+        .report-title {
+            font-size: 14px;
+            font-weight: bold;
+            margin: 8px 0 5px 0;
+        }
         
-        if order_type == 'wholesale':
-            total_wholesale_revenue += payment + balance
-            total_wholesale_paid += payment
-        else:
-            total_retail_revenue += payment + balance
-            total_retail_paid += payment
-            
-        total_debt += balance
+        .meta-info {
+            font-size: 10px;
+            margin-bottom: 5px;
+        }
         
-        today_orders.append({
-            'receipt_id': order_dict.get('receipt_id', doc.id),
-            'shop_name': order_dict.get('shop_name', 'Unknown'),
-            'order_type': order_type,
-            'payment': payment,
-            'balance': balance,
-            'items': processed_items
-        })
+        .section {
+            margin: 15px 0;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 10px;
+        }
+        
+        .section-title {
+            font-weight: bold;
+            font-size: 13px;
+            margin-bottom: 6px;
+            border-bottom: 1px solid #000;
+            padding-bottom: 2px;
+        }
+        
+        .item-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 2px 0;
+            font-size: 11px;
+        }
+        
+        .item-name {
+            flex: 1;
+            text-transform: capitalize;
+        }
+        
+        .item-details {
+            text-align: right;
+            min-width: 120px;
+        }
+        
+        .totals {
+            background: #f5f5f5;
+            padding: 8px;
+            margin: 10px 0;
+            border: 1px solid #333;
+        }
+        
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            margin: 3px 0;
+        }
+        
+        .final-total {
+            border-top: 2px solid #333;
+            padding-top: 5px;
+            margin-top: 8px;
+            font-size: 13px;
+        }
+        
+        .print-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .print-btn:hover {
+            background: #0056b3;
+        }
+        
+        .expense-item {
+            font-size: 10px;
+            color: #666;
+            margin: 2px 0;
+        }
+    </style>
+</head>
+<body>
+    <button class="print-btn no-print" onclick="window.print()">Print Report</button>
     
-    # Fetch today's retail sales
-    retail_ref = db.collection('retail').where('date', '>=', start_of_day).where('date', '<=', end_of_day).stream()
-    for doc in retail_ref:
-        retail_dict = doc.to_dict()
-        amount = float(retail_dict.get('amount', 0))  # Ensure amount is float
-        total_retail_revenue += amount
-        total_retail_paid += amount
-    
-    # Fetch today's expenses
-    expenses_ref = db.collection('expenses').where('date', '>=', start_of_day).where('date', '<=', end_of_day).stream()
-    total_expenses = 0
-    today_expenses = []
-    
-    for doc in expenses_ref:
-        expense_dict = doc.to_dict()
-        amount = float(expense_dict.get('amount', 0))  # Ensure amount is float
-        total_expenses += amount
-        today_expenses.append({
-            'category': expense_dict.get('category', 'Other'),
-            'description': expense_dict.get('description', ''),
-            'amount': amount
-        })
-    
-    # Group similar items
-    grouped_items = group_similar_items(all_items)
-    
-    # Calculate final totals
-    gross_revenue = total_retail_paid + total_wholesale_paid
-    net_profit = gross_revenue - total_expenses
-    
-    report_data = {
-        'date': now.strftime('%d/%m/%Y'),
-        'time_generated': now.strftime('%H:%M:%S'),
-        'grouped_items': dict(grouped_items),
-        'total_wholesale_revenue': total_wholesale_revenue,
-        'total_retail_revenue': total_retail_revenue,
-        'total_wholesale_paid': total_wholesale_paid,
-        'total_retail_paid': total_retail_paid,
-        'total_debt': total_debt,
-        'total_expenses': total_expenses,
-        'gross_revenue': gross_revenue,
-        'net_profit': net_profit,
-        'orders_count': len(today_orders),
-        'today_expenses': today_expenses
-    }
-    
-    return render_template('daily_sales_report.html', **report_data)
+    <div class="header">
+        <div class="company-name">DREAMLAND DISTRIBUTORS</div>
+        <div style="font-size: 10px;">P.O Box 123-00200 Nairobi</div>
+        <div style="font-size: 10px;">Phone: 0725 530632</div>
+        <div class="report-title">DAILY SALES REPORT</div>
+        <div class="meta-info">Date: {{ date }}</div>
+        <div class="meta-info">Generated: {{ time_generated }}</div>
+        <div class="meta-info">Orders Processed: {{ orders_count }}</div>
+    </div>
+
+    <!-- Commented out ITEMS MOVED TODAY section for later use -->
+    <!--
+    {% if grouped_items %}
+    <div class="section">
+        <div class="section-title">ITEMS MOVED TODAY</div>
+        {% for group_name, group_data in grouped_items.items() %}
+        <div class="item-row">
+            <div class="item-name">{{ group_name|title }}</div>
+            <div class="item-details">{{ group_data.quantity }} pcs - {{ group_data.revenue|round(2) }} KES</div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    -->
+
+    <div class="section">
+        <div class="section-title">SALES SUMMARY</div>
+        <div class="item-row">
+            <div>Wholesale Revenue:</div>
+            <div>{{ total_wholesale_revenue|round(2) }} KES</div>
+        </div>
+        <div class="item-row">
+            <div>Retail Revenue:</div>
+            <div>{{ total_retail_revenue|round(2) }} KES</div>
+        </div>
+        <div class="item-row">
+            <div>Wholesale Paid:</div>
+            <div>{{ total_wholesale_paid|round(2) }} KES</div>
+        </div>
+        <div class="item-row">
+            <div>Retail Paid:</div>
+            <div>{{ total_retail_paid|round(2) }} KES</div>
+        </div>
+        <div class="item-row" style="color: #d32f2f;">
+            <div>Outstanding Debt:</div>
+            <div>{{ total_debt|round(2) }} KES</div>
+        </div>
+    </div>
+
+    {% if today_expenses %}
+    <div class="section">
+        <div class="section-title">TODAY'S EXPENSES</div>
+        {% for expense in today_expenses %}
+        <div class="expense-item">
+            {{ expense.category }}: {{ expense.description }} - {{ expense.amount|round(2) }} KES
+        </div>
+        {% endfor %}
+        <div class="item-row" style="color: #d32f2f; margin-top: 5px;">
+            <div><strong>Total Expenses:</strong></div>
+            <div><strong>{{ total_expenses|round(2) }} KES</strong></div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="totals">
+        <div class="total-row">
+            <div>Gross Revenue:</div>
+            <div>{{ gross_revenue|round(2) }} KES</div>
+        </div>
+        <div class="total-row">
+            <div>Total Expenses:</div>
+            <div>{{ total_expenses|round(2) }} KES</div>
+        </div>
+        <div class="total-row">
+            <div>Outstanding Debt:</div>
+            <div>{{ total_debt|round(2) }} KES</div>
+        </div>
+        <div class="total-row final-total" style="color: {{ 'green' if net_profit >= 0 else 'red' }};">
+            <div>NET PROFIT:</div>
+            <div>{{ net_profit|round(2) }} KES</div>
+        </div>
+    </div>
+
+    <div style="text-align: center; margin-top: 20px; font-size: 10px; color: #666;">
+        <div>--- END OF REPORT ---</div>
+        <div>System Generated on {{ date }} {{ time_generated }}</div>
+    </div>
+</body>
+</html>
