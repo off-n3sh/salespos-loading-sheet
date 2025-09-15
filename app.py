@@ -23,6 +23,7 @@ import signal
 from contextlib import contextmanager
 import traceback
 from google.api_core import exceptions
+from collections import defaultdict
 
 
 app = Flask(__name__)
