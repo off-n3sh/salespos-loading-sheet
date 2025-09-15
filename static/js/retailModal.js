@@ -72,10 +72,12 @@ function resetModal(container) {
         debtElement.classList.add('hidden');
         console.log(`Reset debt element for ${modalId}`);
     }
-    // Reset payment type and hide amount paid by default
+    // Reset payment type to cash and show amount paid
     if (retailPaymentType) {
         retailPaymentType.value = 'cash';
-        document.getElementById('retail-amount-paid-container').style.display = 'none';
+        document.getElementById('retail-amount-paid-container').style.display = 'block';
+        retailAmountPaid.value = ''; // Clear input for manual entry
+        retailAmountPaid.removeAttribute('readonly'); // Ensure editable
     }
 }
 
@@ -215,8 +217,9 @@ if (retailPaymentType) {
     };
     retailPaymentType.addEventListener('change', paymentTypeHandler);
     eventListeners.push({ element: retailPaymentType, type: 'change', handler: paymentTypeHandler });
-    paymentTypeHandler(); // Initialize on load
+    paymentTypeHandler(); // Initialize on load to set cash and show amount paid
 }
+
 
 const retailForm = document.getElementById('retail-form');
 if (retailForm) {
