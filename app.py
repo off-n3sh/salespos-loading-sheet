@@ -705,7 +705,6 @@ def daily_sales_report():
     orders_ref = db.collection('orders').where('date', '>=', start_of_day).where('date', '<=', end_of_day).stream()
     
     today_orders = []
-    all_items = []
     total_wholesale_revenue = 0
     total_retail_revenue = 0
     total_wholesale_paid = 0
@@ -716,10 +715,10 @@ def daily_sales_report():
         order_dict = doc.to_dict()
         order_date = process_date(order_dict.get('date'))
         
-        # Extract items from the order
+        # Extract items from the order (no longer needed for grouped_items, but kept for order details)
         items = order_dict.get('items', [])
         
-        # Convert items array to proper format (assuming it's stored as [product, name, quantity, qty_val, price, price_val])
+        # Convert items array to proper format for order details
         processed_items = []
         if items and len(items) >= 6:
             for i in range(0, len(items), 6):
@@ -733,8 +732,6 @@ def daily_sales_report():
                     except (ValueError, TypeError) as e:
                         print(f"Invalid data for item at index {i} in order {doc.id}: quantity={items[i + 3]}, price={items[i + 5]}, error={e}")
                         continue
-        
-        all_items.extend(processed_items)
         
         order_type = order_dict.get('order_type', 'wholesale')
         payment = float(order_dict.get('payment', 0))  # Ensure payment is float
@@ -781,17 +778,13 @@ def daily_sales_report():
             'amount': amount
         })
     
-    # Group similar items
-    grouped_items = group_similar_items(all_items)
-    
     # Calculate final totals
     gross_revenue = total_retail_paid + total_wholesale_paid
-    net_profit = gross_revenue - total_expenses
+    net_profit = gross_revenue - total_expenses - total_debt  # Deduct debt
     
     report_data = {
         'date': now.strftime('%d/%m/%Y'),
         'time_generated': now.strftime('%H:%M:%S'),
-        'grouped_items': dict(grouped_items),
         'total_wholesale_revenue': total_wholesale_revenue,
         'total_retail_revenue': total_retail_revenue,
         'total_wholesale_paid': total_wholesale_paid,
