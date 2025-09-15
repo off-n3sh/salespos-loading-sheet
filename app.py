@@ -724,17 +724,21 @@ def daily_sales_report():
         if items and len(items) >= 6:
             for i in range(0, len(items), 6):
                 if i + 5 < len(items):
-                    processed_items.append({
-                        'product': items[i + 1],
-                        'quantity': items[i + 3],
-                        'price': items[i + 5]
-                    })
+                    try:
+                        processed_items.append({
+                            'product': items[i + 1],
+                            'quantity': float(items[i + 3]),  # Convert to float
+                            'price': float(items[i + 5])      # Convert to float
+                        })
+                    except (ValueError, TypeError) as e:
+                        print(f"Invalid data for item at index {i} in order {doc.id}: quantity={items[i + 3]}, price={items[i + 5]}, error={e}")
+                        continue
         
         all_items.extend(processed_items)
         
         order_type = order_dict.get('order_type', 'wholesale')
-        payment = order_dict.get('payment', 0)
-        balance = order_dict.get('balance', 0)
+        payment = float(order_dict.get('payment', 0))  # Ensure payment is float
+        balance = float(order_dict.get('balance', 0))  # Ensure balance is float
         
         if order_type == 'wholesale':
             total_wholesale_revenue += payment + balance
@@ -758,7 +762,7 @@ def daily_sales_report():
     retail_ref = db.collection('retail').where('date', '>=', start_of_day).where('date', '<=', end_of_day).stream()
     for doc in retail_ref:
         retail_dict = doc.to_dict()
-        amount = retail_dict.get('amount', 0)
+        amount = float(retail_dict.get('amount', 0))  # Ensure amount is float
         total_retail_revenue += amount
         total_retail_paid += amount
     
@@ -769,7 +773,7 @@ def daily_sales_report():
     
     for doc in expenses_ref:
         expense_dict = doc.to_dict()
-        amount = expense_dict.get('amount', 0)
+        amount = float(expense_dict.get('amount', 0))  # Ensure amount is float
         total_expenses += amount
         today_expenses.append({
             'category': expense_dict.get('category', 'Other'),
