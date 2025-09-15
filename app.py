@@ -649,7 +649,157 @@ def timeout(seconds):
     finally:
         signal.alarm(0)
         signal.signal(signal.SIGALRM, old_handler)
+def group_similar_items(items):
+    """Group items with similar names using simple keyword matching"""
+    grouped = defaultdict(lambda: {'quantity': 0, 'revenue': 0, 'items': []})
+    
+    # Define common product keywords for grouping
+    keywords = {
+        'ugali': ['ugali', 'unga', 'flour'],
+        'oil': ['oil', 'mafuta'],
+        'sugar': ['sugar', 'sukari'],
+        'rice': ['rice', 'mchele'],
+        'soap': ['soap', 'sabuni'],
+        'salt': ['salt', 'chumvi'],
+        'milk': ['milk', 'maziwa'],
+        'bread': ['bread', 'mkate'],
+        'tea': ['tea', 'chai'],
+        'maize': ['maize', 'mahindi'],
+        'beans': ['beans', 'maharagwe'],
+        'tissue': ['tissue', 'serviette', 'napkin']
+    }
+    
+    for item in items:
+        product_name = item.get('product', '').lower()
+        quantity = item.get('quantity', 0)
+        price = item.get('price', 0)
+        
+        # Find matching keyword group
+        matched_group = None
+        for group_name, group_keywords in keywords.items():
+            if any(keyword in product_name for keyword in group_keywords):
+                matched_group = group_name
+                break
+        
+        # If no keyword match, use first word as group
+        if not matched_group:
+            matched_group = product_name.split()[0] if product_name else 'other'
+        
+        grouped[matched_group]['quantity'] += quantity
+        grouped[matched_group]['revenue'] += quantity * price
+        grouped[matched_group]['items'].append(item.get('product', 'Unknown'))
+    
+    return grouped
 
+@app.route('/daily_sales_report')
+@no_cache
+@login_required
+def daily_sales_report():
+    # Get today's date range
+    now = datetime.now(NAIROBI_TZ)
+    start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_of_day = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+    
+    # Fetch today's orders
+    orders_ref = db.collection('orders').where('date', '>=', start_of_day).where('date', '<=', end_of_day).stream()
+    
+    today_orders = []
+    all_items = []
+    total_wholesale_revenue = 0
+    total_retail_revenue = 0
+    total_wholesale_paid = 0
+    total_retail_paid = 0
+    total_debt = 0
+    
+    for doc in orders_ref:
+        order_dict = doc.to_dict()
+        order_date = process_date(order_dict.get('date'))
+        
+        # Extract items from the order
+        items = order_dict.get('items', [])
+        
+        # Convert items array to proper format (assuming it's stored as [product, name, quantity, qty_val, price, price_val])
+        processed_items = []
+        if items and len(items) >= 6:
+            for i in range(0, len(items), 6):
+                if i + 5 < len(items):
+                    processed_items.append({
+                        'product': items[i + 1],
+                        'quantity': items[i + 3],
+                        'price': items[i + 5]
+                    })
+        
+        all_items.extend(processed_items)
+        
+        order_type = order_dict.get('order_type', 'wholesale')
+        payment = order_dict.get('payment', 0)
+        balance = order_dict.get('balance', 0)
+        
+        if order_type == 'wholesale':
+            total_wholesale_revenue += payment + balance
+            total_wholesale_paid += payment
+        else:
+            total_retail_revenue += payment + balance
+            total_retail_paid += payment
+            
+        total_debt += balance
+        
+        today_orders.append({
+            'receipt_id': order_dict.get('receipt_id', doc.id),
+            'shop_name': order_dict.get('shop_name', 'Unknown'),
+            'order_type': order_type,
+            'payment': payment,
+            'balance': balance,
+            'items': processed_items
+        })
+    
+    # Fetch today's retail sales
+    retail_ref = db.collection('retail').where('date', '>=', start_of_day).where('date', '<=', end_of_day).stream()
+    for doc in retail_ref:
+        retail_dict = doc.to_dict()
+        amount = retail_dict.get('amount', 0)
+        total_retail_revenue += amount
+        total_retail_paid += amount
+    
+    # Fetch today's expenses
+    expenses_ref = db.collection('expenses').where('date', '>=', start_of_day).where('date', '<=', end_of_day).stream()
+    total_expenses = 0
+    today_expenses = []
+    
+    for doc in expenses_ref:
+        expense_dict = doc.to_dict()
+        amount = expense_dict.get('amount', 0)
+        total_expenses += amount
+        today_expenses.append({
+            'category': expense_dict.get('category', 'Other'),
+            'description': expense_dict.get('description', ''),
+            'amount': amount
+        })
+    
+    # Group similar items
+    grouped_items = group_similar_items(all_items)
+    
+    # Calculate final totals
+    gross_revenue = total_retail_paid + total_wholesale_paid
+    net_profit = gross_revenue - total_expenses
+    
+    report_data = {
+        'date': now.strftime('%d/%m/%Y'),
+        'time_generated': now.strftime('%H:%M:%S'),
+        'grouped_items': dict(grouped_items),
+        'total_wholesale_revenue': total_wholesale_revenue,
+        'total_retail_revenue': total_retail_revenue,
+        'total_wholesale_paid': total_wholesale_paid,
+        'total_retail_paid': total_retail_paid,
+        'total_debt': total_debt,
+        'total_expenses': total_expenses,
+        'gross_revenue': gross_revenue,
+        'net_profit': net_profit,
+        'orders_count': len(today_orders),
+        'today_expenses': today_expenses
+    }
+    
+    return render_template('daily_sales_report.html', **report_data)
 
     
 @app.route('/clear_collections', methods=['POST'])
@@ -3043,6 +3193,8 @@ def export_report():
     now = datetime.now(NAIROBI_TZ)
 
     # Determine the time range based on filter
+    if report_type == 'daily_sales':
+        return redirect(url_for('daily_sales_report'))
     if time_filter == 'day':
         start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     elif time_filter == 'week':
