@@ -284,7 +284,7 @@ def calculate_dashboard_stats(orders, retail_collection, today_start, today_end)
 def process_order(doc):
     order_dict = doc.to_dict()
     balance = float(order_dict.get('balance', 0))
-    closed_date = process_date(order_dict.get('closed_date'))
+    closed_date = process_date(order_dict.get('closed_date')) if order_dict.get('closed_date') else None
     status = order_dict.get('status', 'pending' if balance > 0 else 'completed')
     if balance > 0:
         closed_date = None
@@ -302,7 +302,7 @@ def process_order(doc):
         'date': process_date(order_dict.get('date')),
         'closed_date': closed_date,
         'order_type': order_dict.get('order_type', 'wholesale'),
-        'payment_type': order_dict.get('payment_type', ''),  # Added payment_type
+        'payment_type': order_dict.get('payment_type', ''),
         'payment_history': [
             {'amount': float(ph.get('amount', 0)), 'date': process_date(ph.get('date')), 'payment_type': ph.get('payment_type', '')}
             for ph in order_dict.get('payment_history', [])
@@ -1689,9 +1689,6 @@ def dashboard():
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     today_end = today_start + timedelta(days=1)
 
-    # Debug logs for gateway payments
-    debug_logs = []
-
     # Fetch all orders for stats calculation
     all_orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING)
     all_orders = list(all_orders_ref.stream())
@@ -1720,53 +1717,26 @@ def dashboard():
     total_orders = len(all_orders)
     pending_count = sum(1 for doc in all_orders if float(doc.to_dict().get('balance', 0)) > 0)
     completed_count = sum(1 for doc in all_orders if float(doc.to_dict().get('balance', 0)) <= 0.001)
+    todays_debt = sum(float(order.to_dict().get('balance', 0)) for order in all_orders if process_date(order.to_dict().get('date')) >= today_start and process_date(order.to_dict().get('date')) < today_end and float(order.to_dict().get('balance', 0)) > 0)
 
     # Initialize variables
     gateway_payments = []
     gateway_count = 0
     filtered_orders = []
 
-    # Process gateway payments for the gateway filters
+    # Process gateway payments for the gateway filter
     if status_filter == 'gateway':
-        debug_logs.append("=== GATEWAY PAYMENT PROCESSING STARTED ===")
         all_orders_for_gateway = db.collection('orders').stream()
-        order_processed = 0
-
         for doc in all_orders_for_gateway:
-            order_processed += 1
             order_data = doc.to_dict()
             receipt_id = order_data.get('receipt_id', doc.id)
-
-            debug_logs.append(f"Order {order_processed}: {receipt_id}")
-
-            # CHECK ORDER-LEVEL PAYMENT TYPE FIRST
-            order_payment_type_raw = order_data.get('payment_type', '')
-            order_payment_type = str(order_payment_type_raw).lower().strip()
-            debug_logs.append(f"  Order payment_type: '{order_payment_type_raw}' -> '{order_payment_type}'")
-
-            # Only process if this order has gateway payment type
+            order_payment_type = str(order_data.get('payment_type', '')).lower().strip()
             if order_payment_type in ['mpesa', 'bank_transfer']:
-                debug_logs.append(f"  ✓ Order has gateway payment type!")
                 payment_history = order_data.get('payment_history', [])
-                debug_logs.append(f"  Payment history entries: {len(payment_history)}")
-
-                for i, payment_entry in enumerate(payment_history):
+                for payment_entry in payment_history:
                     payment_amount = float(payment_entry.get('amount', 0))
-                    debug_logs.append(f"    Payment {i+1}: amount={payment_amount}")
-
                     if payment_amount > 0:
-                        debug_logs.append(f"    ✓ GATEWAY PAYMENT FOUND!")
-
-                        # Simple date processing
-                        try:
-                            payment_date = payment_entry.get('date')
-                            if hasattr(payment_date, 'timestamp'):
-                                payment_date = payment_date.replace(tzinfo=None)
-                            debug_logs.append(f"    Date processed: {payment_date}")
-                        except Exception as e:
-                            debug_logs.append(f"    Date error: {e}")
-                            payment_date = datetime.now()
-
+                        payment_date = process_date(payment_entry.get('date', datetime.now(NAIROBI_TZ)))
                         gateway_payment = {
                             'receipt_id': receipt_id,
                             'salesperson_name': order_data.get('salesperson_name', 'Unknown'),
@@ -1777,30 +1747,17 @@ def dashboard():
                             'balance': float(order_data.get('balance', 0))
                         }
                         gateway_payments.append(gateway_payment)
-                        debug_logs.append(f"    Added to list. Total gateway payments: {len(gateway_payments)}")
-            else:
-                debug_logs.append(f"  Skipping - not gateway type ('{order_payment_type}')")
-
-        debug_logs.append(f"=== PROCESSING COMPLETE ===")
-        debug_logs.append(f"Total orders processed: {order_processed}")
-        debug_logs.append(f"Gateway payments found: {len(gateway_payments)}")
         gateway_count = len(gateway_payments)
-
-        # Sort by date
-        if gateway_payments:
-            gateway_payments.sort(key=lambda x: x['date'], reverse=True)
-            debug_logs.append("Gateway payments sorted by date")
+        gateway_payments.sort(key=lambda x: x['date'], reverse=True)
 
     # Process regular orders for non-gateway filters
     if status_filter != 'gateway':
-        # Fetch orders based on status filter
         orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING)
         if status_filter == 'pending':
             orders_ref = orders_ref.where(filter=FieldFilter('balance', '>', 0))
         elif status_filter == 'completed':
             orders_ref = orders_ref.where(filter=FieldFilter('balance', '>=', -0.001)).where(filter=FieldFilter('balance', '<=', 0.001))
 
-        # Apply search query for regular orders
         if search_query:
             search_lower = search_query.lower()
             matching_order_ids = set()
@@ -1822,7 +1779,7 @@ def dashboard():
                 order for order in filtered_orders
                 if order['date'].strftime('%Y-%m-%d') == now.strftime('%Y-%m-%d') or
                 any(today_start <= ph['date'] < today_end for ph in order['payment_history']) or
-                (order['closed_date'] and today_start <= order['closed_date'] < today_end and order['balance'] <= 0)
+                (order.get('closed_date') and today_start <= order['closed_date'] < today_end and order['balance'] <= 0)
             ]
             if status_filter not in ['expenses']:
                 filtered_expenses = [
@@ -1845,7 +1802,7 @@ def dashboard():
                 ]
                 filtered_orders.extend(filtered_expenses)
 
-    # Group orders for sales history (only for non-gateway, non-expense filters)
+    # Group orders for sales history (non-gateway, non-expense filters)
     grouped_sales_history = []
     if status_filter not in ['expenses', 'gateway']:
         grouped_sales_history = group_orders(filtered_orders, time_filter, today_start, today_end, now)
@@ -1853,29 +1810,32 @@ def dashboard():
             group['expenses'] = sum(row['amount'] for row in group['rows'] if row.get('is_expense'))
             group['expenses_list'] = [row for row in group['rows'] if row.get('is_expense')]
 
-    # Determine pagination data based on filter type
+    # Group expenses
+    grouped_expenses = group_expenses(expenses, time_filter, now)
+    grouped_gateway_payments = group_gateway_payments(gateway_payments, time_filter, now)
+
+    # Determine pagination data
     if status_filter == 'expenses':
-        flat_orders = [(f"Day: {e['date'].strftime('%d %b %Y')}", e) for e in expenses]
+        flat_items = [(group['label'], expense) for group in grouped_expenses for expense in group['rows']]
         total_items = expenses_count
     elif status_filter == 'gateway':
-        flat_orders = [(f"Gateway: {gp['date'].strftime('%d %b %Y')}", gp) for gp in gateway_payments]
+        flat_items = [(group['label'], payment) for group in grouped_gateway_payments for payment in group['rows']]
         total_items = gateway_count
-        debug_logs.append(f"Final gateway payments for pagination: {len(gateway_payments)}")
     else:
-        flat_orders = [(group['label'], order) for group in grouped_sales_history for order in group['rows']]
-        total_items = len(flat_orders)
+        flat_items = [(group['label'], order) for group in grouped_sales_history for order in group['rows']]
+        total_items = len(flat_items)
 
     # Calculate pagination
     total_pages = (total_items + per_page - 1) // per_page if total_items > 0 else 1
     start_idx = (page - 1) * per_page
     end_idx = start_idx + per_page
-    paginated_orders = flat_orders[start_idx:end_idx]
+    paginated_items = flat_items[start_idx:end_idx]
 
     # Prepare grouped sales history for non-gateway filters
     grouped_sales_history_paginated = []
     if status_filter not in ['expenses', 'gateway']:
         current_group = None
-        for label, order in paginated_orders:
+        for label, order in paginated_items:
             if not current_group or current_group['label'] != label:
                 current_group = {
                     'label': label,
@@ -1887,43 +1847,49 @@ def dashboard():
                     'is_new': label.startswith(f"Day: {now.strftime('%d %b %Y')}")
                 }
                 grouped_sales_history_paginated.append(current_group)
-
             order_copy = order.copy()
             if not order_copy.get('is_expense'):
                 order_copy['highlight'] = (
                     any(today_start <= ph['date'] < today_end for ph in order['payment_history']) or
                     order['date'] >= today_start or
-                    (order['closed_date'] and today_start <= order['closed_date'] < today_end)
+                    (order.get('closed_date') and today_start <= order['closed_date'] < today_end)
                 )
             current_group['rows'].append(order_copy)
 
-    # Paginate gateway payments for gateway filter
-    gateway_payments_paginated = []
-    if status_filter == 'gateway':
-        gateway_payments_paginated = [order for label, order in paginated_orders]
-        debug_logs.append(f"Paginated gateway payments: {len(gateway_payments_paginated)}")
+    # Paginate expenses
+    grouped_expenses_paginated = []
+    if status_filter == 'expenses':
+        current_group = None
+        for label, expense in paginated_items:
+            if not current_group or current_group['label'] != label:
+                current_group = {
+                    'label': label,
+                    'rows': [],
+                    'total': next((group['total'] for group in grouped_expenses if group['label'] == label), 0)
+                }
+                grouped_expenses_paginated.append(current_group)
+            current_group['rows'].append(expense)
 
-    # Fetch notifications
-    user_id = session['user'].get('uid', '')
-    notifications_ref = db.collection('notifications').where(filter=FieldFilter('recipient', '==', user_id)).order_by('timestamp', direction=firestore.Query.DESCENDING).limit(10)
-    notifications = [
-        {
-            'id': doc.id,
-            'message': doc.to_dict().get('message', ''),
-            'timestamp': process_date(doc.to_dict().get('timestamp', datetime.now(NAIROBI_TZ))),
-            'order_id': doc.to_dict().get('order_id', ''),
-            'read': doc.to_dict().get('read', False)
-        }
-        for doc in notifications_ref.stream()
-    ]
-    unread_count = sum(1 for notif in notifications if not notif['read'])
+    # Paginate gateway payments
+    grouped_gateway_payments_paginated = []
+    if status_filter == 'gateway':
+        current_group = None
+        for label, payment in paginated_items:
+            if not current_group or current_group['label'] != label:
+                current_group = {
+                    'label': label,
+                    'rows': [],
+                    'total': next((group['total'] for group in grouped_gateway_payments if group['label'] == label), 0)
+                }
+                grouped_gateway_payments_paginated.append(current_group)
+            current_group['rows'].append(payment)
 
     return render_template(
         'dashboard.html',
         user=session['user'],
         grouped_sales_history=grouped_sales_history_paginated if status_filter not in ['expenses', 'gateway'] else [],
-        expenses=expenses if status_filter == 'expenses' else [],
-        gateway_payments=gateway_payments_paginated if status_filter == 'gateway' else [],
+        expenses=grouped_expenses_paginated if status_filter == 'expenses' else [],
+        gateway_payments=grouped_gateway_payments_paginated if status_filter == 'gateway' else [],
         gateway_count=gateway_count,
         expenses_count=expenses_count,
         total_sales_today=stats['total_sales_today'],
@@ -1937,6 +1903,7 @@ def dashboard():
         retail_closed_orders=stats['retail_closed_orders'],
         wholesale_open_orders=stats['wholesale_open_orders'],
         wholesale_closed_orders=stats['wholesale_closed_orders'],
+        todays_debt=todays_debt,
         total_orders=total_orders,
         pending_count=pending_count,
         completed_count=completed_count,
@@ -1947,11 +1914,8 @@ def dashboard():
         per_page=per_page,
         total_pages=total_pages,
         total_items=total_items,
-        notifications=notifications,
-        unread_count=unread_count,
         today_start=today_start,
         today_end=today_end,
-        debug_logs=debug_logs if status_filter == 'gateway' else [],
         firebase_config={}
     )
  
