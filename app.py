@@ -2692,31 +2692,53 @@ def calculate_payment_totals():
     start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
     end_of_day = now.replace(hour=23, minute=59, second=59, microsecond=999999)
     
+    # Log query time range for debugging
+    print(f"Querying orders from {start_of_day} to {end_of_day}")
+    
     orders_ref = db.collection('orders').where('date', '>=', start_of_day).where('date', '<=', end_of_day).stream()
     
     total_mpesa = 0
     total_cash = 0
+    orders_processed = 0
     
     for doc in orders_ref:
+        orders_processed += 1
         order_dict = doc.to_dict()
+        receipt_id = order_dict.get('receipt_id', doc.id)
         payment_history = order_dict.get('payment_history', [])
+        
+        # Log order details for debugging
+        print(f"Processing order {receipt_id}, payment_history: {payment_history}")
+        
+        if not isinstance(payment_history, list):
+            print(f"Invalid payment_history format in order {receipt_id}: {payment_history}")
+            continue
         
         for ph in payment_history:
             try:
                 amount = float(ph.get('amount', 0))
-                payment_type = ph.get('payment_type', '').lower()
+                payment_type = str(ph.get('payment_type', '')).lower().strip()
+                
+                # Log payment details
+                print(f"Order {receipt_id} - Payment: amount={amount}, type={payment_type}")
+                
                 if payment_type == 'mpesa':
                     total_mpesa += amount
+                    print(f"Added {amount} to total_mpesa, new total: {total_mpesa}")
                 elif payment_type == 'cash':
                     total_cash += amount
+                    print(f"Added {amount} to total_cash, new total: {total_cash}")
             except (ValueError, TypeError) as e:
-                print(f"Error in payment_history for order {doc.id}: {e}")
+                print(f"Error in payment_history for order {receipt_id}: {e}")
                 continue
+    
+    print(f"Processed {orders_processed} orders, total_mpesa: {total_mpesa}, total_cash: {total_cash}")
     
     return {
         'total_mpesa': total_mpesa,
         'total_cash': total_cash
     }
+
 @app.route('/daily_sales_report')
 @no_cache
 @login_required
