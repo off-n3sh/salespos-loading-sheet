@@ -424,27 +424,35 @@
             </table>
 
             <!-- Expenses Table -->
-            <table id="expenses-list" class="w-full {% if status_filter != 'expenses' %}hidden{% endif %} min-w-[600px]">
-                <thead class="bg-gray-50 dark:bg-gray-900">
-                    <tr>
-                        <th class="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Description</th>
-                        <th class="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Amount</th>
-                        <th class="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Category</th>
-                        <th class="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
-                    </tr>
-                </thead>
-                <tbody id="expenses-body">
-                    {% for expense in expenses %}
-                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-7 transition-colors" data-date="{{ expense.date.strftime('%Y-%m-%d') if expense.get('date') else '' }}" data-search="{{ expense.description | lower }} {{ expense.category | lower }}">
-                        <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-600 dark:text-gray-200">{{ expense.description }}</td>
-                        <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-red-600 dark:text-red-300">KSh {{ "%.2f" % expense.amount }}</td>
-                        <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-600 dark:text-gray-200">{{ expense.category }}</td>
-                        <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-600 dark:text-gray-200">{{ expense.date.strftime('%d/%m/%Y') }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+<table id="expenses-list" class="w-full {% if status_filter != 'expenses' %}hidden{% endif %} min-w-[600px]">
+    <thead class="bg-gray-50 dark:bg-gray-900">
+        <tr>
+            <th class="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Description</th>
+            <th class="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Amount</th>
+            <th class="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Category</th>
+            <th class="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
+        </tr>
+    </thead>
+    <tbody id="expenses-body">
+        {% for group in expenses %}
+            {% if time_filter != 'all' %}
+            <tr class="bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white font-semibold">
+                <td colspan="4" class="px-3 sm:px-6 py-2 text-xs sm:text-sm">
+                    {{ group['label'] }} (Total Expenses: KSh {{ group['total'] | round(2) | default(0) }})
+                </td>
+            </tr>
+            {% endif %}
+            {% for expense in group['rows'] %}
+            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" data-date="{{ expense['date'].strftime('%Y-%m-%d') if expense.get('date') else '' }}" data-search="{{ expense.get('description', '') | lower }} {{ expense.get('category', '') | lower }}">
+                <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-600 dark:text-gray-200">{{ expense.get('description', 'N/A') }}</td>
+                <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-red-600 dark:text-red-300">KSh {{ expense.get('amount', 0) | round(2) }}</td>
+                <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-600 dark:text-gray-200">{{ expense.get('category', 'N/A') }}</td>
+                <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-600 dark:text-gray-200">{{ expense['date'].strftime('%d/%m/%Y') if expense.get('date') else 'N/A' }}</td>
+            </tr>
+            {% endfor %}
+        {% endfor %}
+    </tbody>
+</table>
 
         <!-- Payment Modal -->
         <div id="payment-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
