@@ -421,7 +421,66 @@ def group_orders(filtered_orders, time_filter, today_start, today_end, now):
             'expenses_list': expenses_list
         }]
     return grouped_orders
-
+def group_gateway_payments(payments, time_filter, now):
+    grouped_payments = []
+    if time_filter == 'day':
+        days = {}
+        for payment in payments:
+            day_key = payment['date'].strftime('%Y-%m-%d')
+            if day_key not in days:
+                days[day_key] = {
+                    'label': f"Day: {payment['date'].strftime('%d %b %Y')}",
+                    'rows': [],
+                    'total': 0
+                }
+            days[day_key]['rows'].append(payment)
+            days[day_key]['total'] += payment['payment']
+        grouped_payments = sorted(days.values(), key=lambda x: x['rows'][0]['date'], reverse=True)
+    elif time_filter == 'week':
+        weeks = {}
+        for payment in payments:
+            start_of_week = payment['date'] - timedelta(days=payment['date'].weekday())
+            week_key = start_of_week.strftime('%Y-%m-%d')
+            if week_key not in weeks:
+                end_of_week = start_of_week + timedelta(days=6)
+                weeks[week_key] = {
+                    'label': f"Week: {start_of_week.strftime('%d %b')} – {end_of_week.strftime('%d %b %Y')}",
+                    'rows': [],
+                    'total': 0
+                }
+            weeks[week_key]['rows'].append(payment)
+            weeks[week_key]['total'] += payment['payment']
+        grouped_payments = sorted(weeks.values(), key=lambda x: x['rows'][0]['date'], reverse=True)
+    elif time_filter == 'month':
+        months = {}
+        for payment in payments:
+            month_key = payment['date'].strftime('%Y-%m')
+            if month_key not in months:
+                months[month_key] = {
+                    'label': f"Month: {payment['date'].strftime('%B %Y')}",
+                    'rows': [],
+                    'total': 0
+                }
+            months[month_key]['rows'].append(payment)
+            months[month_key]['total'] += payment['payment']
+        grouped_payments = sorted(months.values(), key=lambda x: x['rows'][0]['date'], reverse=True)
+    elif time_filter == 'year':
+        years = {}
+        for payment in payments:
+            year_key = payment['date'].strftime('%Y')
+            if year_key not in years:
+                years[year_key] = {
+                    'label': f"Year: {year_key}",
+                    'rows': [],
+                    'total': 0
+                }
+            years[year_key]['rows'].append(payment)
+            years[year_key]['total'] += payment['payment']
+        grouped_payments = sorted(years.values(), key=lambda x: x['rows'][0]['date'], reverse=True)
+    else:
+        total = sum(payment['payment'] for payment in payments)
+        grouped_payments = [{'label': 'All Payments', 'rows': payments, 'total': total}]
+    return grouped_payments
 # Initialize Firebase
 cred_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
 if cred_path:
