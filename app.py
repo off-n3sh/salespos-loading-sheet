@@ -2575,59 +2575,6 @@ def receipt(order_id):
         return render_template('error.html', message=f"Internal Server Error: {str(e)}"), 500
         
  #reports section
-def calculate_payment_totals():
-    now = datetime.now(NAIROBI_TZ)
-    start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    end_of_day = now.replace(hour=23, minute=59, second=59, microsecond=999999)
-    
-    # Convert query range to UTC for Firestore
-    start_of_day_utc = start_of_day.astimezone(pytz.UTC)
-    end_of_day_utc = end_of_day.astimezone(pytz.UTC)
-    
-    print(f"Querying orders from {start_of_day_utc} to {end_of_day_utc} (UTC)")
-    
-    orders_ref = db.collection('orders').where('date', '>=', start_of_day_utc).where('date', '<=', end_of_day_utc).stream()
-    
-    total_mpesa = 0
-    total_cash = 0
-    orders_processed = 0
-    
-    for doc in orders_ref:
-        orders_processed += 1
-        order_dict = doc.to_dict()
-        receipt_id = order_dict.get('receipt_id', doc.id)
-        order_date = order_dict.get('date')
-        payment_history = order_dict.get('payment_history', [])
-        
-        print(f"Order {receipt_id}: date={order_date}, payment_history={payment_history}")
-        
-        if not isinstance(payment_history, list):
-            print(f"Invalid payment_history format in order {receipt_id}: {payment_history}")
-            continue
-        
-        for ph in payment_history:
-            try:
-                amount = float(ph.get('amount', 0))
-                payment_type = str(ph.get('payment_type', '')).lower().strip()
-                print(f"Order {receipt_id} - Payment: amount={amount}, type={payment_type}")
-                
-                if payment_type == 'mpesa':
-                    total_mpesa += amount
-                    print(f"Added {amount} to total_mpesa, new total: {total_mpesa}")
-                elif payment_type == 'cash':
-                    total_cash += amount
-                    print(f"Added {amount} to total_cash, new total: {total_cash}")
-            except (ValueError, TypeError) as e:
-                print(f"Error in payment_history for order {receipt_id}: {e}")
-                continue
-    
-    print(f"Processed {orders_processed} orders, total_mpesa: {total_mpesa}, total_cash: {total_cash}")
-    
-    return {
-        'total_mpesa': total_mpesa,
-        'total_cash': total_cash
-    }
-
 @app.route('/daily_sales_report')
 @no_cache
 @login_required
@@ -2640,6 +2587,8 @@ def daily_sales_report():
     start_of_day_utc = start_of_day.astimezone(pytz.UTC)
     end_of_day_utc = end_of_day.astimezone(pytz.UTC)
     
+    print(f"Querying orders from {start_of_day_utc} to {end_of_day_utc} (UTC)")
+    
     orders_ref = db.collection('orders').where('date', '>=', start_of_day_utc).where('date', '<=', end_of_day_utc).stream()
     
     total_wholesale_revenue = 0
@@ -2647,16 +2596,18 @@ def daily_sales_report():
     total_wholesale_paid = 0
     total_retail_paid = 0
     total_debt = 0
+    total_mpesa = 0
+    total_cash = 0
     today_orders = []
-    
-    payment_totals = calculate_payment_totals()
     
     for doc in orders_ref:
         order_dict = doc.to_dict()
         order_type = order_dict.get('order_type', 'wholesale').lower()
         payment = float(order_dict.get('payment', 0))
         balance = float(order_dict.get('balance', 0))
+        receipt_id = order_dict.get('receipt_id', doc.id)
         
+        # Calculate revenue totals
         if order_type == 'wholesale':
             total_wholesale_revenue += payment + balance
             total_wholesale_paid += payment
@@ -2666,13 +2617,44 @@ def daily_sales_report():
         
         total_debt += balance
         
+        # Process payment history for payment method totals
+        payment_history = order_dict.get('payment_history', [])
+        print(f"Order {receipt_id}: payment_history={payment_history}")
+        
+        if isinstance(payment_history, list):
+            for payment_entry in payment_history:
+                if isinstance(payment_entry, dict):
+                    try:
+                        amount = float(payment_entry.get('amount', 0))
+                        payment_type = payment_entry.get('payment_type', '').lower().strip()
+                        
+                        print(f"Order {receipt_id} - Payment: amount={amount}, type='{payment_type}'")
+                        
+                        if payment_type == 'mpesa':
+                            total_mpesa += amount
+                            print(f"Added {amount} to total_mpesa, new total: {total_mpesa}")
+                        elif payment_type == 'cash':
+                            total_cash += amount
+                            print(f"Added {amount} to total_cash, new total: {total_cash}")
+                        else:
+                            print(f"Unknown payment type: '{payment_type}'")
+                            
+                    except (ValueError, TypeError) as e:
+                        print(f"Error processing payment entry in order {receipt_id}: {e}")
+                        continue
+        else:
+            print(f"Invalid payment_history format in order {receipt_id}: {payment_history}")
+        
         today_orders.append({
-            'receipt_id': order_dict.get('receipt_id', doc.id),
+            'receipt_id': receipt_id,
             'order_type': order_type,
             'payment': payment,
             'balance': balance
         })
     
+    print(f"Final totals - M-Pesa: {total_mpesa}, Cash: {total_cash}")
+    
+    # Process retail collection (standalone retail sales)
     retail_ref = db.collection('retail').where('date', '>=', start_of_day_utc).where('date', '<=', end_of_day_utc).stream()
     for doc in retail_ref:
         retail_dict = doc.to_dict()
@@ -2683,6 +2665,7 @@ def daily_sales_report():
         except (ValueError, TypeError) as e:
             print(f"Error in retail doc {doc.id}: {e}")
     
+    # Process expenses
     expenses_ref = db.collection('expenses').where('date', '>=', start_of_day_utc).where('date', '<=', end_of_day_utc).stream()
     total_expenses = 0
     today_expenses = []
@@ -2716,8 +2699,8 @@ def daily_sales_report():
         'net': net,
         'orders_count': len(today_orders),
         'today_expenses': today_expenses,
-        'total_mpesa': payment_totals['total_mpesa'],
-        'total_cash': payment_totals['total_cash']
+        'total_mpesa': total_mpesa,
+        'total_cash': total_cash
     }
     
     return render_template('daily_sales_report.html', **report_data)
