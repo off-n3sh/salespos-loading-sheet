@@ -2686,6 +2686,7 @@ def reports():
 
     return render_template('reports.html', orders=orders, stock_logs=stock_logs, expenses=expenses, user_actions=user_actions,
                           recent_activity=recent_activity, chart_data=chart_data, time_filter=time_filter, total_debt=total_debt)       
+
 @app.route('/daily_sales_report')
 @no_cache
 @login_required
@@ -2719,7 +2720,7 @@ def daily_sales_report():
                             'price': float(items[i + 5])
                         })
                     except (ValueError, TypeError) as e:
-                        print(f"Invalid data for item in order {doc.id}: {e}")
+                        print(f"Invalid item data in order {doc.id}: {e}")
                         continue
         
         order_type = order_dict.get('order_type', 'wholesale')
@@ -2736,13 +2737,18 @@ def daily_sales_report():
         
         total_debt += balance
         
+        # Process payment_history for M-Pesa and Cash
         for ph in payment_history:
-            amount = float(ph.get('amount', 0))
-            payment_type = ph.get('payment_type', '')
-            if payment_type == 'mpesa':
-                total_mpesa += amount
-            elif payment_type == 'cash':
-                total_cash += amount
+            try:
+                amount = float(ph.get('amount', 0))
+                payment_type = ph.get('payment_type', '').lower()
+                if payment_type == 'mpesa':
+                    total_mpesa += amount
+                elif payment_type == 'cash':
+                    total_cash += amount
+            except (ValueError, TypeError) as e:
+                print(f"Invalid payment_history in order {doc.id}: {e}")
+                continue
         
         today_orders.append({
             'receipt_id': order_dict.get('receipt_id', doc.id),
@@ -2768,16 +2774,20 @@ def daily_sales_report():
     
     for doc in expenses_ref:
         expense_dict = doc.to_dict()
-        amount = float(expense_dict.get('amount', 0))
-        total_expenses += amount
-        today_expenses.append({
-            'category': expense_dict.get('category', 'Other'),
-            'description': expense_dict.get('description', ''),
-            'amount': amount
-        })
+        try:
+            amount = float(expense_dict.get('amount', 0))
+            total_expenses += amount
+            today_expenses.append({
+                'category': expense_dict.get('category', 'Other'),
+                'description': expense_dict.get('description', ''),
+                'amount': amount
+            })
+        except (ValueError, TypeError) as e:
+            print(f"Invalid expense data in {doc.id}: {e}")
+            continue
     
-    gross_revenue = total_retail_paid + total_wholesale_paid
-    net_profit = gross_revenue - total_expenses - total_debt
+    total_sales = total_wholesale_paid + total_retail_paid
+    net = total_sales - total_expenses
     
     report_data = {
         'date': now.strftime('%d/%m/%Y'),
@@ -2788,8 +2798,8 @@ def daily_sales_report():
         'total_retail_paid': total_retail_paid,
         'total_debt': total_debt,
         'total_expenses': total_expenses,
-        'gross_revenue': gross_revenue,
-        'net_profit': net_profit,
+        'total_sales': total_sales,
+        'net': net,
         'orders_count': len(today_orders),
         'today_expenses': today_expenses,
         'total_mpesa': total_mpesa,

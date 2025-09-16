@@ -71,20 +71,10 @@
             color: #000;
         }
         
-        .item-name {
-            flex: 1;
-            text-transform: capitalize;
-        }
-        
-        .item-details {
-            text-align: right;
-            min-width: 120px;
-        }
-        
         .totals {
             background: #f0f0f0;
             padding: 10px;
-            margin: 10px 0;
+            margin: 15px 0;
             border: 1px solid #000;
         }
         
@@ -101,7 +91,7 @@
             padding-top: 6px;
             margin-top: 10px;
             font-size: 14px;
-            color: {{ 'green' if net_profit >= 0 else 'red' }};
+            color: {{ 'green' if net >= 0 else 'red' }};
         }
         
         .print-btn {
@@ -126,6 +116,11 @@
             color: #333;
             margin: 3px 0;
         }
+        
+        .separator {
+            border-top: 1px dashed #666;
+            margin: 15px 0;
+        }
     </style>
 </head>
 <body>
@@ -142,7 +137,7 @@
     </div>
 
     <div class="section">
-        <div class="section-title">SALES SUMMARY</div>
+        <div class="section-title">SALES</div>
         <div class="item-row">
             <div>Wholesale Total:</div>
             <div>{{ total_wholesale_revenue|round(2) }} KES</div>
@@ -151,6 +146,7 @@
             <div>Wholesale Paid Orders:</div>
             <div>{{ total_wholesale_paid|round(2) }} KES</div>
         </div>
+        <div class="separator"></div>
         <div class="item-row">
             <div>Retail Total:</div>
             <div>{{ total_retail_revenue|round(2) }} KES</div>
@@ -159,39 +155,44 @@
             <div>Retail Paid Orders:</div>
             <div>{{ total_retail_paid|round(2) }} KES</div>
         </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">PAYMENT METHODS</div>
         <div class="item-row">
-            <div>M-Pesa Payment:</div>
+            <div>M-Pesa:</div>
             <div>{{ total_mpesa|round(2) }} KES</div>
         </div>
         <div class="item-row">
-            <div>Cash Payment:</div>
+            <div>Cash:</div>
             <div>{{ total_cash|round(2) }} KES</div>
         </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">DEBT & EXPENSES</div>
         <div class="item-row" style="color: #cc0000;">
             <div>Outstanding Debt:</div>
             <div>{{ total_debt|round(2) }} KES</div>
         </div>
-    </div>
-
-    {% if today_expenses %}
-    <div class="section">
-        <div class="section-title">TODAY'S EXPENSES</div>
+        {% if today_expenses %}
+        <div class="separator"></div>
         {% for expense in today_expenses %}
         <div class="expense-item">
             {{ expense.category }}: {{ expense.description }} - {{ expense.amount|round(2) }} KES
         </div>
         {% endfor %}
         <div class="item-row" style="color: #cc0000; margin-top: 5px;">
-            <div><strong>Total Expenses:</strong></div>
-            <div><strong>{{ total_expenses|round(2) }} KES</strong></div>
+            <div>Total Expenses:</div>
+            <div>{{ total_expenses|round(2) }} KES</div>
         </div>
+        {% endif %}
     </div>
-    {% endif %}
 
     <div class="totals">
         <div class="total-row">
             <div>Total Sales:</div>
-            <div>{{ (total_wholesale_revenue + total_retail_revenue)|round(2) }} KES</div>
+            <div>{{ total_sales|round(2) }} KES</div>
         </div>
         <div class="total-row">
             <div>Total Expenses:</div>
@@ -199,7 +200,7 @@
         </div>
         <div class="total-row final-total">
             <div>NET:</div>
-            <div>{{ (total_wholesale_paid + total_retail_paid - total_expenses)|round(2) }} KES</div>
+            <div>{{ net|round(2) }} KES</div>
         </div>
     </div>
 
