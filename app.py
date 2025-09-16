@@ -317,10 +317,7 @@ def group_orders(filtered_orders, time_filter, today_start, today_end, now):
     if time_filter == 'day':
         days = {}
         for order in filtered_orders:
-            # Use today's date for orders with payments or closure today
-            has_payment_today = any(today_start <= ph['date'] < today_end for ph in order['payment_history'])
-            is_closed_today = order['closed_date'] and today_start <= order['closed_date'] < today_end and order['balance'] <= 0
-            relevant_date = now if (has_payment_today or is_closed_today) else order['date']
+            relevant_date = order['closed_date'] if order['closed_date'] and order['balance'] <= 0 else order['date']
             day_key = relevant_date.strftime('%Y-%m-%d')
             if day_key not in days:
                 days[day_key] = {
@@ -342,8 +339,8 @@ def group_orders(filtered_orders, time_filter, today_start, today_end, now):
     elif time_filter == 'week':
         weeks = {}
         for order in filtered_orders:
-            sale_date = order['date']
-            start_of_week = sale_date - timedelta(days=sale_date.weekday())
+            relevant_date = order['closed_date'] if order['closed_date'] and order['balance'] <= 0 else order['date']
+            start_of_week = relevant_date - timedelta(days=relevant_date.weekday())
             week_key = start_of_week.strftime('%Y-%m-%d')
             if week_key not in weeks:
                 end_of_week = start_of_week + timedelta(days=6)
@@ -366,11 +363,11 @@ def group_orders(filtered_orders, time_filter, today_start, today_end, now):
     elif time_filter == 'month':
         months = {}
         for order in filtered_orders:
-            sale_date = order['date']
-            month_key = sale_date.strftime('%Y-%m')
+            relevant_date = order['closed_date'] if order['closed_date'] and order['balance'] <= 0 else order['date']
+            month_key = relevant_date.strftime('%Y-%m')
             if month_key not in months:
                 months[month_key] = {
-                    'label': f"Month: {sale_date.strftime('%B %Y')}",
+                    'label': f"Month: {relevant_date.strftime('%B %Y')}",
                     'rows': [],
                     'total': 0,
                     'debt': 0,
@@ -388,8 +385,8 @@ def group_orders(filtered_orders, time_filter, today_start, today_end, now):
     elif time_filter == 'year':
         years = {}
         for order in filtered_orders:
-            sale_date = order['date']
-            year_key = sale_date.strftime('%Y')
+            relevant_date = order['closed_date'] if order['closed_date'] and order['balance'] <= 0 else order['date']
+            year_key = relevant_date.strftime('%Y')
             if year_key not in years:
                 years[year_key] = {
                     'label': f"Year: {year_key}",
