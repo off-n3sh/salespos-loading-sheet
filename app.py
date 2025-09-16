@@ -1882,34 +1882,26 @@ def dashboard():
             for doc in orders_ref.stream():
                 filtered_orders.append(process_order(doc))
 
-        # Apply time filter and include expenses for non-gateway filters
-        if time_filter == 'day':
-            filtered_orders = [
-                order for order in filtered_orders
-                if order['date'].strftime('%Y-%m-%d') == now.strftime('%Y-%m-%d') or
-                any(today_start <= ph['date'] < today_end for ph in order['payment_history']) or
-                (order.get('closed_date') and today_start <= order['closed_date'] < today_end and order['balance'] <= 0)
+        # Include expenses for non-gateway, non-expenses filters
+        if status_filter != 'expenses':
+            filtered_expenses = [
+                {
+                    'receipt_id': doc.id,
+                    'salesperson_name': e.get('salesperson_name', 'N/A'),
+                    'description': e['description'],
+                    'amount': e['amount'],
+                    'date': e['date'],
+                    'is_expense': True,
+                    'order_type': 'expense',
+                    'payment': 0,
+                    'balance': 0,
+                    'payment_history': [],
+                    'notes': '',
+                    'status': 'paid'
+                }
+                for doc, e in [(doc, doc.to_dict()) for doc in expenses_ref.stream()]
             ]
-            if status_filter not in ['expenses']:
-                filtered_expenses = [
-                    {
-                        'receipt_id': doc.id,
-                        'salesperson_name': e.get('salesperson_name', 'N/A'),
-                        'description': e['description'],
-                        'amount': e['amount'],
-                        'date': e['date'],
-                        'is_expense': True,
-                        'order_type': 'expense',
-                        'payment': 0,
-                        'balance': 0,
-                        'payment_history': [],
-                        'notes': '',
-                        'status': 'paid'
-                    }
-                    for doc, e in [(doc, doc.to_dict()) for doc in expenses_ref.stream()]
-                    if today_start <= process_date(e.get('date', datetime.now(NAIROBI_TZ))) < today_end
-                ]
-                filtered_orders.extend(filtered_expenses)
+            filtered_orders.extend(filtered_expenses)
 
     # Group orders for sales history (non-gateway, non-expense filters)
     grouped_sales_history = []
