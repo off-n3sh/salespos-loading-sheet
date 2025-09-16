@@ -2687,6 +2687,36 @@ def reports():
     return render_template('reports.html', orders=orders, stock_logs=stock_logs, expenses=expenses, user_actions=user_actions,
                           recent_activity=recent_activity, chart_data=chart_data, time_filter=time_filter, total_debt=total_debt)       
 
+def calculate_payment_totals():
+    now = datetime.now(NAIROBI_TZ)
+    start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_of_day = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+    
+    orders_ref = db.collection('orders').where('date', '>=', start_of_day).where('date', '<=', end_of_day).stream()
+    
+    total_mpesa = 0
+    total_cash = 0
+    
+    for doc in orders_ref:
+        order_dict = doc.to_dict()
+        payment_history = order_dict.get('payment_history', [])
+        
+        for ph in payment_history:
+            try:
+                amount = float(ph.get('amount', 0))
+                payment_type = ph.get('payment_type', '').lower()
+                if payment_type == 'mpesa':
+                    total_mpesa += amount
+                elif payment_type == 'cash':
+                    total_cash += amount
+            except (ValueError, TypeError) as e:
+                print(f"Error in payment_history for order {doc.id}: {e}")
+                continue
+    
+    return {
+        'total_mpesa': total_mpesa,
+        'total_cash': total_cash
+    }
 @app.route('/daily_sales_report')
 @no_cache
 @login_required
@@ -2697,36 +2727,21 @@ def daily_sales_report():
     
     orders_ref = db.collection('orders').where('date', '>=', start_of_day).where('date', '<=', end_of_day).stream()
     
-    today_orders = []
     total_wholesale_revenue = 0
     total_retail_revenue = 0
     total_wholesale_paid = 0
     total_retail_paid = 0
     total_debt = 0
-    total_mpesa = 0
-    total_cash = 0
+    today_orders = []
+    
+    # Calculate M-Pesa and Cash totals
+    payment_totals = calculate_payment_totals()
     
     for doc in orders_ref:
         order_dict = doc.to_dict()
-        items = order_dict.get('items', [])
-        processed_items = []
-        if items and len(items) >= 6:
-            for i in range(0, len(items), 6):
-                if i + 5 < len(items):
-                    try:
-                        processed_items.append({
-                            'product': items[i + 1],
-                            'quantity': float(items[i + 3]),
-                            'price': float(items[i + 5])
-                        })
-                    except (ValueError, TypeError) as e:
-                        print(f"Invalid item data in order {doc.id}: {e}")
-                        continue
-        
         order_type = order_dict.get('order_type', 'wholesale')
         payment = float(order_dict.get('payment', 0))
         balance = float(order_dict.get('balance', 0))
-        payment_history = order_dict.get('payment_history', [])
         
         if order_type == 'wholesale':
             total_wholesale_revenue += payment + balance
@@ -2737,36 +2752,22 @@ def daily_sales_report():
         
         total_debt += balance
         
-        # Process payment_history for M-Pesa and Cash
-        for ph in payment_history:
-            try:
-                amount = float(ph.get('amount', 0))
-                payment_type = ph.get('payment_type', '').lower()
-                if payment_type == 'mpesa':
-                    total_mpesa += amount
-                elif payment_type == 'cash':
-                    total_cash += amount
-            except (ValueError, TypeError) as e:
-                print(f"Invalid payment_history in order {doc.id}: {e}")
-                continue
-        
         today_orders.append({
             'receipt_id': order_dict.get('receipt_id', doc.id),
-            'shop_name': order_dict.get('shop_name', 'Unknown'),
             'order_type': order_type,
             'payment': payment,
-            'balance': balance,
-            'items': processed_items,
-            'salesperson_name': order_dict.get('salesperson_name', ''),
-            'payment_history': payment_history
+            'balance': balance
         })
     
     retail_ref = db.collection('retail').where('date', '>=', start_of_day).where('date', '<=', end_of_day).stream()
     for doc in retail_ref:
         retail_dict = doc.to_dict()
-        amount = float(retail_dict.get('amount', 0))
-        total_retail_revenue += amount
-        total_retail_paid += amount
+        try:
+            amount = float(retail_dict.get('amount', 0))
+            total_retail_revenue += amount
+            total_retail_paid += amount
+        except (ValueError, TypeError) as e:
+            print(f"Error in retail doc {doc.id}: {e}")
     
     expenses_ref = db.collection('expenses').where('date', '>=', start_of_day).where('date', '<=', end_of_day).stream()
     total_expenses = 0
@@ -2783,8 +2784,7 @@ def daily_sales_report():
                 'amount': amount
             })
         except (ValueError, TypeError) as e:
-            print(f"Invalid expense data in {doc.id}: {e}")
-            continue
+            print(f"Error in expense doc {doc.id}: {e}")
     
     total_sales = total_wholesale_paid + total_retail_paid
     net = total_sales - total_expenses
@@ -2802,8 +2802,8 @@ def daily_sales_report():
         'net': net,
         'orders_count': len(today_orders),
         'today_expenses': today_expenses,
-        'total_mpesa': total_mpesa,
-        'total_cash': total_cash
+        'total_mpesa': payment_totals['total_mpesa'],
+        'total_cash': payment_totals['total_cash']
     }
     
     return render_template('daily_sales_report.html', **report_data)
