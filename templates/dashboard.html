@@ -209,37 +209,46 @@
                     </tr>
                 </thead>
                 <tbody id="gateway-payments-body" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    {% for payment in gateway_payments %}
-                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                        <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                            {{ payment.receipt_id }}
-                        </td>
-                        <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
-                            <div class="font-medium text-gray-900 dark:text-white text-sm">{{ payment.salesperson_name }}</div>
-                            <div class="text-xs text-gray-500 dark:text-gray-400">{{ payment.shop_name }}</div>
-                        </td>
-                        <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
-                            <span class="px-2 py-1 rounded-full text-xs font-medium {% if payment.payment_type == 'mpesa' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% else %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200{% endif %}">
-                                {{ payment.payment_type | upper }}
-                            </span>
-                        </td>
-                        <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                            KSh {{ payment.payment | default(0) | round(2) }}
-                        </td>
-                        <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-200">
-                            {{ payment.date.strftime('%d/%m/%Y %H:%M:%S') if payment.get('date') else 'N/A' }}
-                        </td>
-                        <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
-                            <span class="px-2 py-1 rounded-full text-xs font-medium {% if payment.balance > 0 %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200{% else %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% endif %}">
-                                {% if payment.balance > 0 %}Partial{% else %}Complete{% endif %}
-                            </span>
-                        </td>
-                        <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-right text-sm">
-                            <a href="{{ url_for('receipt', order_id=payment.receipt_id) }}" class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300">View</a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
+    {% for group in gateway_payments %}
+        {% if time_filter != 'all' %}
+        <tr class="bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white font-semibold">
+            <td colspan="7" class="px-3 sm:px-6 py-2 text-xs sm:text-sm">
+                {{ group['label'] }} (Total Payments: KSh {{ group['total'] | round(2) | default(0) }})
+            </td>
+        </tr>
+        {% endif %}
+        {% for payment in group['rows'] %}
+        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+            <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                {{ payment.get('receipt_id', 'N/A') }}
+            </td>
+            <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
+                <div class="font-medium text-gray-900 dark:text-white text-sm">{{ payment.get('salesperson_name', 'Unknown') }}</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400">{{ payment.get('shop_name', 'Unknown') }}</div>
+            </td>
+            <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
+                <span class="px-2 py-1 rounded-full text-xs font-medium {% if payment.get('payment_type') == 'mpesa' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% else %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200{% endif %}">
+                    {{ payment.get('payment_type', 'N/A') | upper }}
+                </span>
+            </td>
+            <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                KSh {{ payment.get('payment', 0) | round(2) }}
+            </td>
+            <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-200">
+                {{ payment['date'].strftime('%d/%m/%Y %H:%M:%S') if payment.get('date') else 'N/A' }}
+            </td>
+            <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
+                <span class="px-2 py-1 rounded-full text-xs font-medium {% if payment.get('balance', 0) > 0 %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200{% else %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% endif %}">
+                    {% if payment.get('balance', 0) > 0 %}Partial{% else %}Complete{% endif %}
+                </span>
+            </td>
+            <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-right text-sm">
+                <a href="{{ url_for('receipt', order_id=payment.get('receipt_id', '')) }}" class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300">View</a>
+            </td>
+        </tr>
+        {% endfor %}
+    {% endfor %}
+</tbody>
             </table>
 
             <!-- Sales History Table -->
