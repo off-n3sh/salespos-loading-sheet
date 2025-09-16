@@ -798,7 +798,66 @@ def daily_sales_report():
     }
     
     return render_template('daily_sales_report.html', **report_data)
-
+def group_expenses(expenses, time_filter, now):
+    grouped_expenses = []
+    if time_filter == 'day':
+        days = {}
+        for expense in expenses:
+            day_key = expense['date'].strftime('%Y-%m-%d')
+            if day_key not in days:
+                days[day_key] = {
+                    'label': f"Day: {expense['date'].strftime('%d %b %Y')}",
+                    'rows': [],
+                    'total': 0
+                }
+            days[day_key]['rows'].append(expense)
+            days[day_key]['total'] += expense['amount']
+        grouped_expenses = sorted(days.values(), key=lambda x: x['rows'][0]['date'], reverse=True)
+    elif time_filter == 'week':
+        weeks = {}
+        for expense in expenses:
+            start_of_week = expense['date'] - timedelta(days=expense['date'].weekday())
+            week_key = start_of_week.strftime('%Y-%m-%d')
+            if week_key not in weeks:
+                end_of_week = start_of_week + timedelta(days=6)
+                weeks[week_key] = {
+                    'label': f"Week: {start_of_week.strftime('%d %b')} – {end_of_week.strftime('%d %b %Y')}",
+                    'rows': [],
+                    'total': 0
+                }
+            weeks[week_key]['rows'].append(expense)
+            weeks[week_key]['total'] += expense['amount']
+        grouped_expenses = sorted(weeks.values(), key=lambda x: x['rows'][0]['date'], reverse=True)
+    elif time_filter == 'month':
+        months = {}
+        for expense in expenses:
+            month_key = expense['date'].strftime('%Y-%m')
+            if month_key not in months:
+                months[month_key] = {
+                    'label': f"Month: {expense['date'].strftime('%B %Y')}",
+                    'rows': [],
+                    'total': 0
+                }
+            months[month_key]['rows'].append(expense)
+            months[month_key]['total'] += expense['amount']
+        grouped_expenses = sorted(months.values(), key=lambda x: x['rows'][0]['date'], reverse=True)
+    elif time_filter == 'year':
+        years = {}
+        for expense in expenses:
+            year_key = expense['date'].strftime('%Y')
+            if year_key not in years:
+                years[year_key] = {
+                    'label': f"Year: {year_key}",
+                    'rows': [],
+                    'total': 0
+                }
+            years[year_key]['rows'].append(expense)
+            years[year_key]['total'] += expense['amount']
+        grouped_expenses = sorted(years.values(), key=lambda x: x['rows'][0]['date'], reverse=True)
+    else:
+        total = sum(expense['amount'] for expense in expenses)
+        grouped_expenses = [{'label': 'All Expenses', 'rows': expenses, 'total': total}]
+    return grouped_expenses
     
 @app.route('/clear_collections', methods=['POST'])
 def clear_collections():
