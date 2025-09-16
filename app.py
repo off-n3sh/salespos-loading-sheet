@@ -2575,127 +2575,18 @@ def receipt(order_id):
         return render_template('error.html', message=f"Internal Server Error: {str(e)}"), 500
         
  #reports section
-@app.route('/reports')
-@no_cache
-@login_required
-def reports():
-    time_filter = request.args.get('time', 'month')
-    now = datetime.now(NAIROBI_TZ)
-
-    # Set start date based on time filter
-    if time_filter == 'day':
-        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    elif time_filter == 'week':
-        start = now - timedelta(days=now.weekday())
-        start = start.replace(hour=0, minute=0, second=0, microsecond=0)
-    elif time_filter == 'month':
-        start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    elif time_filter == 'year':
-        start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-    else:
-        start = None
-
-    # Fetch orders
-    orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).stream()
-    orders = []
-    for doc in orders_ref:
-        order_dict = doc.to_dict()
-        order_date = process_date(order_dict.get('date'))
-        if start and order_date and order_date < start:
-            continue
-        orders.append({
-            'receipt_id': order_dict.get('receipt_id', doc.id),
-            'salesperson_name': order_dict.get('salesperson_name', 'N/A'),
-            'shop_name': order_dict.get('shop_name', 'Unknown Shop'),
-            'items': order_dict.get('items_list', []),  # Use items_list for consistency with receipt template
-            'payment': order_dict.get('payment', 0),
-            'balance': order_dict.get('balance', 0),
-            'date': order_date,
-            'closed_date': process_date(order_dict.get('closed_date')) if order_dict.get('closed_date') else None,
-            'order_type': order_dict.get('order_type', 'wholesale')
-        })
-
-    # Fetch retail sales
-    retail_sales = []
-    retail_ref = db.collection('retail').order_by('date', direction=firestore.Query.DESCENDING).stream()
-    for doc in retail_ref:
-        retail_dict = doc.to_dict()
-        retail_date = process_date(retail_dict.get('date'))  # Handle DatetimeWithNanoseconds directly
-        if start and retail_date and retail_date < start:
-            continue
-        retail_dict['date'] = retail_date
-        retail_sales.append(retail_dict)
-
-    # Calculate metrics
-    total_sales_retail = sum(o['payment'] for o in orders if o['order_type'] == 'retail') + sum(r.get('amount', 0) for r in retail_sales)
-    total_sales_wholesale = sum(o['payment'] for o in orders if o['order_type'] == 'wholesale')
-    total_paid_retail = sum(o['payment'] for o in orders if o['order_type'] == 'retail') + sum(r.get('amount', 0) for r in retail_sales)
-    total_paid_wholesale = sum(o['payment'] for o in orders if o['order_type'] == 'wholesale')
-    total_debt_retail = sum(o['balance'] for o in orders if o['order_type'] == 'retail' and o['balance'] > 0)
-    total_debt_wholesale = sum(o['balance'] for o in orders if o['order_type'] == 'wholesale' and o['balance'] > 0)
-    total_money_bank_retail = total_paid_retail
-    total_money_bank_wholesale = total_paid_wholesale
-    total_debt = total_debt_retail + total_debt_wholesale
-
-    # Chart data
-    chart_data = {
-        'sales_vs_debts': {
-            'labels': ['Retail Sales', 'Wholesale Sales', 'Retail Debt', 'Wholesale Debt'],
-            'data': [total_sales_retail, total_sales_wholesale, total_debt_retail, total_debt_wholesale],
-            'colors': ['#4CAF50', '#2196F3', '#FF9800', '#F44336']
-        },
-        'paid_vs_debt': {
-            'labels': ['Total Paid Retail', 'Total Paid Wholesale', 'Total Debt Retail', 'Total Debt Wholesale'],
-            'data': [total_paid_retail, total_paid_wholesale, total_debt_retail, total_debt_wholesale],
-            'colors': ['#4CAF50', '#2196F3', '#FF9800', '#F44336']
-        },
-        'money_in_bank': {
-            'labels': ['Retail Bank', 'Wholesale Bank'],
-            'data': [total_money_bank_retail, total_money_bank_wholesale],
-            'colors': ['#4CAF50', '#2196F3']
-        }
-    }
-
-    # Fetch logs
-    stock_logs = []
-    for doc in db.collection('stock_logs').order_by('timestamp', direction=firestore.Query.DESCENDING).stream():
-        log = doc.to_dict()
-        log['timestamp'] = process_date(log.get('timestamp'))
-        stock_logs.append(log)
-
-    expenses = []
-    for doc in db.collection('expenses').order_by('date', direction=firestore.Query.DESCENDING).stream():
-        expense = doc.to_dict()
-        expense['date'] = process_date(expense.get('date'))
-        expenses.append(expense)
-
-    user_actions = []
-    for doc in db.collection('user_actions').order_by('timestamp', direction=firestore.Query.DESCENDING).stream():
-        action = doc.to_dict()
-        action['timestamp'] = process_date(action.get('timestamp'))
-        user_actions.append(action)
-
-    recent_activity = [
-        {
-            'receipt_id': doc.to_dict().get('receipt_id', doc.id),
-            'salesperson_name': doc.to_dict().get('salesperson_name', 'N/A'),
-            'shop_name': doc.to_dict().get('shop_name', 'Unknown Shop'),
-            'date': process_date(doc.to_dict().get('date'))
-        } for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).limit(3).stream()
-    ]
-
-    return render_template('reports.html', orders=orders, stock_logs=stock_logs, expenses=expenses, user_actions=user_actions,
-                          recent_activity=recent_activity, chart_data=chart_data, time_filter=time_filter, total_debt=total_debt)       
-
 def calculate_payment_totals():
     now = datetime.now(NAIROBI_TZ)
     start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
     end_of_day = now.replace(hour=23, minute=59, second=59, microsecond=999999)
     
-    # Log query time range for debugging
-    print(f"Querying orders from {start_of_day} to {end_of_day}")
+    # Convert query range to UTC for Firestore
+    start_of_day_utc = start_of_day.astimezone(pytz.UTC)
+    end_of_day_utc = end_of_day.astimezone(pytz.UTC)
     
-    orders_ref = db.collection('orders').where('date', '>=', start_of_day).where('date', '<=', end_of_day).stream()
+    print(f"Querying orders from {start_of_day_utc} to {end_of_day_utc} (UTC)")
+    
+    orders_ref = db.collection('orders').where('date', '>=', start_of_day_utc).where('date', '<=', end_of_day_utc).stream()
     
     total_mpesa = 0
     total_cash = 0
@@ -2705,10 +2596,10 @@ def calculate_payment_totals():
         orders_processed += 1
         order_dict = doc.to_dict()
         receipt_id = order_dict.get('receipt_id', doc.id)
+        order_date = order_dict.get('date')
         payment_history = order_dict.get('payment_history', [])
         
-        # Log order details for debugging
-        print(f"Processing order {receipt_id}, payment_history: {payment_history}")
+        print(f"Order {receipt_id}: date={order_date}, payment_history={payment_history}")
         
         if not isinstance(payment_history, list):
             print(f"Invalid payment_history format in order {receipt_id}: {payment_history}")
@@ -2718,8 +2609,6 @@ def calculate_payment_totals():
             try:
                 amount = float(ph.get('amount', 0))
                 payment_type = str(ph.get('payment_type', '')).lower().strip()
-                
-                # Log payment details
                 print(f"Order {receipt_id} - Payment: amount={amount}, type={payment_type}")
                 
                 if payment_type == 'mpesa':
@@ -2747,7 +2636,11 @@ def daily_sales_report():
     start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
     end_of_day = now.replace(hour=23, minute=59, second=59, microsecond=999999)
     
-    orders_ref = db.collection('orders').where('date', '>=', start_of_day).where('date', '<=', end_of_day).stream()
+    # Convert to UTC for Firestore query
+    start_of_day_utc = start_of_day.astimezone(pytz.UTC)
+    end_of_day_utc = end_of_day.astimezone(pytz.UTC)
+    
+    orders_ref = db.collection('orders').where('date', '>=', start_of_day_utc).where('date', '<=', end_of_day_utc).stream()
     
     total_wholesale_revenue = 0
     total_retail_revenue = 0
@@ -2756,12 +2649,11 @@ def daily_sales_report():
     total_debt = 0
     today_orders = []
     
-    # Calculate M-Pesa and Cash totals
     payment_totals = calculate_payment_totals()
     
     for doc in orders_ref:
         order_dict = doc.to_dict()
-        order_type = order_dict.get('order_type', 'wholesale')
+        order_type = order_dict.get('order_type', 'wholesale').lower()
         payment = float(order_dict.get('payment', 0))
         balance = float(order_dict.get('balance', 0))
         
@@ -2781,7 +2673,7 @@ def daily_sales_report():
             'balance': balance
         })
     
-    retail_ref = db.collection('retail').where('date', '>=', start_of_day).where('date', '<=', end_of_day).stream()
+    retail_ref = db.collection('retail').where('date', '>=', start_of_day_utc).where('date', '<=', end_of_day_utc).stream()
     for doc in retail_ref:
         retail_dict = doc.to_dict()
         try:
@@ -2791,7 +2683,7 @@ def daily_sales_report():
         except (ValueError, TypeError) as e:
             print(f"Error in retail doc {doc.id}: {e}")
     
-    expenses_ref = db.collection('expenses').where('date', '>=', start_of_day).where('date', '<=', end_of_day).stream()
+    expenses_ref = db.collection('expenses').where('date', '>=', start_of_day_utc).where('date', '<=', end_of_day_utc).stream()
     total_expenses = 0
     today_expenses = []
     
@@ -2829,19 +2721,15 @@ def daily_sales_report():
     }
     
     return render_template('daily_sales_report.html', **report_data)
-    
-@app.route('/export_report')
+
+@app.route('/reports')
 @no_cache
 @login_required
-def export_report():
-    """Generate and export a PDF report based on the type and time filter."""
-    report_type = request.args.get('type')
+def reports():
     time_filter = request.args.get('time', 'month')
     now = datetime.now(NAIROBI_TZ)
 
-    # Determine the time range based on filter
-    if report_type == 'daily_sales':
-        return redirect(url_for('daily_sales_report'))
+    # Set start date based on time filter
     if time_filter == 'day':
         start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     elif time_filter == 'week':
@@ -2853,13 +2741,142 @@ def export_report():
         start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
     else:
         start = None
+    
+    # Convert start to UTC for Firestore
+    start_utc = start.astimezone(pytz.UTC) if start else None
+    
+    # Fetch orders
+    orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).stream()
+    orders = []
+    for doc in orders_ref:
+        order_dict = doc.to_dict()
+        order_date = process_date(order_dict.get('date'))
+        if start_utc and order_date and order_date < start_utc:
+            continue
+        orders.append({
+            'receipt_id': order_dict.get('receipt_id', doc.id),
+            'salesperson_name': order_dict.get('salesperson_name', 'N/A'),
+            'shop_name': order_dict.get('shop_name', 'Unknown Shop'),
+            'items': order_dict.get('items_list', order_dict.get('items', [])),
+            'payment': order_dict.get('payment', 0),
+            'balance': order_dict.get('balance', 0),
+            'date': order_date,
+            'closed_date': process_date(order_dict.get('closed_date')) if order_dict.get('closed_date') else None,
+            'order_type': order_dict.get('order_type', 'wholesale')
+        })
+
+    # Calculate payment totals for reports page
+    payment_totals = calculate_payment_totals()
+
+    # Fetch retail sales
+    retail_ref = db.collection('retail').order_by('date', direction=firestore.Query.DESCENDING).stream()
+    retail_sales = []
+    for doc in retail_ref:
+        retail_dict = doc.to_dict()
+        retail_date = process_date(retail_dict.get('date'))
+        if start_utc and retail_date and retail_date < start_utc:
+            continue
+        retail_dict['date'] = retail_date
+        retail_sales.append(retail_dict)
+
+    # Calculate metrics
+    total_sales_retail = sum(o['payment'] for o in orders if o['order_type'] == 'retail') + sum(float(r.get('amount', 0)) for r in retail_sales)
+    total_sales_wholesale = sum(o['payment'] for o in orders if o['order_type'] == 'wholesale')
+    total_paid_retail = sum(o['payment'] for o in orders if o['order_type'] == 'retail') + sum(float(r.get('amount', 0)) for r in retail_sales)
+    total_paid_wholesale = sum(o['payment'] for o in orders if o['order_type'] == 'wholesale')
+    total_debt_retail = sum(o['balance'] for o in orders if o['order_type'] == 'retail' and o['balance'] > 0)
+    total_debt_wholesale = sum(o['balance'] for o in orders if o['order_type'] == 'wholesale' and o['balance'] > 0)
+    total_debt = total_debt_retail + total_debt_wholesale
+
+    # Chart data with M-Pesa and Cash
+    chart_data = {
+        'sales_vs_debts': {
+            'labels': ['Retail Sales', 'Wholesale Sales', 'Retail Debt', 'Wholesale Debt', 'M-Pesa', 'Cash'],
+            'data': [total_sales_retail, total_sales_wholesale, total_debt_retail, total_debt_wholesale, payment_totals['total_mpesa'], payment_totals['total_cash']],
+            'colors': ['#4CAF50', '#2196F3', '#FF9800', '#F44336', '#00BCD4', '#FFC107']
+        },
+        'paid_vs_debt': {
+            'labels': ['Total Paid Retail', 'Total Paid Wholesale', 'Total Debt Retail', 'Total Debt Wholesale', 'M-Pesa', 'Cash'],
+            'data': [total_paid_retail, total_paid_wholesale, total_debt_retail, total_debt_wholesale, payment_totals['total_mpesa'], payment_totals['total_cash']],
+            'colors': ['#4CAF50', '#2196F3', '#FF9800', '#F44336', '#00BCD4', '#FFC107']
+        },
+        'money_in_bank': {
+            'labels': ['Retail Bank', 'Wholesale Bank', 'M-Pesa', 'Cash'],
+            'data': [total_paid_retail, total_paid_wholesale, payment_totals['total_mpesa'], payment_totals['total_cash']],
+            'colors': ['#4CAF50', '#2196F3', '#00BCD4', '#FFC107']
+        }
+    }
+
+    # Fetch logs
+    stock_logs = []
+    for doc in db.collection('stock_logs').order_by('timestamp', direction=firestore.Query.DESCENDING).stream():
+        log = doc.to_dict()
+        log['timestamp'] = process_date(log.get('timestamp'))
+        if start_utc and log['timestamp'] and log['timestamp'] < start_utc:
+            continue
+        stock_logs.append(log)
+
+    expenses = []
+    for doc in db.collection('expenses').order_by('date', direction=firestore.Query.DESCENDING).stream():
+        expense = doc.to_dict()
+        expense['date'] = process_date(expense.get('date'))
+        if start_utc and expense['date'] and expense['date'] < start_utc:
+            continue
+        expenses.append(expense)
+
+    user_actions = []
+    for doc in db.collection('user_actions').order_by('timestamp', direction=firestore.Query.DESCENDING).stream():
+        action = doc.to_dict()
+        action['timestamp'] = process_date(action.get('timestamp'))
+        if start_utc and action['timestamp'] and action['timestamp'] < start_utc:
+            continue
+        user_actions.append(action)
+
+    recent_activity = [
+        {
+            'receipt_id': doc.to_dict().get('receipt_id', doc.id),
+            'salesperson_name': doc.to_dict().get('salesperson_name', 'N/A'),
+            'shop_name': doc.to_dict().get('shop_name', 'Unknown Shop'),
+            'date': process_date(doc.to_dict().get('date'))
+        } for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).limit(3).stream()
+    ]
+
+    return render_template('reports.html', orders=orders, stock_logs=stock_logs, expenses=expenses, user_actions=user_actions,
+                          recent_activity=recent_activity, chart_data=chart_data, time_filter=time_filter, total_debt=total_debt,
+                          total_mpesa=payment_totals['total_mpesa'], total_cash=payment_totals['total_cash'])
+
+@app.route('/export_report')
+@no_cache
+@login_required
+def export_report():
+    report_type = request.args.get('type')
+    time_filter = request.args.get('time', 'month')
+    now = datetime.now(NAIROBI_TZ)
+
+    if report_type == 'daily_sales':
+        return redirect(url_for('daily_sales_report'))
+
+    # Set time range
+    if time_filter == 'day':
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif time_filter == 'week':
+        start = now - timedelta(days=now.weekday())
+        start = start.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif time_filter == 'month':
+        start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    elif time_filter == 'year':
+        start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    else:
+        start = None
+    
+    start_utc = start.astimezone(pytz.UTC) if start else None
 
     # Generate PDF
     buffer = BytesIO()
     p = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
 
-    # Header - Professional Layout
+    # Header
     p.setFont("Helvetica-Bold", 16)
     p.drawCentredString(width / 2, height - 40, "Dreamland Distributors")
     p.setFont("Helvetica", 10)
@@ -2870,7 +2887,7 @@ def export_report():
 
     # Report Title and Metadata
     p.setFont("Helvetica-Bold", 12)
-    report_title = f"{report_type.capitalize()} Report - {time_filter.capitalize()}"
+    report_title = f"{report_type.replace('_', ' ').title()} Report - {time_filter.capitalize()}"
     p.drawCentredString(width / 2, height - 110, report_title)
     p.setFont("Helvetica", 9)
     p.drawString(40, height - 130, f"Generated on: {now.strftime('%d/%m/%Y %H:%M')}")
@@ -2880,15 +2897,12 @@ def export_report():
     y = height - 170
 
     if report_type == 'stock':
-        # Enhanced Stock Movement Report
         p.setFont("Helvetica-Bold", 10)
         p.drawString(40, y, "Product")
         p.drawString(170, y, "Category")
         p.drawString(320, y, "Quantity")
         p.drawString(420, y, "Value (KES)")
         p.drawString(510, y, "Date")
-        
-        # Add proper spacing before the line
         y -= 10
         p.line(40, y, width - 40, y)
         y -= 10
@@ -2901,7 +2915,7 @@ def export_report():
         for log in stock_logs:
             log_dict = log.to_dict()
             timestamp = process_date(log_dict.get('timestamp'))
-            if start and timestamp < start:
+            if start_utc and timestamp < start_utc:
                 continue
                 
             if y < 60:
@@ -2938,15 +2952,13 @@ def export_report():
         p.drawString(320, y, f"Total Value: {total_value:.2f} KES")
 
     elif report_type == 'user':
-        # User Sales Report - Grouped by User
-        # First, collect and group orders by salesperson
         orders = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).stream()
         user_data = {}
         
         for order in orders:
             order_dict = order.to_dict()
             order_date = process_date(order_dict.get('date'))
-            if start and order_date < start:
+            if start_utc and order_date < start_utc:
                 continue
                 
             salesperson = order_dict.get('salesperson_name', 'Unknown')
@@ -2962,19 +2974,16 @@ def export_report():
             user_data[salesperson]['total_sales'] += order_dict.get('payment', 0)
             user_data[salesperson]['total_items'] += process_items(order_dict.get('items', []))
 
-        # Now render the grouped data
         p.setFont("Helvetica", 9)
         for salesperson, data in user_data.items():
             if y < 60:
                 p.showPage()
                 y = height - 50
 
-            # User Header
             p.setFont("Helvetica-Bold", 11)
             p.drawString(40, y, f"User: {salesperson}")
             y -= 20
 
-            # Table Header
             p.setFont("Helvetica-Bold", 9)
             p.drawString(40, y, "Order ID")
             p.drawString(120, y, "Shop")
@@ -2982,12 +2991,10 @@ def export_report():
             p.drawString(300, y, "Debt (KES)")
             p.drawString(380, y, "Sales (KES)")
             p.drawString(460, y, "Date")
-            
             y -= 10
             p.line(40, y, width - 40, y)
             y -= 10
             
-            # Order Details
             p.setFont("Helvetica", 9)
             for order_dict in data['orders']:
                 if y < 60:
@@ -3011,7 +3018,6 @@ def export_report():
                 p.drawString(460, y, process_date(order_dict.get('date')).strftime('%d/%m/%Y'))
                 y -= 15
 
-            # User Summary
             y -= 5
             p.line(40, y, width - 40, y)
             y -= 15
@@ -3024,14 +3030,12 @@ def export_report():
             y -= 25
 
     elif report_type == 'debt':
-        # Enhanced Debt Report
         p.setFont("Helvetica-Bold", 10)
         p.drawString(40, y, "Order ID")
         p.drawString(120, y, "Shop")
         p.drawString(220, y, "Salesperson")
         p.drawString(320, y, "Debt Amount (KES)")
         p.drawString(420, y, "Date")
-        
         y -= 10
         p.line(40, y, width - 40, y)
         y -= 10
@@ -3043,7 +3047,7 @@ def export_report():
         for order in orders:
             order_dict = order.to_dict()
             order_date = process_date(order_dict.get('date'))
-            if start and order_date < start:
+            if start_utc and order_date < start_utc:
                 continue
                 
             debt = order_dict.get('balance', 0)
@@ -3075,7 +3079,6 @@ def export_report():
         p.drawString(40, y, f"Total Outstanding Debt: {total_debt:.2f} KES")
 
     elif report_type == 'sales':
-        # Enhanced Sales Report with Debt Information
         p.setFont("Helvetica-Bold", 10)
         p.drawString(40, y, "Order ID")
         p.drawString(110, y, "Shop")
@@ -3084,7 +3087,6 @@ def export_report():
         p.drawString(370, y, "Payment (KES)")
         p.drawString(450, y, "Debt (KES)")
         p.drawString(520, y, "Date")
-        
         y -= 10
         p.line(40, y, width - 40, y)
         y -= 10
@@ -3097,7 +3099,7 @@ def export_report():
         for order in orders:
             order_dict = order.to_dict()
             order_date = process_date(order_dict.get('date'))
-            if start and order_date < start:
+            if start_utc and order_date < start_utc:
                 continue
                 
             payment = order_dict.get('payment', 0)
@@ -3135,12 +3137,6 @@ def export_report():
         p.drawString(40, y, f"Total Sales: {total_sales:.2f} KES")
         p.drawString(300, y, f"Total Outstanding Debt: {total_debt:.2f} KES")
 
-    else:
-        p.setFont("Helvetica", 12)
-        p.drawString(40, y, "Invalid report type selected.")
-        y -= 20
-
-    # Footer - Professional Touch
     p.setFont("Helvetica-Oblique", 8)
     p.drawString(40, 40, "Dreamland Distributors System © 2025")
     p.drawString(width - 150, 40, f"Page {p.getPageNumber()}")
