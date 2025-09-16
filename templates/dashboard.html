@@ -227,7 +227,7 @@
                             KSh {{ payment.payment | default(0) | round(2) }}
                         </td>
                         <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-200">
-                            {{ payment.date.strftime('%d/%m/%Y %H:%M:%S') }}
+                            {{ payment.date.strftime('%d/%m/%Y %H:%M:%S') if payment.get('date') else 'N/A' }}
                         </td>
                         <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
                             <span class="px-2 py-1 rounded-full text-xs font-medium {% if payment.balance > 0 %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200{% else %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% endif %}">
@@ -435,7 +435,7 @@
                 </thead>
                 <tbody id="expenses-body">
                     {% for expense in expenses %}
-                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-7 transition-colors" data-date="{{ expense.date.strftime('%Y-%m-%d') }}" data-search="{{ expense.description | lower }} {{ expense.category | lower }}">
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-7 transition-colors" data-date="{{ expense.date.strftime('%Y-%m-%d') if expense.get('date') else '' }}" data-search="{{ expense.description | lower }} {{ expense.category | lower }}">
                         <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-600 dark:text-gray-200">{{ expense.description }}</td>
                         <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-red-600 dark:text-red-300">KSh {{ "%.2f" % expense.amount }}</td>
                         <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-600 dark:text-gray-200">{{ expense.category }}</td>
