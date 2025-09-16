@@ -2599,16 +2599,16 @@ def daily_sales_report():
     total_mpesa = 0
     total_cash = 0
     today_orders = []
-    payment_debug = []  # For debugging payment methods
     
     for doc in orders_ref:
         order_dict = doc.to_dict()
         order_type = order_dict.get('order_type', 'wholesale').lower()
         payment = float(order_dict.get('payment', 0))
         balance = float(order_dict.get('balance', 0))
+        payment_type = order_dict.get('payment_type', '').lower().strip()
         receipt_id = order_dict.get('receipt_id', doc.id)
         
-        # Calculate revenue totals
+        # Calculate revenue totals (same logic as before)
         if order_type == 'wholesale':
             total_wholesale_revenue += payment + balance
             total_wholesale_paid += payment
@@ -2618,31 +2618,13 @@ def daily_sales_report():
         
         total_debt += balance
         
-        # Process payment history for payment method totals
-        payment_history = order_dict.get('payment_history', [])
+        # Calculate payment method totals (same simple logic)
+        if payment_type == 'mpesa':
+            total_mpesa += payment
+        elif payment_type == 'cash':
+            total_cash += payment
         
-        # Debug info for this order
-        order_payment_debug = {
-            'receipt_id': receipt_id,
-            'payment_history_count': len(payment_history),
-            'payment_entries': []
-        }
-        
-        for payment_entry in payment_history:
-            amount = payment_entry.get('amount', 0)
-            payment_type = payment_entry.get('payment_type', '')
-            
-            order_payment_debug['payment_entries'].append({
-                'amount': amount,
-                'payment_type': payment_type
-            })
-            
-            if payment_type == 'mpesa':
-                total_mpesa += amount
-            elif payment_type == 'cash':
-                total_cash += amount
-        
-        payment_debug.append(order_payment_debug)
+        print(f"Order {receipt_id}: type={order_type}, payment={payment}, payment_type={payment_type}")
         
         today_orders.append({
             'receipt_id': receipt_id,
@@ -2699,12 +2681,10 @@ def daily_sales_report():
         'orders_count': len(today_orders),
         'today_expenses': today_expenses,
         'total_mpesa': total_mpesa,
-        'total_cash': total_cash,
-        'payment_debug': payment_debug  # Add debug info
+        'total_cash': total_cash
     }
     
     return render_template('daily_sales_report.html', **report_data)
-
 @app.route('/reports')
 @no_cache
 @login_required
