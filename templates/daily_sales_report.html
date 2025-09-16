@@ -8,62 +8,67 @@
         @media print {
             body { margin: 0; padding: 10px; }
             .no-print { display: none; }
-            .print-break { page-break-after: always; }
         }
         
         body {
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            line-height: 1.2;
-            max-width: 300px;
+            font-family: 'Arial', sans-serif;
+            font-size: 13px;
+            line-height: 1.4;
+            max-width: 320px;
             margin: 0 auto;
-            padding: 10px;
-            background: white;
+            padding: 15px;
+            background: #fff;
+            color: #000;
         }
         
         .header {
             text-align: center;
-            border-bottom: 2px solid #333;
-            padding-bottom: 8px;
+            border-bottom: 2px solid #000;
+            padding-bottom: 10px;
             margin-bottom: 15px;
         }
         
         .company-name {
-            font-size: 16px;
+            font-size: 18px;
             font-weight: bold;
-            margin-bottom: 3px;
+            color: #000;
+            margin-bottom: 5px;
         }
         
         .report-title {
-            font-size: 14px;
+            font-size: 15px;
             font-weight: bold;
-            margin: 8px 0 5px 0;
+            color: #000;
+            margin: 10px 0 5px;
         }
         
         .meta-info {
-            font-size: 10px;
+            font-size: 11px;
+            color: #333;
             margin-bottom: 5px;
         }
         
         .section {
             margin: 15px 0;
-            border-bottom: 1px solid #ccc;
             padding-bottom: 10px;
+            border-bottom: 1px solid #666;
         }
         
         .section-title {
             font-weight: bold;
-            font-size: 13px;
-            margin-bottom: 6px;
+            font-size: 14px;
+            color: #000;
+            margin-bottom: 8px;
             border-bottom: 1px solid #000;
-            padding-bottom: 2px;
+            padding-bottom: 3px;
         }
         
         .item-row {
             display: flex;
             justify-content: space-between;
-            margin: 2px 0;
-            font-size: 11px;
+            margin: 3px 0;
+            font-size: 12px;
+            color: #000;
         }
         
         .item-name {
@@ -77,47 +82,49 @@
         }
         
         .totals {
-            background: #f5f5f5;
-            padding: 8px;
+            background: #f0f0f0;
+            padding: 10px;
             margin: 10px 0;
-            border: 1px solid #333;
+            border: 1px solid #000;
         }
         
         .total-row {
             display: flex;
             justify-content: space-between;
             font-weight: bold;
-            margin: 3px 0;
+            margin: 4px 0;
+            color: #000;
         }
         
         .final-total {
-            border-top: 2px solid #333;
-            padding-top: 5px;
-            margin-top: 8px;
-            font-size: 13px;
+            border-top: 2px solid #000;
+            padding-top: 6px;
+            margin-top: 10px;
+            font-size: 14px;
+            color: {{ 'green' if net >= 0 else 'red' }};
         }
         
         .print-btn {
             position: fixed;
             top: 20px;
             right: 20px;
-            background: #007bff;
-            color: white;
+            background: #0066cc;
+            color: #fff;
             border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
+            padding: 8px 16px;
+            border-radius: 4px;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 13px;
         }
         
         .print-btn:hover {
-            background: #0056b3;
+            background: #004d99;
         }
         
         .expense-item {
-            font-size: 10px;
-            color: #666;
-            margin: 2px 0;
+            font-size: 11px;
+            color: #333;
+            margin: 3px 0;
         }
     </style>
 </head>
@@ -126,48 +133,41 @@
     
     <div class="header">
         <div class="company-name">DREAMLAND DISTRIBUTORS</div>
-        <div style="font-size: 10px;">P.O Box 123-00200 Nairobi</div>
-        <div style="font-size: 10px;">Phone: 0725 530632</div>
+        <div class="meta-info">P.O Box 123-00200 Nairobi</div>
+        <div class="meta-info">Phone: 0725 530632</div>
         <div class="report-title">DAILY SALES REPORT</div>
         <div class="meta-info">Date: {{ date }}</div>
         <div class="meta-info">Generated: {{ time_generated }}</div>
         <div class="meta-info">Orders Processed: {{ orders_count }}</div>
     </div>
 
-    <!-- Commented out ITEMS MOVED TODAY section for later use -->
-    <!--
-    {% if grouped_items %}
-    <div class="section">
-        <div class="section-title">ITEMS MOVED TODAY</div>
-        {% for group_name, group_data in grouped_items.items() %}
-        <div class="item-row">
-            <div class="item-name">{{ group_name|title }}</div>
-            <div class="item-details">{{ group_data.quantity }} pcs - {{ group_data.revenue|round(2) }} KES</div>
-        </div>
-        {% endfor %}
-    </div>
-    {% endif %}
-    -->
-
     <div class="section">
         <div class="section-title">SALES SUMMARY</div>
         <div class="item-row">
-            <div>Wholesale Revenue:</div>
+            <div>Wholesale Total:</div>
             <div>{{ total_wholesale_revenue|round(2) }} KES</div>
         </div>
         <div class="item-row">
-            <div>Retail Revenue:</div>
-            <div>{{ total_retail_revenue|round(2) }} KES</div>
-        </div>
-        <div class="item-row">
-            <div>Wholesale Paid:</div>
+            <div>Wholesale Paid Orders:</div>
             <div>{{ total_wholesale_paid|round(2) }} KES</div>
         </div>
         <div class="item-row">
-            <div>Retail Paid:</div>
+            <div>Retail Total:</div>
+            <div>{{ total_retail_revenue|round(2) }} KES</div>
+        </div>
+        <div class="item-row">
+            <div>Retail Paid Orders:</div>
             <div>{{ total_retail_paid|round(2) }} KES</div>
         </div>
-        <div class="item-row" style="color: #d32f2f;">
+        <div class="item-row">
+            <div>M-Pesa Payment:</div>
+            <div>{{ total_mpesa|round(2) }} KES</div>
+        </div>
+        <div class="item-row">
+            <div>Cash Payment:</div>
+            <div>{{ total_cash|round(2) }} KES</div>
+        </div>
+        <div class="item-row" style="color: #cc0000;">
             <div>Outstanding Debt:</div>
             <div>{{ total_debt|round(2) }} KES</div>
         </div>
@@ -181,7 +181,7 @@
             {{ expense.category }}: {{ expense.description }} - {{ expense.amount|round(2) }} KES
         </div>
         {% endfor %}
-        <div class="item-row" style="color: #d32f2f; margin-top: 5px;">
+        <div class="item-row" style="color: #cc0000; margin-top: 5px;">
             <div><strong>Total Expenses:</strong></div>
             <div><strong>{{ total_expenses|round(2) }} KES</strong></div>
         </div>
@@ -190,24 +190,20 @@
 
     <div class="totals">
         <div class="total-row">
-            <div>Gross Revenue:</div>
-            <div>{{ gross_revenue|round(2) }} KES</div>
+            <div>Total Sales:</div>
+            <div>{{ (total_wholesale_revenue + total_retail_revenue)|round(2) }} KES</div>
         </div>
         <div class="total-row">
             <div>Total Expenses:</div>
             <div>{{ total_expenses|round(2) }} KES</div>
         </div>
-        <div class="total-row">
-            <div>Outstanding Debt:</div>
-            <div>{{ total_debt|round(2) }} KES</div>
-        </div>
-        <div class="total-row final-total" style="color: {{ 'green' if net_profit >= 0 else 'red' }};">
-            <div>NET PROFIT:</div>
-            <div>{{ net_profit|round(2) }} KES</div>
+        <div class="total-row final-total">
+            <div>NET:</div>
+            <div>{{ (total_wholesale_paid + total_retail_paid - total_expenses)|round(2) }} KES</div>
         </div>
     </div>
 
-    <div style="text-align: center; margin-top: 20px; font-size: 10px; color: #666;">
+    <div style="text-align: center; margin-top: 20px; font-size: 11px; color: #333;">
         <div>--- END OF REPORT ---</div>
         <div>System Generated on {{ date }} {{ time_generated }}</div>
     </div>

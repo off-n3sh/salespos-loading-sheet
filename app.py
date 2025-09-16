@@ -745,112 +745,7 @@ def group_similar_items(items):
     
     return grouped
 
-@app.route('/daily_sales_report')
-@no_cache
-@login_required
-def daily_sales_report():
-    # Get today's date range
-    now = datetime.now(NAIROBI_TZ)
-    start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    end_of_day = now.replace(hour=23, minute=59, second=59, microsecond=999999)
-    
-    # Fetch today's orders
-    orders_ref = db.collection('orders').where('date', '>=', start_of_day).where('date', '<=', end_of_day).stream()
-    
-    today_orders = []
-    total_wholesale_revenue = 0
-    total_retail_revenue = 0
-    total_wholesale_paid = 0
-    total_retail_paid = 0
-    total_debt = 0
-    
-    for doc in orders_ref:
-        order_dict = doc.to_dict()
-        order_date = process_date(order_dict.get('date'))
-        
-        # Extract items from the order (no longer needed for grouped_items, but kept for order details)
-        items = order_dict.get('items', [])
-        
-        # Convert items array to proper format for order details
-        processed_items = []
-        if items and len(items) >= 6:
-            for i in range(0, len(items), 6):
-                if i + 5 < len(items):
-                    try:
-                        processed_items.append({
-                            'product': items[i + 1],
-                            'quantity': float(items[i + 3]),  # Convert to float
-                            'price': float(items[i + 5])      # Convert to float
-                        })
-                    except (ValueError, TypeError) as e:
-                        print(f"Invalid data for item at index {i} in order {doc.id}: quantity={items[i + 3]}, price={items[i + 5]}, error={e}")
-                        continue
-        
-        order_type = order_dict.get('order_type', 'wholesale')
-        payment = float(order_dict.get('payment', 0))  # Ensure payment is float
-        balance = float(order_dict.get('balance', 0))  # Ensure balance is float
-        
-        if order_type == 'wholesale':
-            total_wholesale_revenue += payment + balance
-            total_wholesale_paid += payment
-        else:
-            total_retail_revenue += payment + balance
-            total_retail_paid += payment
-            
-        total_debt += balance
-        
-        today_orders.append({
-            'receipt_id': order_dict.get('receipt_id', doc.id),
-            'shop_name': order_dict.get('shop_name', 'Unknown'),
-            'order_type': order_type,
-            'payment': payment,
-            'balance': balance,
-            'items': processed_items
-        })
-    
-    # Fetch today's retail sales
-    retail_ref = db.collection('retail').where('date', '>=', start_of_day).where('date', '<=', end_of_day).stream()
-    for doc in retail_ref:
-        retail_dict = doc.to_dict()
-        amount = float(retail_dict.get('amount', 0))  # Ensure amount is float
-        total_retail_revenue += amount
-        total_retail_paid += amount
-    
-    # Fetch today's expenses
-    expenses_ref = db.collection('expenses').where('date', '>=', start_of_day).where('date', '<=', end_of_day).stream()
-    total_expenses = 0
-    today_expenses = []
-    
-    for doc in expenses_ref:
-        expense_dict = doc.to_dict()
-        amount = float(expense_dict.get('amount', 0))  # Ensure amount is float
-        total_expenses += amount
-        today_expenses.append({
-            'category': expense_dict.get('category', 'Other'),
-            'description': expense_dict.get('description', ''),
-            'amount': amount
-        })
-    
-    # Calculate final totals
-    gross_revenue = total_retail_paid + total_wholesale_paid
-    net_profit = gross_revenue - total_expenses - total_debt  # Deduct debt
-    
-    report_data = {
-        'date': now.strftime('%d/%m/%Y'),
-        'time_generated': now.strftime('%H:%M:%S'),
-        'total_wholesale_revenue': total_wholesale_revenue,
-        'total_retail_revenue': total_retail_revenue,
-        'total_wholesale_paid': total_wholesale_paid,
-        'total_retail_paid': total_retail_paid,
-        'total_debt': total_debt,
-        'total_expenses': total_expenses,
-        'gross_revenue': gross_revenue,
-        'net_profit': net_profit,
-        'orders_count': len(today_orders),
-        'today_expenses': today_expenses
-    }
-    
-    return render_template('daily_sales_report.html', **report_data)
+
 def group_expenses(expenses, time_filter, now):
     grouped_expenses = []
     if time_filter == 'day':
@@ -2207,811 +2102,6 @@ def orders():
         logger.error(f"Error fetching orders: {e}")
         return render_template('error.html', message=f"Failed to load orders: {str(e)}"), 500
 
-
-@app.route('/mark_paid/<receipt_id>', methods=['POST'])
-def mark_paid(receipt_id):
-    orders_ref = db.collection('orders').where('receipt_id', '==', receipt_id).limit(1).stream()
-    order_doc = next(orders_ref, None)
-    if not order_doc:
-        return jsonify({"error": f"Order with receipt_id {receipt_id} not found"}), 404
-
-    try:
-        order_ref = db.collection('orders').document(order_doc.id)
-        order_dict = order_doc.to_dict()
-        current_payment = float(order_dict.get('payment', 0))
-        current_balance = float(order_dict.get('balance', 0))
-        amount_paid = float(request.form.get('amount_paid', 0))
-        now = datetime.now(NAIROBI_TZ)
-
-        # Validation
-        if amount_paid <= 0:
-            return jsonify({"error": "Payment amount must be greater than 0"}), 400
-        if current_balance <= 0:
-            return jsonify({"error": "Order is already fully paid"}), 400
-
-        # Update payment and balance
-        new_payment = current_payment + amount_paid
-        new_balance = max(current_balance - amount_paid, 0)
-        payment_history = order_dict.get('payment_history', [])
-
-        # Append new payment to payment_history
-        payment_history.append({
-            'amount': amount_paid,
-            'date': now
-        })
-
-        update_data = {
-            'payment': new_payment,
-            'balance': new_balance,
-            'payment_history': payment_history
-        }
-        if new_balance == 0:
-            update_data['closed_date'] = now
-
-        # Update order
-        order_ref.update(update_data)
-
-        # Update client debt
-        shop_name = order_dict.get('shop_name')
-        client_ref = db.collection('clients').where('shop_name', '==', shop_name).limit(1).get()
-        if client_ref:
-            client_doc = client_ref[0]
-            client_data = client_doc.to_dict()
-            new_debt = max(float(client_data.get('debt', 0)) - amount_paid, 0)
-            db.collection('clients').document(client_doc.id).update({'debt': new_debt})
-
-        # Create notification
-        user_id = order_dict.get('user_id')
-        if user_id:
-            notification_title = "Payment Processed"
-            notification_body = (
-                f"Order #{receipt_id} fully paid on {now.strftime('%d/%m/%Y %H:%M')}"
-                if new_balance == 0 else
-                f"Order #{receipt_id} partially paid. New balance: KSh {new_balance:.2f} on {now.strftime('%d/%m/%Y %H:%M')}"
-            )
-            db.collection('users').document(user_id).collection('notifications').add({
-                'type': 'payment_processed' if new_balance == 0 else 'payment_partial',
-                'title': notification_title,
-                'body': notification_body,
-                'data': {
-                    'orderId': order_doc.id,
-                    'receipt_id': receipt_id
-                },
-                'timestamp': firestore.SERVER_TIMESTAMP,
-                'read': False
-            })
-
-        return jsonify({"success": True, "message": "Payment processed successfully", "new_balance": new_balance}), 200
-    except Exception as e:
-        return jsonify({"error": f"Error updating order: {str(e)}"}), 500
-
-@app.route('/receipts')
-@no_cache
-@login_required
-def receipts():
-    try:
-        orders = [doc.to_dict() for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).get()]
-        for order in orders:
-            order['date'] = process_date(order.get('date'))
-        return render_template('receipts.html', orders=orders)
-    except Exception as e:
-        return f"Error loading receipts: {str(e)}", 500       
-@app.route('/receipt/<order_id>')
-@no_cache
-@login_required
-def receipt(order_id):
-    try:
-        db = firestore.Client()
-        orders_ref = db.collection('orders').where('receipt_id', '==', order_id).limit(1).stream()
-        order_doc = next(orders_ref, None)
-        if not order_doc:
-            return "Order not found", 404
-        order_dict = order_doc.to_dict()
-        items_raw = order_dict.get('items', [])
-        items_list = []
-        subtotal_amount = 0
-
-        # Process items_raw based on order_type
-        if order_dict.get('order_type') == 'app' and isinstance(items_raw, list) and items_raw and isinstance(items_raw[0], dict):
-            for item in items_raw:
-                quantity = float(item.get('quantity', '0'))  # Use float for app orders
-                price = float(item.get('price', '0.0'))
-                amount = quantity * price
-                subtotal_amount += amount
-                items_list.append({
-                    'name': item.get('product', 'Unknown'),
-                    'quantity': quantity,
-                    'price': price,
-                    'amount': amount
-                })
-        else:
-            # Web order: flat array
-            i = 0
-            while i < len(items_raw):
-                if items_raw[i] == 'product':
-                    product_name = items_raw[i + 1]
-                    quantity_str = str(items_raw[i + 3]) if i + 2 < len(items_raw) and items_raw[i + 2] == 'quantity' else '0'
-                    price_str = str(items_raw[i + 5]) if i + 4 < len(items_raw) and items_raw[i + 4] == 'price' else '0'
-                    try:
-                        quantity = float(quantity_str) if quantity_str.replace('.', '').replace('-', '').isdigit() else 0.0
-                    except ValueError:
-                        logger.error(f"Invalid quantity format for {product_name}: {quantity_str}")
-                        quantity = 0.0
-                    price = float(price_str) if price_str.replace('.', '').replace('-', '').isdigit() else 0.0
-                    amount = quantity * price
-                    subtotal_amount += amount
-                    items_list.append({
-                        'name': product_name,
-                        'quantity': quantity,
-                        'price': price,
-                        'amount': amount
-                    })
-                    i += 6
-                else:
-                    i += 1
-
-        shop_name = order_dict.get('shop_name', 'Unknown Shop')
-        try:
-            shop_address = next((doc.to_dict().get('address', 'No address') for doc in db.collection('shops').where('name', '==', shop_name).limit(1).stream()), 'No address')
-        except Exception as e:
-            logger.error(f"Error fetching shop address: {str(e)}")
-            shop_address = 'No address available'
-
-        order = {
-            'receipt_id': order_dict.get('receipt_id', order_doc.id),
-            'salesperson_name': order_dict.get('salesperson_name', 'N/A'),
-            'shop_name': shop_name,
-            'shop_address': shop_address,
-            'items_list': items_list,
-            'total_items': process_items(order_dict.get('items')),
-            'subtotal': subtotal_amount,
-            'total_amount': subtotal_amount,
-            'payment': order_dict.get('payment', 0),
-            'balance': order_dict.get('balance', 0),
-            'date': process_date(order_dict.get('date')),
-            'order_type': order_dict.get('order_type', 'wholesale')
-        }
-        recent_activity = [{'receipt_id': doc.to_dict().get('receipt_id', doc.id), 'salesperson_name': doc.to_dict().get('salesperson_name', 'N/A'), 
-                           'shop_name': doc.to_dict().get('shop_name', 'Unknown Shop'), 'date': process_date(doc.to_dict().get('date'))} 
-                          for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).limit(3).get()]
-        logger.info(f"Order data for {order_id}: {order}")
-        return render_template('receipt.html', order=order, recent_activity=recent_activity)
-    except Exception as e:
-        logger.error(f"Error in receipt route for {order_id}: {str(e)}")
-        return render_template('error.html', message=f"Internal Server Error: {str(e)}"), 500
-@app.route('/reports')
-@no_cache
-@login_required
-def reports():
-    time_filter = request.args.get('time', 'month')
-    now = datetime.now(NAIROBI_TZ)
-
-    # Set start date based on time filter
-    if time_filter == 'day':
-        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    elif time_filter == 'week':
-        start = now - timedelta(days=now.weekday())
-        start = start.replace(hour=0, minute=0, second=0, microsecond=0)
-    elif time_filter == 'month':
-        start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    elif time_filter == 'year':
-        start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-    else:
-        start = None
-
-    # Fetch orders
-    orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).stream()
-    orders = []
-    for doc in orders_ref:
-        order_dict = doc.to_dict()
-        order_date = process_date(order_dict.get('date'))
-        if start and order_date and order_date < start:
-            continue
-        orders.append({
-            'receipt_id': order_dict.get('receipt_id', doc.id),
-            'salesperson_name': order_dict.get('salesperson_name', 'N/A'),
-            'shop_name': order_dict.get('shop_name', 'Unknown Shop'),
-            'items': order_dict.get('items_list', []),  # Use items_list for consistency with receipt template
-            'payment': order_dict.get('payment', 0),
-            'balance': order_dict.get('balance', 0),
-            'date': order_date,
-            'closed_date': process_date(order_dict.get('closed_date')) if order_dict.get('closed_date') else None,
-            'order_type': order_dict.get('order_type', 'wholesale')
-        })
-
-    # Fetch retail sales
-    retail_sales = []
-    retail_ref = db.collection('retail').order_by('date', direction=firestore.Query.DESCENDING).stream()
-    for doc in retail_ref:
-        retail_dict = doc.to_dict()
-        retail_date = process_date(retail_dict.get('date'))  # Handle DatetimeWithNanoseconds directly
-        if start and retail_date and retail_date < start:
-            continue
-        retail_dict['date'] = retail_date
-        retail_sales.append(retail_dict)
-
-    # Calculate metrics
-    total_sales_retail = sum(o['payment'] for o in orders if o['order_type'] == 'retail') + sum(r.get('amount', 0) for r in retail_sales)
-    total_sales_wholesale = sum(o['payment'] for o in orders if o['order_type'] == 'wholesale')
-    total_paid_retail = sum(o['payment'] for o in orders if o['order_type'] == 'retail') + sum(r.get('amount', 0) for r in retail_sales)
-    total_paid_wholesale = sum(o['payment'] for o in orders if o['order_type'] == 'wholesale')
-    total_debt_retail = sum(o['balance'] for o in orders if o['order_type'] == 'retail' and o['balance'] > 0)
-    total_debt_wholesale = sum(o['balance'] for o in orders if o['order_type'] == 'wholesale' and o['balance'] > 0)
-    total_money_bank_retail = total_paid_retail
-    total_money_bank_wholesale = total_paid_wholesale
-    total_debt = total_debt_retail + total_debt_wholesale
-
-    # Chart data
-    chart_data = {
-        'sales_vs_debts': {
-            'labels': ['Retail Sales', 'Wholesale Sales', 'Retail Debt', 'Wholesale Debt'],
-            'data': [total_sales_retail, total_sales_wholesale, total_debt_retail, total_debt_wholesale],
-            'colors': ['#4CAF50', '#2196F3', '#FF9800', '#F44336']
-        },
-        'paid_vs_debt': {
-            'labels': ['Total Paid Retail', 'Total Paid Wholesale', 'Total Debt Retail', 'Total Debt Wholesale'],
-            'data': [total_paid_retail, total_paid_wholesale, total_debt_retail, total_debt_wholesale],
-            'colors': ['#4CAF50', '#2196F3', '#FF9800', '#F44336']
-        },
-        'money_in_bank': {
-            'labels': ['Retail Bank', 'Wholesale Bank'],
-            'data': [total_money_bank_retail, total_money_bank_wholesale],
-            'colors': ['#4CAF50', '#2196F3']
-        }
-    }
-
-    # Fetch logs
-    stock_logs = []
-    for doc in db.collection('stock_logs').order_by('timestamp', direction=firestore.Query.DESCENDING).stream():
-        log = doc.to_dict()
-        log['timestamp'] = process_date(log.get('timestamp'))
-        stock_logs.append(log)
-
-    expenses = []
-    for doc in db.collection('expenses').order_by('date', direction=firestore.Query.DESCENDING).stream():
-        expense = doc.to_dict()
-        expense['date'] = process_date(expense.get('date'))
-        expenses.append(expense)
-
-    user_actions = []
-    for doc in db.collection('user_actions').order_by('timestamp', direction=firestore.Query.DESCENDING).stream():
-        action = doc.to_dict()
-        action['timestamp'] = process_date(action.get('timestamp'))
-        user_actions.append(action)
-
-    recent_activity = [
-        {
-            'receipt_id': doc.to_dict().get('receipt_id', doc.id),
-            'salesperson_name': doc.to_dict().get('salesperson_name', 'N/A'),
-            'shop_name': doc.to_dict().get('shop_name', 'Unknown Shop'),
-            'date': process_date(doc.to_dict().get('date'))
-        } for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).limit(3).stream()
-    ]
-
-    return render_template('reports.html', orders=orders, stock_logs=stock_logs, expenses=expenses, user_actions=user_actions,
-                          recent_activity=recent_activity, chart_data=chart_data, time_filter=time_filter, total_debt=total_debt)       
-
-@app.route('/return_stock/<order_id>', methods=['POST'])
-@no_cache
-@login_required
-def return_stock(order_id):
-    """Log stock returns for an order and update the order with new item quantities and balance."""
-    orders_ref = db.collection('orders').where('receipt_id', '==', order_id).limit(1).stream()
-    order_doc = next(orders_ref, None)
-    if not order_doc:
-        return "Order not found", 404
-
-    try:
-        order_ref = db.collection('orders').document(order_doc.id)
-        order_dict = order_doc.to_dict()
-        current_payment = float(order_dict.get('payment', 0))
-        items_raw = order_dict.get('items', [])
-        items_list = []
-        i = 0
-        while i < len(items_raw):
-            if items_raw[i] == 'product':
-                product_name = items_raw[i + 1]
-                quantity = int(items_raw[i + 3]) if i + 2 < len(items_raw) and items_raw[i + 2] == 'quantity' else 0
-                price = float(items_raw[i + 5]) if i + 4 < len(items_raw) and items_raw[i + 4] == 'price' else 0
-                items_list.append({
-                    'name': product_name,
-                    'quantity': quantity,
-                    'price': price
-                })
-                i += 6
-            else:
-                i += 1
-
-        returned_items = []
-        total_returned_value = 0
-        updated_items_raw = []
-        i = 0
-        while i < len(items_raw):
-            if items_raw[i] == 'product':
-                product_name = items_raw[i + 1]
-                quantity = int(items_raw[i + 3]) if i + 2 < len(items_raw) and items_raw[i + 2] == 'quantity' else 0
-                price = float(items_raw[i + 5]) if i + 4 < len(items_raw) and items_raw[i + 4] == 'price' else 0
-                return_qty_str = request.form.get(f'return_qty_{product_name}', '0')
-                return_qty = int(return_qty_str) if return_qty_str.isdigit() else 0
-
-                if return_qty > 0 and return_qty <= quantity:
-                    returned_items.append({
-                        'name': product_name,
-                        'quantity': return_qty,
-                        'price': price
-                    })
-                    total_returned_value += return_qty * price
-                    new_quantity = quantity - return_qty
-                    if new_quantity > 0:
-                        updated_items_raw.extend(['product', product_name, 'quantity', new_quantity, 'price', price])
-                else:
-                    updated_items_raw.extend(['product', product_name, 'quantity', quantity, 'price', price])
-                i += 6
-            else:
-                i += 1
-
-        if returned_items:
-            db.collection('stock_returns').add({
-                'order_id': order_id,
-                'salesperson_id': order_dict.get('salesperson_id', ''),
-                'items': [{'name': item['name'], 'quantity': item['quantity'], 'price': item['price']} for item in returned_items],
-                'reason': 'Returned by shop',
-                'timestamp': datetime.now(NAIROBI_TZ)
-            })
-
-            for item in returned_items:
-                stock_ref = db.collection('stock').where('stock_name', '==', item['name']).limit(1).get()
-                category = stock_ref[0].to_dict().get('category', 'Unknown') if stock_ref else 'Unknown'
-                log_stock_change(category, item['name'], 'stock_return_logged', item['quantity'], item['price'])
-
-            original_total = sum(item['quantity'] * item['price'] for item in items_list)
-            new_total = original_total - total_returned_value
-            new_balance = max(new_total - current_payment, 0)
-
-            update_data = {
-                'items': updated_items_raw,
-                'balance': new_balance
-            }
-            if not updated_items_raw:
-                update_data['closed_date'] = datetime.now(NAIROBI_TZ)
-                notification_message = f"Order #{order_id} fully returned and closed on {datetime.now(NAIROBI_TZ).strftime('%d/%m/%Y %H:%M')}"
-            else:
-                notification_message = f"Order #{order_id} updated: {len(items_list) - len(returned_items)} item{'s' if len(items_list) - len(returned_items) != 1 else ''} remaining, new balance: KSh {new_balance} on {datetime.now(NAIROBI_TZ).strftime('%d/%m/%Y %H:%M')}"
-
-            order_ref.update(update_data)
-
-            db.collection('notifications').add({
-                'recipient': order_dict.get('salesperson_id', ''),
-                'message': notification_message,
-                'timestamp': datetime.now(NAIROBI_TZ),
-                'order_id': order_id,
-                'read': False
-            })
-
-        return '', 200
-    except Exception as e:
-        return f"Error processing stock returns: {str(e)}", 500
-    
-
-@app.route('/expenses', methods=['GET', 'POST'])
-@no_cache
-@login_required
-def expenses():
-    """Add a new expense and redirect to the dashboard."""
-    if session['user']['role'] != 'manager':
-        return jsonify({'error': 'Unauthorized: Only managers can add expenses'}), 403
-
-    if request.method == 'POST':
-        description = request.form['description']
-        amount = float(request.form['amount'])
-        category = request.form['category']
-        reason = request.form.get('reason', '')  # Optional reason for "Other"
-
-        # Append reason to description for "Other" category
-        if category == 'Other' and reason:
-            description = f"Other: {reason} - {description}"
-
-        db.collection('expenses').add({
-            'description': description,
-            'amount': amount,
-            'category': category,
-            'date': datetime.now(NAIROBI_TZ)
-        })
-        log_stock_change(category, description, 'expense', -amount, 1)
-        return redirect(url_for('dashboard'))
-    
-    return jsonify({'error': 'Method not allowed'}), 405
-
-@app.route('/load_to_loading_sheet/<receipt_id>/<action>')
-@login_required
-def load_to_loading_sheet(receipt_id, action):
-    order_ref = db.collection('orders').where('receipt_id', '==', receipt_id).limit(1).stream()
-    order_doc = next(order_ref, None)
-    if not order_doc:
-        return "Order not found", 404
-    
-    order_dict = order_doc.to_dict()
-    if order_dict.get('order_type', 'wholesale') == 'retail':
-        return "Retail orders cannot be loaded to a loading sheet", 400
-    
-    items_raw = order_dict.get('items', [])
-    items_list = []
-    i = 0
-    while i < len(items_raw):
-        if items_raw[i] == 'product':
-            product_name = items_raw[i + 1]
-            quantity = items_raw[i + 3] if i + 2 < len(items_raw) and items_raw[i + 2] == 'quantity' else 0
-            items_list.append({'name': product_name, 'quantity': quantity})
-            i += 6
-        else:
-            i += 1
-
-    # If action is 'new', save the current sheet to Firestore before creating a new one
-    if action == 'new' and 'current_loading_sheet' in session:
-        current_sheet = session['current_loading_sheet']
-        items = current_sheet.get('items', [])
-        total_items = current_sheet.get('total_items', 0)
-        
-        # Parse created_at from session
-        created_at_str = current_sheet.get('created_at')
-        if isinstance(created_at_str, str):
-            try:
-                created_at = datetime.fromisoformat(created_at_str)
-            except ValueError:
-                created_at = datetime.now(NAIROBI_TZ)
-        else:
-            created_at = datetime.now(NAIROBI_TZ)
-
-        # Generate a unique loading sheet ID
-        loading_sheet_id = f"LOAD_{datetime.now(NAIROBI_TZ).strftime('%Y%m%d_%H%M%S')}"
-        
-        # Save the current sheet to Firestore
-        db.collection('loading_sheets').document(loading_sheet_id).set({
-            'items': items,
-            'total_items': total_items,
-            'created_at': created_at
-        })
-        
-        # Log the action
-        log_user_action('Saved Loading Sheet', f"Saved loading sheet {loading_sheet_id} with {total_items} items")
-        
-        # Clear the current sheet from session
-        session.pop('current_loading_sheet')
-
-    # Now handle the new items
-    if action == 'current' and 'current_loading_sheet' in session:
-        current_items = session.get('current_loading_sheet', {}).get('items', [])
-        for item in items_list:
-            found = False
-            for existing_item in current_items:
-                if existing_item['name'] == item['name']:
-                    existing_item['quantity'] += item['quantity']
-                    found = True
-                    break
-            if not found:
-                current_items.append(item)
-        session['current_loading_sheet'] = {
-            'items': current_items,
-            'total_items': sum(item['quantity'] for item in current_items),
-            'created_at': session.get('current_loading_sheet', {}).get('created_at', datetime.now(NAIROBI_TZ).isoformat())
-        }
-    else:
-        # Create a new loading sheet in session
-        session['current_loading_sheet'] = {
-            'items': items_list,
-            'total_items': sum(item['quantity'] for item in items_list),
-            'created_at': datetime.now(NAIROBI_TZ).isoformat()
-        }
-
-    return redirect(url_for('loading_sheets'))
-
-
-@app.route('/loading-sheets')
-@login_required
-def loading_sheets():
-    """Display the loading sheets page."""
-    current_loading_sheet = session.get('current_loading_sheet', None)
-    if current_loading_sheet:
-        aggregated_items = current_loading_sheet.get('items', [])
-        total_items = current_loading_sheet.get('total_items', 0)
-        # Fix the datetime serialization issue
-        created_at_str = current_loading_sheet.get('created_at')
-        if isinstance(created_at_str, str):
-            try:
-                created_at = datetime.fromisoformat(created_at_str)
-            except ValueError:
-                created_at = datetime.now(NAIROBI_TZ)
-        else:
-            created_at = current_loading_sheet.get('created_at', datetime.now(NAIROBI_TZ))
-    else:
-        aggregated_items = []
-        total_items = 0
-        created_at = None
-
-    # Get recent sheets
-    try:
-        recent_sheets = []
-        for doc in db.collection('loading_sheets').order_by('created_at', direction=firestore.Query.DESCENDING).limit(5).get():
-            sheet_data = doc.to_dict()
-            sheet_data['id'] = doc.id
-            # Convert Firestore timestamp to datetime if needed
-            created_at_field = sheet_data.get('created_at')
-            if isinstance(created_at_field, datetime):
-                sheet_data['created_at'] = created_at_field
-            elif isinstance(created_at_field, str):
-                try:
-                    sheet_data['created_at'] = datetime.fromisoformat(created_at_field)
-                except ValueError:
-                    sheet_data['created_at'] = datetime.now(NAIROBI_TZ)
-            else:
-                sheet_data['created_at'] = datetime.now(NAIROBI_TZ)
-            recent_sheets.append(sheet_data)
-    except Exception as e:
-        print(f"Error fetching recent sheets: {e}")
-        recent_sheets = []
-
-    now = datetime.now(NAIROBI_TZ)
-    
-    return render_template('loading_sheets.html', 
-                          aggregated_items=aggregated_items, 
-                          current_date=now, 
-                          total_items=total_items, 
-                          created_at=created_at, 
-                          recent_sheets=recent_sheets)
-                          
-@app.route('/view-loading-sheet')
-@login_required
-def view_loading_sheet():
-    """View a specific loading sheet."""
-    sheet_id = request.args.get('sheet_id')
-    print_mode = request.args.get('print') == 'true'
-    
-    if not sheet_id:
-        flash('Sheet ID is required', 'error')
-        return redirect(url_for('loading_sheets'))
-
-    # Fetch loading sheet from Firestore
-    try:
-        sheet_ref = db.collection('loading_sheets').document(sheet_id).get()
-        if not sheet_ref.exists:
-            flash('Loading sheet not found', 'error')
-            return redirect(url_for('loading_sheets'))
-        
-        sheet_data = sheet_ref.to_dict()
-        sheet_data['id'] = sheet_id
-        
-        # Handle date conversion
-        created_at_field = sheet_data.get('created_at')
-        if isinstance(created_at_field, datetime):
-            created_at = created_at_field
-        elif isinstance(created_at_field, str):
-            try:
-                created_at = datetime.fromisoformat(created_at_field)
-            except ValueError:
-                created_at = datetime.now(NAIROBI_TZ)
-        else:
-            created_at = datetime.now(NAIROBI_TZ)
-        
-        aggregated_items = sheet_data.get('items', [])
-        total_items = sheet_data.get('total_items', 0)
-        
-        return render_template('view_loading_sheet.html',
-                              aggregated_items=aggregated_items,
-                              total_items=total_items,
-                              created_at=created_at,
-                              current_date=datetime.now(NAIROBI_TZ),
-                              sheet_id=sheet_id,
-                              print_mode=print_mode)
-    except Exception as e:
-        print(f"Error in view-loading-sheet: {str(e)}")
-        flash(f'Error loading sheet: {str(e)}', 'error')
-        return redirect(url_for('loading_sheets'))
-        
-
-
-@app.route('/download-loading-sheet')
-@login_required
-def download_loading_sheet():
-    sheet_id = request.args.get('sheet_id')
-    
-    # Handle specific sheet download if ID is provided
-    if sheet_id:
-        try:
-            sheet_doc = db.collection('loading_sheets').document(sheet_id).get()
-            if not sheet_doc.exists:
-                return "Loading sheet not found", 404
-                
-            sheet_data = sheet_doc.to_dict()
-            aggregated_items = sheet_data.get('items', [])
-            total_items = sheet_data.get('total_items', 0)
-            
-            # Handle created_at timestamp conversion
-            created_at_field = sheet_data.get('created_at')
-            if isinstance(created_at_field, datetime):
-                created_at = created_at_field
-            elif isinstance(created_at_field, str):
-                try:
-                    created_at = datetime.fromisoformat(created_at_field)
-                except ValueError:
-                    created_at = datetime.now(NAIROBI_TZ)
-            else:
-                created_at = datetime.now(NAIROBI_TZ)
-        except Exception as e:
-            print(f"Error fetching loading sheet: {str(e)}")
-            return f"Error fetching loading sheet: {str(e)}", 500
-    # Handle current sheet in session
-    else:
-        current_loading_sheet = session.get('current_loading_sheet', None)
-        if not current_loading_sheet or not current_loading_sheet.get('items'):
-            return "No loading sheet available to download", 400
-
-        aggregated_items = current_loading_sheet.get('items', [])
-        total_items = current_loading_sheet.get('total_items', 0)
-        
-        # Fix created_at datetime handling
-        created_at_str = current_loading_sheet.get('created_at')
-        if isinstance(created_at_str, str):
-            try:
-                created_at = datetime.fromisoformat(created_at_str)
-            except ValueError:
-                created_at = datetime.now(NAIROBI_TZ)
-        else:
-            created_at = current_loading_sheet.get('created_at', datetime.now(NAIROBI_TZ))
-
-    try:
-        # Generate PDF
-        buffer = BytesIO()
-        p = canvas.Canvas(buffer, pagesize=A4)
-        width, height = A4
-
-        # Header
-        p.setFont("Helvetica-Bold", 14)
-        p.drawCentredString(width / 2, height - 50, "Dreamland Distributors")
-        p.setFont("Helvetica", 10)
-        p.drawCentredString(width / 2, height - 70, "P.O Box 123-00200 Nairobi | Phone: 0725 530632")
-        p.line(50, height - 80, width - 50, height - 80)
-        p.setFont("Helvetica-Bold", 12)
-        p.drawCentredString(width / 2, height - 100, "Loading Sheet")
-        p.setFont("Helvetica", 10)
-        formatted_date = created_at.strftime('%d/%m/%Y %H:%M') if hasattr(created_at, 'strftime') else str(created_at)
-        p.drawString(50, height - 120, f"Date: {formatted_date}")
-
-        # Table header
-        y = height - 160
-        p.setFont("Helvetica-Bold", 10)
-        p.drawString(50, y, "Item")
-        p.drawString(300, y, "Details")
-        p.line(50, y - 5, width - 50, y - 5)
-        y -= 20
-
-        # Items
-        p.setFont("Helvetica", 10)
-        for item in aggregated_items:
-            if y < 100:  # Start new page if not enough space
-                p.showPage()
-                p.setFont("Helvetica", 10)
-                y = height - 50
-            
-            p.drawString(50, y, item['name'])
-            
-            if "sugar" in item['name'].lower() and "2k" in item['name'].lower():
-                notes = f"2 pieces x {item['quantity']}"
-            elif item['quantity'] > 1:
-                notes = f"{item['quantity']} pieces"
-            else:
-                notes = "Single unit"
-                
-            p.drawString(300, y, notes)
-            y -= 20
-
-        # Footer
-        y -= 20
-        p.line(50, y, width - 50, y)
-        y -= 20
-        
-        p.setFont("Helvetica-Bold", 10)
-        p.drawString(50, y, f"Total Items: {total_items}")
-        y -= 30
-        
-        p.drawString(50, y, "Driver Signature: ____________________")
-        y -= 20
-        p.drawString(50, y, "Date Loaded: ____________________")
-
-        p.showPage()
-        p.save()
-
-        buffer.seek(0)
-        filename = f"loading_sheet_{sheet_id if sheet_id else created_at.strftime('%Y%m%d_%H%M') if hasattr(created_at, 'strftime') else 'current'}.pdf"
-        
-        return Response(
-            buffer,
-            mimetype='application/pdf',
-            headers={"Content-Disposition": f"attachment;filename={filename}"}
-        )
-    except Exception as e:
-        print(f"Error generating PDF: {str(e)}")
-        return f"Error generating PDF: {str(e)}", 500
-
-@app.route('/create-loading-sheet')
-@login_required
-def create_loading_sheet():
-    """Create a new loading sheet by saving the current one to Firestore and clearing the session."""
-    # Check if there's a current loading sheet in session
-    if 'current_loading_sheet' in session:
-        current_sheet = session['current_loading_sheet']
-        items = current_sheet.get('items', [])
-        total_items = current_sheet.get('total_items', 0)
-        
-        # Parse created_at from session
-        created_at_str = current_sheet.get('created_at')
-        if isinstance(created_at_str, str):
-            try:
-                created_at = datetime.fromisoformat(created_at_str)
-            except ValueError:
-                created_at = datetime.now(NAIROBI_TZ)
-        else:
-            created_at = datetime.now(NAIROBI_TZ)
-
-        # Generate a unique loading sheet ID
-        loading_sheet_id = f"LOAD_{datetime.now(NAIROBI_TZ).strftime('%Y%m%d_%H%M%S')}"
-        
-        # Save the current sheet to Firestore
-        db.collection('loading_sheets').document(loading_sheet_id).set({
-            'items': items,
-            'total_items': total_items,
-            'created_at': created_at
-        })
-        
-        # Log the action
-        log_user_action('Saved Loading Sheet', f"Saved loading sheet {loading_sheet_id} with {total_items} items")
-        
-        # Clear the current sheet from session
-        session.pop('current_loading_sheet')
-    
-    log_user_action('Created New Loading Sheet', 'Started a fresh loading sheet')
-    return redirect(url_for('loading_sheets'))
-
-@app.route('/get_loading_sheet/<sheet_id>')
-@login_required
-def get_loading_sheet(sheet_id):
-    try:
-        sheet_ref = db.collection('loading_sheets').document(sheet_id).get()
-        if not sheet_ref.exists:
-            return jsonify({"error": "Loading sheet not found"}), 404
-        
-        sheet_dict = sheet_ref.to_dict()
-        sheet_dict['id'] = sheet_id
-        return jsonify(sheet_dict)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/order/<order_id>', methods=['GET'])
-@login_required
-def get_order(order_id):
-    try:
-        db = firestore.Client()
-        order_ref = db.collection('orders').document(order_id)
-        order = order_ref.get()
-        if not order.exists:
-            order_query = db.collection('orders').where('receipt_id', '==', order_id).limit(1).stream()
-            order_doc = next(order_query, None)
-            if not order_doc:
-                return jsonify({"error": "Order not found"}), 404
-            order = order_doc
-        order_data = order.to_dict()
-        return jsonify({
-            "items": order_data.get('items', []),
-            "balance": order_data.get('balance', 0),
-            "order_type": order_data.get('order_type', 'wholesale'),
-            "shop_name": order_data.get('shop_name', ''),
-            "subtotal": order_data.get('subtotal', 0),
-            "payment": order_data.get('payment', 0),
-            "items_list": order_data.get('items_list', []),
-            "receipt_id": order_data.get('receipt_id', order_id)
-        }), 200
-    except Exception as e:
-        logger.error(f"Error fetching order {order_id}: {str(e)}")
-        return jsonify({"error": f"Failed to fetch order: {str(e)}"}), 500
 @app.route('/edit_order/<order_id>', methods=['POST'])
 @login_required
 def edit_order(order_id):
@@ -3182,73 +2272,532 @@ def edit_order(order_id):
         logger.error(f"[EDIT_ORDER] Failed to update order {order_id}: {str(e)}")
         client_logs.append(f"Failed to update order: {str(e)}")
         return jsonify({"error": f"Failed to update order: {str(e)}", "client_logs": client_logs}), 500
-
-@app.route('/receipt/<receipt_id>', methods=['GET'])
-@login_required
-def view_receipt(receipt_id):  # Renamed to avoid conflict
-    try:
-        db = firestore.Client()
-        order_ref = db.collection('orders').document(receipt_id)
-        order = order_ref.get()
-        if not order.exists:
-            order_query = db.collection('orders').where('receipt_id', '==', receipt_id).limit(1).stream()
-            order_doc = next(order_query, None)
-            if not order_doc:
-                return render_template('404.html'), 404
-            order = order_doc
-        order_data = order.to_dict()
-        return render_template('receipt.html', order=order_data)
-    except Exception as e:
-        logger.error(f"Error fetching receipt {receipt_id}: {str(e)}")
-        return render_template('error.html', error=str(e)), 500
-
-@app.route('/delete_order/<receipt_id>', methods=['POST'])
-@login_required
-def delete_order(receipt_id):
-    try:
-        # Try querying receipt_id as a string first
-        order_ref = db.collection('orders').where('receipt_id', '==', receipt_id).limit(1).stream()
-        order_doc = next(order_ref, None)
-
-        # If not found as a string, try as an integer
-        if not order_doc:
-            try:
-                receipt_id_int = int(receipt_id)
-                order_ref = db.collection('orders').where('receipt_id', '==', receipt_id_int).limit(1).stream()
-                order_doc = next(order_ref, None)
-            except ValueError:
-                return jsonify({"status": "error", "error": "Invalid receipt ID format"}), 400
-
-        if not order_doc:
-            return jsonify({"status": "error", "error": "Order not found"}), 404
-
-        order_dict = order_doc.to_dict()
         
-        # Check if the order is unpaid (balance > 0)
-        balance = order_dict.get('balance', 0)
-        if balance <= 0:
-            return jsonify({"status": "error", "error": "Cannot delete a paid order"}), 403
+@app.route('/mark_paid/<receipt_id>', methods=['POST'])
+def mark_paid(receipt_id):
+    orders_ref = db.collection('orders').where('receipt_id', '==', receipt_id).limit(1).stream()
+    order_doc = next(orders_ref, None)
+    if not order_doc:
+        return jsonify({"error": f"Order with receipt_id {receipt_id} not found"}), 404
 
-        # Delete the order from Firestore
-        db.collection('orders').document(order_doc.id).delete()
+    try:
+        order_ref = db.collection('orders').document(order_doc.id)
+        order_dict = order_doc.to_dict()
+        current_payment = float(order_dict.get('payment', 0))
+        current_balance = float(order_dict.get('balance', 0))
+        amount_paid = float(request.form.get('amount_paid', 0))
+        now = datetime.now(NAIROBI_TZ)
 
-        # Add a notification for salespeople
-        notification_message = (
-            f"Order #{receipt_id} deleted on "
-            f"{datetime.now(NAIROBI_TZ).strftime('%d/%m/%Y %H:%M')}"
-        )
-        db.collection('notifications').add({
-            'user_id': order_dict['user_id'],  # Notify the salesperson who created the order
-            'message': notification_message,
-            'timestamp': datetime.now(NAIROBI_TZ),
-            'read': False
+        # Validation
+        if amount_paid <= 0:
+            return jsonify({"error": "Payment amount must be greater than 0"}), 400
+        if current_balance <= 0:
+            return jsonify({"error": "Order is already fully paid"}), 400
+
+        # Update payment and balance
+        new_payment = current_payment + amount_paid
+        new_balance = max(current_balance - amount_paid, 0)
+        payment_history = order_dict.get('payment_history', [])
+
+        # Append new payment to payment_history
+        payment_history.append({
+            'amount': amount_paid,
+            'date': now
         })
 
-        return jsonify({"status": "success", "message": "Order deleted successfully"}), 200
+        update_data = {
+            'payment': new_payment,
+            'balance': new_balance,
+            'payment_history': payment_history
+        }
+        if new_balance == 0:
+            update_data['closed_date'] = now
 
+        # Update order
+        order_ref.update(update_data)
+
+        # Update client debt
+        shop_name = order_dict.get('shop_name')
+        client_ref = db.collection('clients').where('shop_name', '==', shop_name).limit(1).get()
+        if client_ref:
+            client_doc = client_ref[0]
+            client_data = client_doc.to_dict()
+            new_debt = max(float(client_data.get('debt', 0)) - amount_paid, 0)
+            db.collection('clients').document(client_doc.id).update({'debt': new_debt})
+
+        # Create notification
+        user_id = order_dict.get('user_id')
+        if user_id:
+            notification_title = "Payment Processed"
+            notification_body = (
+                f"Order #{receipt_id} fully paid on {now.strftime('%d/%m/%Y %H:%M')}"
+                if new_balance == 0 else
+                f"Order #{receipt_id} partially paid. New balance: KSh {new_balance:.2f} on {now.strftime('%d/%m/%Y %H:%M')}"
+            )
+            db.collection('users').document(user_id).collection('notifications').add({
+                'type': 'payment_processed' if new_balance == 0 else 'payment_partial',
+                'title': notification_title,
+                'body': notification_body,
+                'data': {
+                    'orderId': order_doc.id,
+                    'receipt_id': receipt_id
+                },
+                'timestamp': firestore.SERVER_TIMESTAMP,
+                'read': False
+            })
+
+        return jsonify({"success": True, "message": "Payment processed successfully", "new_balance": new_balance}), 200
     except Exception as e:
-        return jsonify({"status": "error", "error": f"Failed to delete order: {str(e)}"}), 500
+        return jsonify({"error": f"Error updating order: {str(e)}"}), 500
+@app.route('/return_stock/<order_id>', methods=['POST'])
+@no_cache
+@login_required
+def return_stock(order_id):
+    """Log stock returns for an order and update the order with new item quantities and balance."""
+    orders_ref = db.collection('orders').where('receipt_id', '==', order_id).limit(1).stream()
+    order_doc = next(orders_ref, None)
+    if not order_doc:
+        return "Order not found", 404
 
+    try:
+        order_ref = db.collection('orders').document(order_doc.id)
+        order_dict = order_doc.to_dict()
+        current_payment = float(order_dict.get('payment', 0))
+        items_raw = order_dict.get('items', [])
+        items_list = []
+        i = 0
+        while i < len(items_raw):
+            if items_raw[i] == 'product':
+                product_name = items_raw[i + 1]
+                quantity = int(items_raw[i + 3]) if i + 2 < len(items_raw) and items_raw[i + 2] == 'quantity' else 0
+                price = float(items_raw[i + 5]) if i + 4 < len(items_raw) and items_raw[i + 4] == 'price' else 0
+                items_list.append({
+                    'name': product_name,
+                    'quantity': quantity,
+                    'price': price
+                })
+                i += 6
+            else:
+                i += 1
+
+        returned_items = []
+        total_returned_value = 0
+        updated_items_raw = []
+        i = 0
+        while i < len(items_raw):
+            if items_raw[i] == 'product':
+                product_name = items_raw[i + 1]
+                quantity = int(items_raw[i + 3]) if i + 2 < len(items_raw) and items_raw[i + 2] == 'quantity' else 0
+                price = float(items_raw[i + 5]) if i + 4 < len(items_raw) and items_raw[i + 4] == 'price' else 0
+                return_qty_str = request.form.get(f'return_qty_{product_name}', '0')
+                return_qty = int(return_qty_str) if return_qty_str.isdigit() else 0
+
+                if return_qty > 0 and return_qty <= quantity:
+                    returned_items.append({
+                        'name': product_name,
+                        'quantity': return_qty,
+                        'price': price
+                    })
+                    total_returned_value += return_qty * price
+                    new_quantity = quantity - return_qty
+                    if new_quantity > 0:
+                        updated_items_raw.extend(['product', product_name, 'quantity', new_quantity, 'price', price])
+                else:
+                    updated_items_raw.extend(['product', product_name, 'quantity', quantity, 'price', price])
+                i += 6
+            else:
+                i += 1
+
+        if returned_items:
+            db.collection('stock_returns').add({
+                'order_id': order_id,
+                'salesperson_id': order_dict.get('salesperson_id', ''),
+                'items': [{'name': item['name'], 'quantity': item['quantity'], 'price': item['price']} for item in returned_items],
+                'reason': 'Returned by shop',
+                'timestamp': datetime.now(NAIROBI_TZ)
+            })
+
+            for item in returned_items:
+                stock_ref = db.collection('stock').where('stock_name', '==', item['name']).limit(1).get()
+                category = stock_ref[0].to_dict().get('category', 'Unknown') if stock_ref else 'Unknown'
+                log_stock_change(category, item['name'], 'stock_return_logged', item['quantity'], item['price'])
+
+            original_total = sum(item['quantity'] * item['price'] for item in items_list)
+            new_total = original_total - total_returned_value
+            new_balance = max(new_total - current_payment, 0)
+
+            update_data = {
+                'items': updated_items_raw,
+                'balance': new_balance
+            }
+            if not updated_items_raw:
+                update_data['closed_date'] = datetime.now(NAIROBI_TZ)
+                notification_message = f"Order #{order_id} fully returned and closed on {datetime.now(NAIROBI_TZ).strftime('%d/%m/%Y %H:%M')}"
+            else:
+                notification_message = f"Order #{order_id} updated: {len(items_list) - len(returned_items)} item{'s' if len(items_list) - len(returned_items) != 1 else ''} remaining, new balance: KSh {new_balance} on {datetime.now(NAIROBI_TZ).strftime('%d/%m/%Y %H:%M')}"
+
+            order_ref.update(update_data)
+
+            db.collection('notifications').add({
+                'recipient': order_dict.get('salesperson_id', ''),
+                'message': notification_message,
+                'timestamp': datetime.now(NAIROBI_TZ),
+                'order_id': order_id,
+                'read': False
+            })
+
+        return '', 200
+    except Exception as e:
+        return f"Error processing stock returns: {str(e)}", 500
+
+@app.route('/expenses', methods=['GET', 'POST'])
+@no_cache
+@login_required
+def expenses():
+    """Add a new expense and redirect to the dashboard."""
+    if session['user']['role'] != 'manager':
+        return jsonify({'error': 'Unauthorized: Only managers can add expenses'}), 403
+
+    if request.method == 'POST':
+        description = request.form['description']
+        amount = float(request.form['amount'])
+        category = request.form['category']
+        reason = request.form.get('reason', '')  # Optional reason for "Other"
+
+        # Append reason to description for "Other" category
+        if category == 'Other' and reason:
+            description = f"Other: {reason} - {description}"
+
+        db.collection('expenses').add({
+            'description': description,
+            'amount': amount,
+            'category': category,
+            'date': datetime.now(NAIROBI_TZ)
+        })
+        log_stock_change(category, description, 'expense', -amount, 1)
+        return redirect(url_for('dashboard'))
+    
+    return jsonify({'error': 'Method not allowed'}), 405
+
+@app.route('/receipts')
+@no_cache
+@login_required
+def receipts():
+    try:
+        orders = [doc.to_dict() for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).get()]
+        for order in orders:
+            order['date'] = process_date(order.get('date'))
+        return render_template('receipts.html', orders=orders)
+    except Exception as e:
+        return f"Error loading receipts: {str(e)}", 500       
+@app.route('/receipt/<order_id>')
+@no_cache
+@login_required
+def receipt(order_id):
+    try:
+        db = firestore.Client()
+        orders_ref = db.collection('orders').where('receipt_id', '==', order_id).limit(1).stream()
+        order_doc = next(orders_ref, None)
+        if not order_doc:
+            return "Order not found", 404
+        order_dict = order_doc.to_dict()
+        items_raw = order_dict.get('items', [])
+        items_list = []
+        subtotal_amount = 0
+
+        # Process items_raw based on order_type
+        if order_dict.get('order_type') == 'app' and isinstance(items_raw, list) and items_raw and isinstance(items_raw[0], dict):
+            for item in items_raw:
+                quantity = float(item.get('quantity', '0'))  # Use float for app orders
+                price = float(item.get('price', '0.0'))
+                amount = quantity * price
+                subtotal_amount += amount
+                items_list.append({
+                    'name': item.get('product', 'Unknown'),
+                    'quantity': quantity,
+                    'price': price,
+                    'amount': amount
+                })
+        else:
+            # Web order: flat array
+            i = 0
+            while i < len(items_raw):
+                if items_raw[i] == 'product':
+                    product_name = items_raw[i + 1]
+                    quantity_str = str(items_raw[i + 3]) if i + 2 < len(items_raw) and items_raw[i + 2] == 'quantity' else '0'
+                    price_str = str(items_raw[i + 5]) if i + 4 < len(items_raw) and items_raw[i + 4] == 'price' else '0'
+                    try:
+                        quantity = float(quantity_str) if quantity_str.replace('.', '').replace('-', '').isdigit() else 0.0
+                    except ValueError:
+                        logger.error(f"Invalid quantity format for {product_name}: {quantity_str}")
+                        quantity = 0.0
+                    price = float(price_str) if price_str.replace('.', '').replace('-', '').isdigit() else 0.0
+                    amount = quantity * price
+                    subtotal_amount += amount
+                    items_list.append({
+                        'name': product_name,
+                        'quantity': quantity,
+                        'price': price,
+                        'amount': amount
+                    })
+                    i += 6
+                else:
+                    i += 1
+
+        shop_name = order_dict.get('shop_name', 'Unknown Shop')
+        try:
+            shop_address = next((doc.to_dict().get('address', 'No address') for doc in db.collection('shops').where('name', '==', shop_name).limit(1).stream()), 'No address')
+        except Exception as e:
+            logger.error(f"Error fetching shop address: {str(e)}")
+            shop_address = 'No address available'
+
+        order = {
+            'receipt_id': order_dict.get('receipt_id', order_doc.id),
+            'salesperson_name': order_dict.get('salesperson_name', 'N/A'),
+            'shop_name': shop_name,
+            'shop_address': shop_address,
+            'items_list': items_list,
+            'total_items': process_items(order_dict.get('items')),
+            'subtotal': subtotal_amount,
+            'total_amount': subtotal_amount,
+            'payment': order_dict.get('payment', 0),
+            'balance': order_dict.get('balance', 0),
+            'date': process_date(order_dict.get('date')),
+            'order_type': order_dict.get('order_type', 'wholesale')
+        }
+        recent_activity = [{'receipt_id': doc.to_dict().get('receipt_id', doc.id), 'salesperson_name': doc.to_dict().get('salesperson_name', 'N/A'), 
+                           'shop_name': doc.to_dict().get('shop_name', 'Unknown Shop'), 'date': process_date(doc.to_dict().get('date'))} 
+                          for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).limit(3).get()]
+        logger.info(f"Order data for {order_id}: {order}")
+        return render_template('receipt.html', order=order, recent_activity=recent_activity)
+    except Exception as e:
+        logger.error(f"Error in receipt route for {order_id}: {str(e)}")
+        return render_template('error.html', message=f"Internal Server Error: {str(e)}"), 500
+        
+ #reports section
+@app.route('/reports')
+@no_cache
+@login_required
+def reports():
+    time_filter = request.args.get('time', 'month')
+    now = datetime.now(NAIROBI_TZ)
+
+    # Set start date based on time filter
+    if time_filter == 'day':
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif time_filter == 'week':
+        start = now - timedelta(days=now.weekday())
+        start = start.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif time_filter == 'month':
+        start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    elif time_filter == 'year':
+        start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    else:
+        start = None
+
+    # Fetch orders
+    orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).stream()
+    orders = []
+    for doc in orders_ref:
+        order_dict = doc.to_dict()
+        order_date = process_date(order_dict.get('date'))
+        if start and order_date and order_date < start:
+            continue
+        orders.append({
+            'receipt_id': order_dict.get('receipt_id', doc.id),
+            'salesperson_name': order_dict.get('salesperson_name', 'N/A'),
+            'shop_name': order_dict.get('shop_name', 'Unknown Shop'),
+            'items': order_dict.get('items_list', []),  # Use items_list for consistency with receipt template
+            'payment': order_dict.get('payment', 0),
+            'balance': order_dict.get('balance', 0),
+            'date': order_date,
+            'closed_date': process_date(order_dict.get('closed_date')) if order_dict.get('closed_date') else None,
+            'order_type': order_dict.get('order_type', 'wholesale')
+        })
+
+    # Fetch retail sales
+    retail_sales = []
+    retail_ref = db.collection('retail').order_by('date', direction=firestore.Query.DESCENDING).stream()
+    for doc in retail_ref:
+        retail_dict = doc.to_dict()
+        retail_date = process_date(retail_dict.get('date'))  # Handle DatetimeWithNanoseconds directly
+        if start and retail_date and retail_date < start:
+            continue
+        retail_dict['date'] = retail_date
+        retail_sales.append(retail_dict)
+
+    # Calculate metrics
+    total_sales_retail = sum(o['payment'] for o in orders if o['order_type'] == 'retail') + sum(r.get('amount', 0) for r in retail_sales)
+    total_sales_wholesale = sum(o['payment'] for o in orders if o['order_type'] == 'wholesale')
+    total_paid_retail = sum(o['payment'] for o in orders if o['order_type'] == 'retail') + sum(r.get('amount', 0) for r in retail_sales)
+    total_paid_wholesale = sum(o['payment'] for o in orders if o['order_type'] == 'wholesale')
+    total_debt_retail = sum(o['balance'] for o in orders if o['order_type'] == 'retail' and o['balance'] > 0)
+    total_debt_wholesale = sum(o['balance'] for o in orders if o['order_type'] == 'wholesale' and o['balance'] > 0)
+    total_money_bank_retail = total_paid_retail
+    total_money_bank_wholesale = total_paid_wholesale
+    total_debt = total_debt_retail + total_debt_wholesale
+
+    # Chart data
+    chart_data = {
+        'sales_vs_debts': {
+            'labels': ['Retail Sales', 'Wholesale Sales', 'Retail Debt', 'Wholesale Debt'],
+            'data': [total_sales_retail, total_sales_wholesale, total_debt_retail, total_debt_wholesale],
+            'colors': ['#4CAF50', '#2196F3', '#FF9800', '#F44336']
+        },
+        'paid_vs_debt': {
+            'labels': ['Total Paid Retail', 'Total Paid Wholesale', 'Total Debt Retail', 'Total Debt Wholesale'],
+            'data': [total_paid_retail, total_paid_wholesale, total_debt_retail, total_debt_wholesale],
+            'colors': ['#4CAF50', '#2196F3', '#FF9800', '#F44336']
+        },
+        'money_in_bank': {
+            'labels': ['Retail Bank', 'Wholesale Bank'],
+            'data': [total_money_bank_retail, total_money_bank_wholesale],
+            'colors': ['#4CAF50', '#2196F3']
+        }
+    }
+
+    # Fetch logs
+    stock_logs = []
+    for doc in db.collection('stock_logs').order_by('timestamp', direction=firestore.Query.DESCENDING).stream():
+        log = doc.to_dict()
+        log['timestamp'] = process_date(log.get('timestamp'))
+        stock_logs.append(log)
+
+    expenses = []
+    for doc in db.collection('expenses').order_by('date', direction=firestore.Query.DESCENDING).stream():
+        expense = doc.to_dict()
+        expense['date'] = process_date(expense.get('date'))
+        expenses.append(expense)
+
+    user_actions = []
+    for doc in db.collection('user_actions').order_by('timestamp', direction=firestore.Query.DESCENDING).stream():
+        action = doc.to_dict()
+        action['timestamp'] = process_date(action.get('timestamp'))
+        user_actions.append(action)
+
+    recent_activity = [
+        {
+            'receipt_id': doc.to_dict().get('receipt_id', doc.id),
+            'salesperson_name': doc.to_dict().get('salesperson_name', 'N/A'),
+            'shop_name': doc.to_dict().get('shop_name', 'Unknown Shop'),
+            'date': process_date(doc.to_dict().get('date'))
+        } for doc in db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).limit(3).stream()
+    ]
+
+    return render_template('reports.html', orders=orders, stock_logs=stock_logs, expenses=expenses, user_actions=user_actions,
+                          recent_activity=recent_activity, chart_data=chart_data, time_filter=time_filter, total_debt=total_debt)       
+@app.route('/daily_sales_report')
+@no_cache
+@login_required
+def daily_sales_report():
+    now = datetime.now(NAIROBI_TZ)
+    start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_of_day = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+    
+    orders_ref = db.collection('orders').where('date', '>=', start_of_day).where('date', '<=', end_of_day).stream()
+    
+    today_orders = []
+    total_wholesale_revenue = 0
+    total_retail_revenue = 0
+    total_wholesale_paid = 0
+    total_retail_paid = 0
+    total_debt = 0
+    total_mpesa = 0
+    total_cash = 0
+    
+    for doc in orders_ref:
+        order_dict = doc.to_dict()
+        items = order_dict.get('items', [])
+        processed_items = []
+        if items and len(items) >= 6:
+            for i in range(0, len(items), 6):
+                if i + 5 < len(items):
+                    try:
+                        processed_items.append({
+                            'product': items[i + 1],
+                            'quantity': float(items[i + 3]),
+                            'price': float(items[i + 5])
+                        })
+                    except (ValueError, TypeError) as e:
+                        print(f"Invalid data for item in order {doc.id}: {e}")
+                        continue
+        
+        order_type = order_dict.get('order_type', 'wholesale')
+        payment = float(order_dict.get('payment', 0))
+        balance = float(order_dict.get('balance', 0))
+        payment_history = order_dict.get('payment_history', [])
+        
+        if order_type == 'wholesale':
+            total_wholesale_revenue += payment + balance
+            total_wholesale_paid += payment
+        else:
+            total_retail_revenue += payment + balance
+            total_retail_paid += payment
+        
+        total_debt += balance
+        
+        for ph in payment_history:
+            amount = float(ph.get('amount', 0))
+            payment_type = ph.get('payment_type', '')
+            if payment_type == 'mpesa':
+                total_mpesa += amount
+            elif payment_type == 'cash':
+                total_cash += amount
+        
+        today_orders.append({
+            'receipt_id': order_dict.get('receipt_id', doc.id),
+            'shop_name': order_dict.get('shop_name', 'Unknown'),
+            'order_type': order_type,
+            'payment': payment,
+            'balance': balance,
+            'items': processed_items,
+            'salesperson_name': order_dict.get('salesperson_name', ''),
+            'payment_history': payment_history
+        })
+    
+    retail_ref = db.collection('retail').where('date', '>=', start_of_day).where('date', '<=', end_of_day).stream()
+    for doc in retail_ref:
+        retail_dict = doc.to_dict()
+        amount = float(retail_dict.get('amount', 0))
+        total_retail_revenue += amount
+        total_retail_paid += amount
+    
+    expenses_ref = db.collection('expenses').where('date', '>=', start_of_day).where('date', '<=', end_of_day).stream()
+    total_expenses = 0
+    today_expenses = []
+    
+    for doc in expenses_ref:
+        expense_dict = doc.to_dict()
+        amount = float(expense_dict.get('amount', 0))
+        total_expenses += amount
+        today_expenses.append({
+            'category': expense_dict.get('category', 'Other'),
+            'description': expense_dict.get('description', ''),
+            'amount': amount
+        })
+    
+    gross_revenue = total_retail_paid + total_wholesale_paid
+    net_profit = gross_revenue - total_expenses - total_debt
+    
+    report_data = {
+        'date': now.strftime('%d/%m/%Y'),
+        'time_generated': now.strftime('%H:%M:%S'),
+        'total_wholesale_revenue': total_wholesale_revenue,
+        'total_retail_revenue': total_retail_revenue,
+        'total_wholesale_paid': total_wholesale_paid,
+        'total_retail_paid': total_retail_paid,
+        'total_debt': total_debt,
+        'total_expenses': total_expenses,
+        'gross_revenue': gross_revenue,
+        'net_profit': net_profit,
+        'orders_count': len(today_orders),
+        'today_expenses': today_expenses,
+        'total_mpesa': total_mpesa,
+        'total_cash': total_cash
+    }
+    
+    return render_template('daily_sales_report.html', **report_data)
+    
 @app.route('/export_report')
 @no_cache
 @login_required
@@ -3574,6 +3123,462 @@ def export_report():
         mimetype='application/pdf',
         headers={"Content-Disposition": f"attachment;filename={filename}"}
     )
+@app.route('/load_to_loading_sheet/<receipt_id>/<action>')
+@login_required
+def load_to_loading_sheet(receipt_id, action):
+    order_ref = db.collection('orders').where('receipt_id', '==', receipt_id).limit(1).stream()
+    order_doc = next(order_ref, None)
+    if not order_doc:
+        return "Order not found", 404
+    
+    order_dict = order_doc.to_dict()
+    if order_dict.get('order_type', 'wholesale') == 'retail':
+        return "Retail orders cannot be loaded to a loading sheet", 400
+    
+    items_raw = order_dict.get('items', [])
+    items_list = []
+    i = 0
+    while i < len(items_raw):
+        if items_raw[i] == 'product':
+            product_name = items_raw[i + 1]
+            quantity = items_raw[i + 3] if i + 2 < len(items_raw) and items_raw[i + 2] == 'quantity' else 0
+            items_list.append({'name': product_name, 'quantity': quantity})
+            i += 6
+        else:
+            i += 1
+
+    # If action is 'new', save the current sheet to Firestore before creating a new one
+    if action == 'new' and 'current_loading_sheet' in session:
+        current_sheet = session['current_loading_sheet']
+        items = current_sheet.get('items', [])
+        total_items = current_sheet.get('total_items', 0)
+        
+        # Parse created_at from session
+        created_at_str = current_sheet.get('created_at')
+        if isinstance(created_at_str, str):
+            try:
+                created_at = datetime.fromisoformat(created_at_str)
+            except ValueError:
+                created_at = datetime.now(NAIROBI_TZ)
+        else:
+            created_at = datetime.now(NAIROBI_TZ)
+
+        # Generate a unique loading sheet ID
+        loading_sheet_id = f"LOAD_{datetime.now(NAIROBI_TZ).strftime('%Y%m%d_%H%M%S')}"
+        
+        # Save the current sheet to Firestore
+        db.collection('loading_sheets').document(loading_sheet_id).set({
+            'items': items,
+            'total_items': total_items,
+            'created_at': created_at
+        })
+        
+        # Log the action
+        log_user_action('Saved Loading Sheet', f"Saved loading sheet {loading_sheet_id} with {total_items} items")
+        
+        # Clear the current sheet from session
+        session.pop('current_loading_sheet')
+
+    # Now handle the new items
+    if action == 'current' and 'current_loading_sheet' in session:
+        current_items = session.get('current_loading_sheet', {}).get('items', [])
+        for item in items_list:
+            found = False
+            for existing_item in current_items:
+                if existing_item['name'] == item['name']:
+                    existing_item['quantity'] += item['quantity']
+                    found = True
+                    break
+            if not found:
+                current_items.append(item)
+        session['current_loading_sheet'] = {
+            'items': current_items,
+            'total_items': sum(item['quantity'] for item in current_items),
+            'created_at': session.get('current_loading_sheet', {}).get('created_at', datetime.now(NAIROBI_TZ).isoformat())
+        }
+    else:
+        # Create a new loading sheet in session
+        session['current_loading_sheet'] = {
+            'items': items_list,
+            'total_items': sum(item['quantity'] for item in items_list),
+            'created_at': datetime.now(NAIROBI_TZ).isoformat()
+        }
+
+    return redirect(url_for('loading_sheets'))
+
+
+@app.route('/loading-sheets')
+@login_required
+def loading_sheets():
+    """Display the loading sheets page."""
+    current_loading_sheet = session.get('current_loading_sheet', None)
+    if current_loading_sheet:
+        aggregated_items = current_loading_sheet.get('items', [])
+        total_items = current_loading_sheet.get('total_items', 0)
+        # Fix the datetime serialization issue
+        created_at_str = current_loading_sheet.get('created_at')
+        if isinstance(created_at_str, str):
+            try:
+                created_at = datetime.fromisoformat(created_at_str)
+            except ValueError:
+                created_at = datetime.now(NAIROBI_TZ)
+        else:
+            created_at = current_loading_sheet.get('created_at', datetime.now(NAIROBI_TZ))
+    else:
+        aggregated_items = []
+        total_items = 0
+        created_at = None
+
+    # Get recent sheets
+    try:
+        recent_sheets = []
+        for doc in db.collection('loading_sheets').order_by('created_at', direction=firestore.Query.DESCENDING).limit(5).get():
+            sheet_data = doc.to_dict()
+            sheet_data['id'] = doc.id
+            # Convert Firestore timestamp to datetime if needed
+            created_at_field = sheet_data.get('created_at')
+            if isinstance(created_at_field, datetime):
+                sheet_data['created_at'] = created_at_field
+            elif isinstance(created_at_field, str):
+                try:
+                    sheet_data['created_at'] = datetime.fromisoformat(created_at_field)
+                except ValueError:
+                    sheet_data['created_at'] = datetime.now(NAIROBI_TZ)
+            else:
+                sheet_data['created_at'] = datetime.now(NAIROBI_TZ)
+            recent_sheets.append(sheet_data)
+    except Exception as e:
+        print(f"Error fetching recent sheets: {e}")
+        recent_sheets = []
+
+    now = datetime.now(NAIROBI_TZ)
+    
+    return render_template('loading_sheets.html', 
+                          aggregated_items=aggregated_items, 
+                          current_date=now, 
+                          total_items=total_items, 
+                          created_at=created_at, 
+                          recent_sheets=recent_sheets)
+                          
+@app.route('/view-loading-sheet')
+@login_required
+def view_loading_sheet():
+    """View a specific loading sheet."""
+    sheet_id = request.args.get('sheet_id')
+    print_mode = request.args.get('print') == 'true'
+    
+    if not sheet_id:
+        flash('Sheet ID is required', 'error')
+        return redirect(url_for('loading_sheets'))
+
+    # Fetch loading sheet from Firestore
+    try:
+        sheet_ref = db.collection('loading_sheets').document(sheet_id).get()
+        if not sheet_ref.exists:
+            flash('Loading sheet not found', 'error')
+            return redirect(url_for('loading_sheets'))
+        
+        sheet_data = sheet_ref.to_dict()
+        sheet_data['id'] = sheet_id
+        
+        # Handle date conversion
+        created_at_field = sheet_data.get('created_at')
+        if isinstance(created_at_field, datetime):
+            created_at = created_at_field
+        elif isinstance(created_at_field, str):
+            try:
+                created_at = datetime.fromisoformat(created_at_field)
+            except ValueError:
+                created_at = datetime.now(NAIROBI_TZ)
+        else:
+            created_at = datetime.now(NAIROBI_TZ)
+        
+        aggregated_items = sheet_data.get('items', [])
+        total_items = sheet_data.get('total_items', 0)
+        
+        return render_template('view_loading_sheet.html',
+                              aggregated_items=aggregated_items,
+                              total_items=total_items,
+                              created_at=created_at,
+                              current_date=datetime.now(NAIROBI_TZ),
+                              sheet_id=sheet_id,
+                              print_mode=print_mode)
+    except Exception as e:
+        print(f"Error in view-loading-sheet: {str(e)}")
+        flash(f'Error loading sheet: {str(e)}', 'error')
+        return redirect(url_for('loading_sheets'))
+        
+@app.route('/download-loading-sheet')
+@login_required
+def download_loading_sheet():
+    sheet_id = request.args.get('sheet_id')
+    
+    # Handle specific sheet download if ID is provided
+    if sheet_id:
+        try:
+            sheet_doc = db.collection('loading_sheets').document(sheet_id).get()
+            if not sheet_doc.exists:
+                return "Loading sheet not found", 404
+                
+            sheet_data = sheet_doc.to_dict()
+            aggregated_items = sheet_data.get('items', [])
+            total_items = sheet_data.get('total_items', 0)
+            
+            # Handle created_at timestamp conversion
+            created_at_field = sheet_data.get('created_at')
+            if isinstance(created_at_field, datetime):
+                created_at = created_at_field
+            elif isinstance(created_at_field, str):
+                try:
+                    created_at = datetime.fromisoformat(created_at_field)
+                except ValueError:
+                    created_at = datetime.now(NAIROBI_TZ)
+            else:
+                created_at = datetime.now(NAIROBI_TZ)
+        except Exception as e:
+            print(f"Error fetching loading sheet: {str(e)}")
+            return f"Error fetching loading sheet: {str(e)}", 500
+    # Handle current sheet in session
+    else:
+        current_loading_sheet = session.get('current_loading_sheet', None)
+        if not current_loading_sheet or not current_loading_sheet.get('items'):
+            return "No loading sheet available to download", 400
+
+        aggregated_items = current_loading_sheet.get('items', [])
+        total_items = current_loading_sheet.get('total_items', 0)
+        
+        # Fix created_at datetime handling
+        created_at_str = current_loading_sheet.get('created_at')
+        if isinstance(created_at_str, str):
+            try:
+                created_at = datetime.fromisoformat(created_at_str)
+            except ValueError:
+                created_at = datetime.now(NAIROBI_TZ)
+        else:
+            created_at = current_loading_sheet.get('created_at', datetime.now(NAIROBI_TZ))
+
+    try:
+        # Generate PDF
+        buffer = BytesIO()
+        p = canvas.Canvas(buffer, pagesize=A4)
+        width, height = A4
+
+        # Header
+        p.setFont("Helvetica-Bold", 14)
+        p.drawCentredString(width / 2, height - 50, "Dreamland Distributors")
+        p.setFont("Helvetica", 10)
+        p.drawCentredString(width / 2, height - 70, "P.O Box 123-00200 Nairobi | Phone: 0725 530632")
+        p.line(50, height - 80, width - 50, height - 80)
+        p.setFont("Helvetica-Bold", 12)
+        p.drawCentredString(width / 2, height - 100, "Loading Sheet")
+        p.setFont("Helvetica", 10)
+        formatted_date = created_at.strftime('%d/%m/%Y %H:%M') if hasattr(created_at, 'strftime') else str(created_at)
+        p.drawString(50, height - 120, f"Date: {formatted_date}")
+
+        # Table header
+        y = height - 160
+        p.setFont("Helvetica-Bold", 10)
+        p.drawString(50, y, "Item")
+        p.drawString(300, y, "Details")
+        p.line(50, y - 5, width - 50, y - 5)
+        y -= 20
+
+        # Items
+        p.setFont("Helvetica", 10)
+        for item in aggregated_items:
+            if y < 100:  # Start new page if not enough space
+                p.showPage()
+                p.setFont("Helvetica", 10)
+                y = height - 50
+            
+            p.drawString(50, y, item['name'])
+            
+            if "sugar" in item['name'].lower() and "2k" in item['name'].lower():
+                notes = f"2 pieces x {item['quantity']}"
+            elif item['quantity'] > 1:
+                notes = f"{item['quantity']} pieces"
+            else:
+                notes = "Single unit"
+                
+            p.drawString(300, y, notes)
+            y -= 20
+
+        # Footer
+        y -= 20
+        p.line(50, y, width - 50, y)
+        y -= 20
+        
+        p.setFont("Helvetica-Bold", 10)
+        p.drawString(50, y, f"Total Items: {total_items}")
+        y -= 30
+        
+        p.drawString(50, y, "Driver Signature: ____________________")
+        y -= 20
+        p.drawString(50, y, "Date Loaded: ____________________")
+
+        p.showPage()
+        p.save()
+
+        buffer.seek(0)
+        filename = f"loading_sheet_{sheet_id if sheet_id else created_at.strftime('%Y%m%d_%H%M') if hasattr(created_at, 'strftime') else 'current'}.pdf"
+        
+        return Response(
+            buffer,
+            mimetype='application/pdf',
+            headers={"Content-Disposition": f"attachment;filename={filename}"}
+        )
+    except Exception as e:
+        print(f"Error generating PDF: {str(e)}")
+        return f"Error generating PDF: {str(e)}", 500
+
+@app.route('/create-loading-sheet')
+@login_required
+def create_loading_sheet():
+    """Create a new loading sheet by saving the current one to Firestore and clearing the session."""
+    # Check if there's a current loading sheet in session
+    if 'current_loading_sheet' in session:
+        current_sheet = session['current_loading_sheet']
+        items = current_sheet.get('items', [])
+        total_items = current_sheet.get('total_items', 0)
+        
+        # Parse created_at from session
+        created_at_str = current_sheet.get('created_at')
+        if isinstance(created_at_str, str):
+            try:
+                created_at = datetime.fromisoformat(created_at_str)
+            except ValueError:
+                created_at = datetime.now(NAIROBI_TZ)
+        else:
+            created_at = datetime.now(NAIROBI_TZ)
+
+        # Generate a unique loading sheet ID
+        loading_sheet_id = f"LOAD_{datetime.now(NAIROBI_TZ).strftime('%Y%m%d_%H%M%S')}"
+        
+        # Save the current sheet to Firestore
+        db.collection('loading_sheets').document(loading_sheet_id).set({
+            'items': items,
+            'total_items': total_items,
+            'created_at': created_at
+        })
+        
+        # Log the action
+        log_user_action('Saved Loading Sheet', f"Saved loading sheet {loading_sheet_id} with {total_items} items")
+        
+        # Clear the current sheet from session
+        session.pop('current_loading_sheet')
+    
+    log_user_action('Created New Loading Sheet', 'Started a fresh loading sheet')
+    return redirect(url_for('loading_sheets'))
+
+@app.route('/get_loading_sheet/<sheet_id>')
+@login_required
+def get_loading_sheet(sheet_id):
+    try:
+        sheet_ref = db.collection('loading_sheets').document(sheet_id).get()
+        if not sheet_ref.exists:
+            return jsonify({"error": "Loading sheet not found"}), 404
+        
+        sheet_dict = sheet_ref.to_dict()
+        sheet_dict['id'] = sheet_id
+        return jsonify(sheet_dict)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/order/<order_id>', methods=['GET'])
+@login_required
+def get_order(order_id):
+    try:
+        db = firestore.Client()
+        order_ref = db.collection('orders').document(order_id)
+        order = order_ref.get()
+        if not order.exists:
+            order_query = db.collection('orders').where('receipt_id', '==', order_id).limit(1).stream()
+            order_doc = next(order_query, None)
+            if not order_doc:
+                return jsonify({"error": "Order not found"}), 404
+            order = order_doc
+        order_data = order.to_dict()
+        return jsonify({
+            "items": order_data.get('items', []),
+            "balance": order_data.get('balance', 0),
+            "order_type": order_data.get('order_type', 'wholesale'),
+            "shop_name": order_data.get('shop_name', ''),
+            "subtotal": order_data.get('subtotal', 0),
+            "payment": order_data.get('payment', 0),
+            "items_list": order_data.get('items_list', []),
+            "receipt_id": order_data.get('receipt_id', order_id)
+        }), 200
+    except Exception as e:
+        logger.error(f"Error fetching order {order_id}: {str(e)}")
+        return jsonify({"error": f"Failed to fetch order: {str(e)}"}), 500
+
+@app.route('/receipt/<receipt_id>', methods=['GET'])
+@login_required
+def view_receipt(receipt_id):  # Renamed to avoid conflict
+    try:
+        db = firestore.Client()
+        order_ref = db.collection('orders').document(receipt_id)
+        order = order_ref.get()
+        if not order.exists:
+            order_query = db.collection('orders').where('receipt_id', '==', receipt_id).limit(1).stream()
+            order_doc = next(order_query, None)
+            if not order_doc:
+                return render_template('404.html'), 404
+            order = order_doc
+        order_data = order.to_dict()
+        return render_template('receipt.html', order=order_data)
+    except Exception as e:
+        logger.error(f"Error fetching receipt {receipt_id}: {str(e)}")
+        return render_template('error.html', error=str(e)), 500
+
+@app.route('/delete_order/<receipt_id>', methods=['POST'])
+@login_required
+def delete_order(receipt_id):
+    try:
+        # Try querying receipt_id as a string first
+        order_ref = db.collection('orders').where('receipt_id', '==', receipt_id).limit(1).stream()
+        order_doc = next(order_ref, None)
+
+        # If not found as a string, try as an integer
+        if not order_doc:
+            try:
+                receipt_id_int = int(receipt_id)
+                order_ref = db.collection('orders').where('receipt_id', '==', receipt_id_int).limit(1).stream()
+                order_doc = next(order_ref, None)
+            except ValueError:
+                return jsonify({"status": "error", "error": "Invalid receipt ID format"}), 400
+
+        if not order_doc:
+            return jsonify({"status": "error", "error": "Order not found"}), 404
+
+        order_dict = order_doc.to_dict()
+        
+        # Check if the order is unpaid (balance > 0)
+        balance = order_dict.get('balance', 0)
+        if balance <= 0:
+            return jsonify({"status": "error", "error": "Cannot delete a paid order"}), 403
+
+        # Delete the order from Firestore
+        db.collection('orders').document(order_doc.id).delete()
+
+        # Add a notification for salespeople
+        notification_message = (
+            f"Order #{receipt_id} deleted on "
+            f"{datetime.now(NAIROBI_TZ).strftime('%d/%m/%Y %H:%M')}"
+        )
+        db.collection('notifications').add({
+            'user_id': order_dict['user_id'],  # Notify the salesperson who created the order
+            'message': notification_message,
+            'timestamp': datetime.now(NAIROBI_TZ),
+            'read': False
+        })
+
+        return jsonify({"status": "success", "message": "Order deleted successfully"}), 200
+
+    except Exception as e:
+        return jsonify({"status": "error", "error": f"Failed to delete order: {str(e)}"}), 500
+
+
     
 @app.route('/mark_notification_read/<notification_id>', methods=['POST'])
 @no_cache
@@ -3842,6 +3847,7 @@ def api_order_details(receipt_id):
     except Exception as e:
         logger.error(f"Error in /api/orders/{receipt_id}: {str(e)}")
         return jsonify({"error": f"Failed to fetch order details: {str(e)}"}), 500
+
 
 # GET /api/admin/orders - Admins fetch all orders
 @app.route('/api/admin/orders', methods=['GET'])
