@@ -5,6 +5,9 @@ const closeRetail = document.getElementById('close-retail-modal');
 const retailContainer = document.getElementById('retail-items-container');
 const retailAmountPaid = document.getElementById('retail-amount-paid');
 const retailPaymentType = document.getElementById('retail-payment-type');
+const retailPaymentType2 = document.getElementById('retail-payment-type-2');
+const retailCashAmount = document.getElementById('retail-cash-amount');
+const retailMpesaAmount = document.getElementById('retail-mpesa-amount');
 let currentContainer = retailContainer;
 let eventListeners = [];
 
@@ -72,13 +75,33 @@ function resetModal(container) {
         debtElement.classList.add('hidden');
         console.log(`Reset debt element for ${modalId}`);
     }
-    // Reset payment type to cash and show amount paid
+    // Reset payment types and show single payment input
     if (retailPaymentType) {
         retailPaymentType.value = 'cash';
+        retailPaymentType2.value = '';
         document.getElementById('retail-amount-paid-container').style.display = 'block';
-        retailAmountPaid.value = ''; // Clear input for manual entry
-        retailAmountPaid.removeAttribute('readonly'); // Ensure editable
+        document.getElementById('retail-dual-payment-container').classList.add('hidden');
+        retailAmountPaid.value = '';
+        retailAmountPaid.removeAttribute('readonly');
+        if (retailCashAmount) retailCashAmount.value = '';
+        if (retailMpesaAmount) retailMpesaAmount.value = '';
     }
+}
+
+// Function to update dual payment totals and change
+function updateDualPaymentTotals() {
+    const cashAmount = parseFloat(retailCashAmount.value) || 0;
+    const mpesaAmount = parseFloat(retailMpesaAmount.value) || 0;
+    const totalPaid = cashAmount + mpesaAmount;
+    const orderTotalSpan = document.getElementById('retail-order-total');
+    const orderTotal = parseFloat(orderTotalSpan.textContent) || 0;
+    const change = Math.max(0, totalPaid - orderTotal);
+
+    const dualTotalSpan = document.getElementById('retail-dual-total');
+    const dualChangeSpan = document.getElementById('retail-dual-change');
+    
+    if (dualTotalSpan) dualTotalSpan.textContent = totalPaid.toFixed(2);
+    if (dualChangeSpan) dualChangeSpan.textContent = change.toFixed(2);
 }
 
 function attachAddItemListeners(container) {
@@ -207,19 +230,67 @@ if (retailPaymentType) {
         const amountPaidContainer = document.getElementById('retail-amount-paid-container');
         if (retailPaymentType.value === 'credit') {
             amountPaidContainer.style.display = 'none';
-            retailAmountPaid.value = '0.00'; // Set to 0 for credit
+            retailAmountPaid.value = '0.00';
             updateChange(retailContainer);
         } else {
             amountPaidContainer.style.display = 'block';
-            retailAmountPaid.value = ''; // Clear input for manual entry
-            retailAmountPaid.removeAttribute('readonly'); // Ensure editable
+            retailAmountPaid.value = '';
+            retailAmountPaid.removeAttribute('readonly');
         }
     };
     retailPaymentType.addEventListener('change', paymentTypeHandler);
     eventListeners.push({ element: retailPaymentType, type: 'change', handler: paymentTypeHandler });
-    paymentTypeHandler(); // Initialize on load to set cash and show amount paid
+    paymentTypeHandler();
 }
 
+// Payment Type 2 handler for dual payment
+if (retailPaymentType2) {
+    const paymentType2Handler = () => {
+        const singlePaymentContainer = document.getElementById('retail-amount-paid-container');
+        const dualPaymentContainer = document.getElementById('retail-dual-payment-container');
+        
+        if (retailPaymentType2.value === 'dual') {
+            console.log('Switching to dual payment mode');
+            singlePaymentContainer.classList.add('hidden');
+            dualPaymentContainer.classList.remove('hidden');
+            updateDualPaymentTotals();
+        } else {
+            console.log('Switching to single payment mode');
+            singlePaymentContainer.classList.remove('hidden');
+            dualPaymentContainer.classList.add('hidden');
+            // Clear dual payment inputs
+            if (retailCashAmount) retailCashAmount.value = '';
+            if (retailMpesaAmount) retailMpesaAmount.value = '';
+        }
+    };
+    retailPaymentType2.addEventListener('change', paymentType2Handler);
+    eventListeners.push({ element: retailPaymentType2, type: 'change', handler: paymentType2Handler });
+}
+
+// Dual payment input listeners
+if (retailCashAmount) {
+    const cashAmountHandler = () => {
+        if (!retailModal || retailModal.classList.contains('hidden')) {
+            console.warn('Skipping cashAmountHandler: modal is hidden');
+            return;
+        }
+        updateDualPaymentTotals();
+    };
+    retailCashAmount.addEventListener('input', cashAmountHandler);
+    eventListeners.push({ element: retailCashAmount, type: 'input', handler: cashAmountHandler });
+}
+
+if (retailMpesaAmount) {
+    const mpesaAmountHandler = () => {
+        if (!retailModal || retailModal.classList.contains('hidden')) {
+            console.warn('Skipping mpesaAmountHandler: modal is hidden');
+            return;
+        }
+        updateDualPaymentTotals();
+    };
+    retailMpesaAmount.addEventListener('input', mpesaAmountHandler);
+    eventListeners.push({ element: retailMpesaAmount, type: 'input', handler: mpesaAmountHandler });
+}
 
 const retailForm = document.getElementById('retail-form');
 if (retailForm) {
@@ -243,6 +314,7 @@ if (retailForm) {
 
         // Handle payment type and amount paid for credit
         const paymentType = formData.get('payment_type');
+        const paymentType2 = formData.get('payment_type_2');
         const shopName = formData.get('shop_name')?.toLowerCase();
         const restrictedClients = ['client', 'clients', 'walk in', 'walkin'];
 
@@ -254,12 +326,38 @@ if (retailForm) {
             return;
         }
 
-        // No need to set amount_paid to 0 for credit (handled in paymentTypeHandler)
-
-        // Add change to formData
-        const changeSpan = document.getElementById('retail-order-change');
-        const change = parseFloat(changeSpan.textContent) || 0;
-        formData.set('change', change.toFixed(2));
+        // Handle dual payment submission
+        if (paymentType2 === 'dual') {
+            const cashAmount = parseFloat(retailCashAmount.value) || 0;
+            const mpesaAmount = parseFloat(retailMpesaAmount.value) || 0;
+            
+            // Remove single payment data
+            formData.delete('payment_type');
+            formData.delete('amount_paid');
+            
+            // Add dual payment data
+            formData.set('payment_type_dual', 'true');
+            formData.set('cash_amount', cashAmount.toFixed(2));
+            formData.set('mpesa_amount', mpesaAmount.toFixed(2));
+            formData.set('total_amount_paid', (cashAmount + mpesaAmount).toFixed(2));
+            
+            // Add change from dual payment
+            const dualChangeSpan = document.getElementById('retail-dual-change');
+            const dualChange = parseFloat(dualChangeSpan.textContent) || 0;
+            formData.set('change', dualChange.toFixed(2));
+            
+            console.log('Dual payment data:', {
+                cash: cashAmount,
+                mpesa: mpesaAmount,
+                total: cashAmount + mpesaAmount,
+                change: dualChange
+            });
+        } else {
+            // Single payment - add change from single payment
+            const changeSpan = document.getElementById('retail-order-change');
+            const change = parseFloat(changeSpan.textContent) || 0;
+            formData.set('change', change.toFixed(2));
+        }
 
         itemRows.forEach(row => {
             const select = row.querySelector('.product-select');
@@ -275,8 +373,8 @@ if (retailForm) {
                     return;
                 }
                 values[5] = price.toFixed(2);
-                items.push(values.join('|')); // e.g., product|Bread|quantity|0|price|50.00|stock|100|uom|Loaf
-                items.push(qtyInput.value); // e.g., 2
+                items.push(values.join('|'));
+                items.push(qtyInput.value);
             } else if (productInput && productInput.value && qtyInput.value && priceInput.value) {
                 const price = parseFloat(priceInput.value) || 0;
                 if (price <= 0) {
@@ -331,7 +429,7 @@ if (retailForm) {
                 console.log('Form submitted successfully, reloading page');
                 retailModal.classList.add('hidden');
                 cleanupEventListeners();
-                preloadedStockData = null; // Reset cache to ensure fresh data on next open
+                preloadedStockData = null;
                 window.location.reload();
             } else {
                 console.error('Form submission failed:', result.error || text);

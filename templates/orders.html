@@ -128,19 +128,55 @@
                 <button type="button" id="add-retail-manual" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">Add Manual Item</button>
                 <div class="text-right"><span class="font-semibold">Subtotal:</span> <span id="retail-order-total" class="ml-2">0.00</span></div>
             </div>
-            <div>
-                <label for="retail-payment-type" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Payment Type</label>
-                <select id="retail-payment-type" name="payment_type" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                    <option value="cash">Cash</option>
-                    <option value="mpesa">Mpesa</option>
-                    <option value="bank_transfer">Bank Transfer</option>
-                    <option value="credit">Credit</option>
-                </select>
+            
+            <!-- Payment Type Selection -->
+            <div class="grid grid-cols-2 gap-4">
+                <!-- Payment Type 1 (Original) -->
+                <div>
+                    <label for="retail-payment-type" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Payment Type</label>
+                    <select id="retail-payment-type" name="payment_type" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                        <option value="cash">Cash</option>
+                        <option value="mpesa">Mpesa</option>
+                        <option value="bank_transfer">Bank Transfer</option>
+                        <option value="credit">Credit</option>
+                    </select>
+                </div>
+                
+                <!-- Payment Type 2 (New) -->
+                <div>
+                    <label for="retail-payment-type-2" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Payment Type 2</label>
+                    <select id="retail-payment-type-2" name="payment_type_2" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">Select Payment Type 2</option>
+                        <option value="dual">Cash + Mpesa</option>
+                    </select>
+                </div>
             </div>
+
+            <!-- Payment Amount Containers -->
             <div id="retail-amount-paid-container">
                 <input type="number" name="amount_paid" id="retail-amount-paid" placeholder="Amount Paid (optional)" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" min="0" step="0.01">
                 <div class="text-right mt-2"><span class="font-semibold">Change:</span> <span id="retail-order-change" class="ml-2">0.00</span></div>
             </div>
+
+            <!-- Dual Payment Inputs (Hidden by default) -->
+            <div id="retail-dual-payment-container" class="hidden grid grid-cols-2 gap-4">
+                <div>
+                    <label for="retail-cash-amount" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Cash Amount</label>
+                    <input type="number" name="cash_amount" id="retail-cash-amount" placeholder="Cash amount" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" step="0.01">
+                </div>
+                <div>
+                    <label for="retail-mpesa-amount" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Mpesa Amount</label>
+                    <input type="number" name="mpesa_amount" id="retail-mpesa-amount" placeholder="Mpesa amount" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" step="0.01">
+                </div>
+                <div class="col-span-2 text-right">
+                    <span class="font-semibold">Total Paid:</span> 
+                    <span id="retail-dual-total" class="ml-2">0.00</span>
+                    <br>
+                    <span class="font-semibold">Change:</span> 
+                    <span id="retail-dual-change" class="ml-2">0.00</span>
+                </div>
+            </div>
+
             <div class="flex space-x-2 mt-4">
                 <button type="submit" class="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600 submit-btn">Submit Order</button>
                 <button type="button" id="close-retail-modal" class="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600">Cancel</button>
