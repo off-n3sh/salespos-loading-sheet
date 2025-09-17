@@ -2687,21 +2687,25 @@ def daily_sales_report():
                 'payment_breakdown': payment_breakdown
             })
             
-            # Add M-Pesa/Cash for orders created today (same data that contributes to total_retail_paid)
+            # 📊 RETAIL TRADE TODAY (created today): Check payment type
             if payment > 0 and order_type in ['retail', 'app']:
-                if payment_breakdown:
+                print(f"📊 RETAIL TRADE TODAY (NEW): Order {receipt_id}, Amount: {payment}")
+                
+                # 💰 CHECK PAYMENT TYPE - Extract cash/mpesa from same retail trade
+                if payment_type == 'mpesa':
+                    total_mpesa += payment
+                    print(f"   └── 📱 MPESA: +{payment}")
+                elif payment_type == 'cash':
+                    total_cash += payment
+                    print(f"   └── 💵 CASH: +{payment}")
+                elif payment_breakdown:
                     # Dual payment
                     cash_amount = payment_breakdown.get('cash', 0)
                     mpesa_amount = payment_breakdown.get('mpesa', 0)
                     total_cash += cash_amount
                     total_mpesa += mpesa_amount
                     total_dual_payments += 1
-                else:
-                    # Single payment type
-                    if payment_type == 'mpesa':
-                        total_mpesa += payment
-                    elif payment_type == 'cash':
-                        total_cash += payment
+                    print(f"   └── 📱 MPESA: +{mpesa_amount}, 💵 CASH: +{cash_amount}")
         
         # Always add current balance to total debt
         if balance > 0:
@@ -2722,29 +2726,16 @@ def daily_sales_report():
                     # Add to sales totals
                     if order_type in ['retail', 'app']:
                         total_retail_paid += payment_amount
+                        print(f"📊 RETAIL TRADE TODAY: Order {receipt_id}, Amount: {payment_amount}")
                         
-                        # Add to M-Pesa/Cash totals (same data that contributed to total_retail_paid)
-                        if payment_breakdown:
-                            # This was a dual payment - split proportionally
-                            cash_ratio = payment_breakdown.get('cash', 0) / payment if payment > 0 else 0
-                            mpesa_ratio = payment_breakdown.get('mpesa', 0) / payment if payment > 0 else 0
-                            
-                            cash_portion = payment_amount * cash_ratio
-                            mpesa_portion = payment_amount * mpesa_ratio
-                            
-                            total_cash += cash_portion
-                            total_mpesa += mpesa_portion
-                            
-                            print(f"Order {receipt_id} (payment history - DUAL): cash={cash_portion:.2f}, mpesa={mpesa_portion:.2f}, total={payment_amount}")
-                            
-                        else:
-                            # Single payment type
-                            if payment_type == 'mpesa':
-                                total_mpesa += payment_amount
-                            elif payment_type == 'cash':
-                                total_cash += payment_amount
-                            
-                            print(f"Order {receipt_id} (payment history - {payment_type.upper()}): amount={payment_amount}")
+                        # 💰 CHECK PAYMENT TYPE - Extract cash/mpesa from same retail trade
+                        if payment_type == 'mpesa':
+                            total_mpesa += payment_amount
+                            print(f"   └── 📱 MPESA: +{payment_amount}")
+                        elif payment_type == 'cash':
+                            total_cash += payment_amount
+                            print(f"   └── 💵 CASH: +{payment_amount}")
+                        
                     else:
                         total_wholesale_paid += payment_amount
                     
