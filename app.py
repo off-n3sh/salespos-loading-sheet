@@ -1945,10 +1945,34 @@ def orders():
             shop_name = request.form.get('shop_name', 'Retail Direct')
             salesperson_name = request.form.get('salesperson_name', 'N/A')
             order_type = request.form.get('order_type', 'wholesale')
-            payment_type = request.form.get('payment_type', 'cash')
-            amount_paid = float(request.form.get('amount_paid', '0') or 0)
-            change = float(request.form.get('change', '0') or 0)  # Get change from form
+            change = float(request.form.get('change', '0') or 0)
             items_raw = request.form.getlist('items[]')
+
+            # Check if this is a dual payment
+            is_dual_payment = request.form.get('payment_type_dual') == 'true'
+            
+            if is_dual_payment:
+                # Handle dual payment
+                cash_amount = float(request.form.get('cash_amount', '0') or 0)
+                mpesa_amount = float(request.form.get('mpesa_amount', '0') or 0)
+                total_amount_paid = float(request.form.get('total_amount_paid', '0') or 0)
+                
+                # Validation for dual payment
+                if cash_amount + mpesa_amount != total_amount_paid:
+                    logger.error(f"Dual payment amounts don't match: cash={cash_amount}, mpesa={mpesa_amount}, total={total_amount_paid}")
+                    return jsonify({'error': 'Payment amounts do not match'}), 400
+                
+                payment_type = 'dual'
+                amount_paid = total_amount_paid
+                
+                logger.info(f"Processing dual payment: cash={cash_amount}, mpesa={mpesa_amount}, total={total_amount_paid}")
+                
+            else:
+                # Handle single payment (existing logic)
+                payment_type = request.form.get('payment_type', 'cash')
+                amount_paid = float(request.form.get('amount_paid', '0') or 0)
+                cash_amount = 0
+                mpesa_amount = 0
 
             # Validate payment_type for restricted clients
             restricted_clients = ['client', 'clients', 'walk in', 'walkin']
@@ -1998,6 +2022,7 @@ def orders():
                 'date': datetime.now(NAIROBI_TZ)
             }] if amount_paid > 0 else []
 
+            # Build order data with hybrid payment structure
             order_data = {
                 'receipt_id': receipt_id,
                 'salesperson_name': salesperson_name,
@@ -2012,7 +2037,7 @@ def orders():
                 'date': datetime.now(NAIROBI_TZ),
                 'order_type': order_type,
                 'payment_type': payment_type,
-                'change': change,  # Store change from form (e.g., 200 or 0)
+                'change': change,
                 'closed_date': datetime.now(NAIROBI_TZ) if balance == 0 else None,
                 'tracking': {
                     'status': 'pending',
@@ -2020,6 +2045,14 @@ def orders():
                     'notes': 'Order received, awaiting dispatch'
                 }
             }
+
+            # Add payment breakdown for dual payments only
+            if is_dual_payment:
+                order_data['payment_breakdown'] = {
+                    'cash': cash_amount,
+                    'mpesa': mpesa_amount
+                }
+                logger.info(f"Added payment breakdown: cash={cash_amount}, mpesa={mpesa_amount}")
 
             db.collection('orders').add(order_data)
 
@@ -2038,12 +2071,20 @@ def orders():
                 })
 
             log_user_action('Opened Order', f"Order #{receipt_id} - {order_type} for {shop_name}")
+            
+            # Log payment details
+            if is_dual_payment:
+                logger.info(f"Order {receipt_id} created with dual payment: cash={cash_amount}, mpesa={mpesa_amount}")
+            else:
+                logger.info(f"Order {receipt_id} created with single payment: {payment_type}={amount_paid}")
+                
             return jsonify({'message': 'Order created successfully', 'receipt_id': receipt_id}), 200
+            
         except Exception as e:
             logger.error(f"Error creating order: {e}")
             return jsonify({'error': str(e)}), 500
 
-    # GET method (updated to include change in response)
+    # GET method (updated to include payment breakdown in response)
     try:
         orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).stream()
         orders = []
@@ -2079,7 +2120,8 @@ def orders():
                     else:
                         i += 1
 
-            orders.append({
+            # Build order response with payment breakdown info
+            order_response = {
                 'receipt_id': order_dict.get('receipt_id', doc.id),
                 'salesperson_name': order_dict.get('salesperson_name', 'N/A'),
                 'salesperson_id': order_dict.get('salesperson_id', ''),
@@ -2092,8 +2134,15 @@ def orders():
                 'closed_date': process_date(order_dict.get('closed_date', None)) if order_dict.get('closed_date') else None,
                 'order_type': order_dict.get('order_type', 'wholesale'),
                 'payment_type': order_dict.get('payment_type', 'cash'),
-                'change': order_dict.get('change', 0)  # Include change in response
-            })
+                'change': order_dict.get('change', 0)
+            }
+            
+            # Add payment breakdown if it exists (for dual payments)
+            payment_breakdown = order_dict.get('payment_breakdown')
+            if payment_breakdown:
+                order_response['payment_breakdown'] = payment_breakdown
+                
+            orders.append(order_response)
 
         recent_activity = orders[:3]
         stock_items = [doc.to_dict() for doc in db.collection('stock').order_by('stock_name').get()]
@@ -2101,7 +2150,8 @@ def orders():
     except Exception as e:
         logger.error(f"Error fetching orders: {e}")
         return render_template('error.html', message=f"Failed to load orders: {str(e)}"), 500
-
+        
+        
 @app.route('/edit_order/<order_id>', methods=['POST'])
 @login_required
 def edit_order(order_id):
