@@ -2637,13 +2637,10 @@ def daily_sales_report():
     start_of_day_utc = start_of_day.astimezone(pytz.UTC)
     end_of_day_utc = end_of_day.astimezone(pytz.UTC)
     
-    print(f"Querying orders from {start_of_day_utc} to {end_of_day_utc} (UTC)")
+    print(f"Querying payments made from {start_of_day_utc} to {end_of_day_utc} (UTC)")
     
-    # Get ALL orders (not just today's) to check payment_history
+    # Get ALL orders to check payment_history for payments made today
     all_orders_ref = db.collection('orders').stream()
-    
-    # Get today's orders for revenue calculation
-    today_orders_ref = db.collection('orders').where('date', '>=', start_of_day_utc).where('date', '<=', end_of_day_utc).stream()
     
     total_wholesale_revenue = 0
     total_retail_revenue = 0
@@ -2653,10 +2650,10 @@ def daily_sales_report():
     total_mpesa = 0
     total_cash = 0
     total_dual_payments = 0
-    today_orders = []
+    today_orders = []  # Orders created today
     
-    # First, process today's orders for revenue calculation
-    for doc in today_orders_ref:
+    # Process ALL orders to find payments made today
+    for doc in all_orders_ref:
         order_dict = doc.to_dict()
         order_type = order_dict.get('order_type', 'wholesale').lower()
         payment = float(order_dict.get('payment', 0))
@@ -2664,65 +2661,37 @@ def daily_sales_report():
         payment_type = order_dict.get('payment_type', '').lower().strip()
         receipt_id = order_dict.get('receipt_id', doc.id)
         payment_breakdown = order_dict.get('payment_breakdown')
-        
-        # Calculate revenue totals (orders created today)
-        if order_type == 'wholesale':
-            total_wholesale_revenue += payment + balance
-            total_wholesale_paid += payment
-        else:
-            total_retail_revenue += payment + balance
-            total_retail_paid += payment
-        
-        total_debt += balance
-        
-        today_orders.append({
-            'receipt_id': receipt_id,
-            'order_type': order_type,
-            'payment': payment,
-            'balance': balance,
-            'payment_type': payment_type,
-            'payment_breakdown': payment_breakdown
-        })
-    
-    # Process ALL orders to check for payments made today (including previous orders)
-    for doc in all_orders_ref:
-        order_dict = doc.to_dict()
-        order_type = order_dict.get('order_type', 'wholesale').lower()
-        payment_type = order_dict.get('payment_type', '').lower().strip()
-        receipt_id = order_dict.get('receipt_id', doc.id)
-        payment_breakdown = order_dict.get('payment_breakdown')
         payment_history = order_dict.get('payment_history', [])
-        
-        # Check if this order was created today (already processed above)
         order_date = order_dict.get('date')
+        
+        # Check if order was created today (for revenue calculation)
         is_todays_order = False
         if order_date:
             order_date_local = order_date.replace(tzinfo=pytz.UTC).astimezone(NAIROBI_TZ)
             is_todays_order = start_of_day <= order_date_local < end_of_day
         
+        # Calculate revenue totals (only for orders created today)
         if is_todays_order:
-            # For today's orders, process initial payment
-            if payment_breakdown:
-                # Dual payment made today
-                cash_amount = float(payment_breakdown.get('cash', 0))
-                mpesa_amount = float(payment_breakdown.get('mpesa', 0))
-                
-                total_cash += cash_amount
-                total_mpesa += mpesa_amount
-                total_dual_payments += 1
-                
-                print(f"Order {receipt_id} (created today): DUAL payment - cash={cash_amount}, mpesa={mpesa_amount}")
+            if order_type == 'wholesale':
+                total_wholesale_revenue += payment + balance
             else:
-                # Single payment made today
-                initial_payment = float(order_dict.get('payment', 0))
-                if payment_type == 'mpesa':
-                    total_mpesa += initial_payment
-                elif payment_type == 'cash':
-                    total_cash += initial_payment
-                
-                print(f"Order {receipt_id} (created today): {payment_type.upper()} payment - amount={initial_payment}")
+                total_retail_revenue += payment + balance
+            
+            # Add to today's orders list
+            today_orders.append({
+                'receipt_id': receipt_id,
+                'order_type': order_type,
+                'payment': payment,
+                'balance': balance,
+                'payment_type': payment_type,
+                'payment_breakdown': payment_breakdown
+            })
         
-        # Process payment_history for payments made today (from any order)
+        # Always add current balance to total debt
+        if balance > 0:
+            total_debt += balance
+        
+        # Process payment_history for payments made TODAY (from any order date)
         for payment_entry in payment_history:
             payment_date = payment_entry.get('date')
             payment_amount = float(payment_entry.get('amount', 0))
@@ -2733,32 +2702,58 @@ def daily_sales_report():
                 
                 # Check if this payment was made today
                 if start_of_day <= payment_date_local < end_of_day:
-                    # For payment_history, we don't have breakdown info, so use payment_type
-                    if payment_type == 'mpesa':
-                        total_mpesa += payment_amount
-                    elif payment_type == 'cash':
-                        total_cash += payment_amount
                     
-                    print(f"Order {receipt_id} (payment history): {payment_type.upper()} payment made today - amount={payment_amount}")
-                    
-                    # Add to sales totals for payments made today
-                    if order_type == 'wholesale':
-                        total_wholesale_paid += payment_amount
-                    else:
+                    # Add to sales totals
+                    if order_type in ['retail', 'app']:
                         total_retail_paid += payment_amount
+                    else:
+                        total_wholesale_paid += payment_amount
+                    
+                    # Handle payment method totals
+                    if payment_breakdown:
+                        # This was a dual payment - we need to split it
+                        # Since payment_history doesn't store breakdown, we'll split proportionally
+                        cash_ratio = payment_breakdown.get('cash', 0) / payment
+                        mpesa_ratio = payment_breakdown.get('mpesa', 0) / payment
+                        
+                        cash_portion = payment_amount * cash_ratio
+                        mpesa_portion = payment_amount * mpesa_ratio
+                        
+                        total_cash += cash_portion
+                        total_mpesa += mpesa_portion
+                        
+                        if is_todays_order:  # Only count as dual payment if order was created today
+                            total_dual_payments += 1
+                        
+                        print(f"Order {receipt_id} (payment history - DUAL): cash={cash_portion:.2f}, mpesa={mpesa_portion:.2f}, total={payment_amount}")
+                        
+                    else:
+                        # Single payment type
+                        if payment_type == 'mpesa':
+                            total_mpesa += payment_amount
+                        elif payment_type == 'cash':
+                            total_cash += payment_amount
+                        
+                        print(f"Order {receipt_id} (payment history - {payment_type.upper()}): amount={payment_amount}")
     
-    print(f"Final totals - M-Pesa: {total_mpesa}, Cash: {total_cash}, Dual Payments: {total_dual_payments}")
-    
-    # Process retail collection (standalone retail sales)
+    # Process retail collection (standalone retail sales made today)
     retail_ref = db.collection('retail').where('date', '>=', start_of_day_utc).where('date', '<=', end_of_day_utc).stream()
+    retail_collection_total = 0
     for doc in retail_ref:
         retail_dict = doc.to_dict()
         try:
             amount = float(retail_dict.get('amount', 0))
-            total_retail_revenue += amount
-            total_retail_paid += amount
+            if amount > 0:
+                retail_collection_total += amount
+                total_retail_paid += amount
+                # Retail collection is typically cash (adjust if needed)
+                total_cash += amount
         except (ValueError, TypeError) as e:
             print(f"Error in retail doc {doc.id}: {e}")
+    
+    if retail_collection_total > 0:
+        total_retail_revenue += retail_collection_total
+        print(f"Added {retail_collection_total} from retail collection")
     
     # Process expenses
     expenses_ref = db.collection('expenses').where('date', '>=', start_of_day_utc).where('date', '<=', end_of_day_utc).stream()
@@ -2778,13 +2773,16 @@ def daily_sales_report():
         except (ValueError, TypeError) as e:
             print(f"Error in expense doc {doc.id}: {e}")
     
-    total_sales = total_wholesale_paid + total_retail_paid
-    net = total_sales - total_expenses
+    total_sales_today = total_wholesale_paid + total_retail_paid
+    net = total_sales_today - total_expenses
     
     # Calculate payment method percentages
     total_payment_methods = total_cash + total_mpesa
     cash_percentage = (total_cash / total_payment_methods * 100) if total_payment_methods > 0 else 0
     mpesa_percentage = (total_mpesa / total_payment_methods * 100) if total_payment_methods > 0 else 0
+    
+    print(f"Final totals - Total Sales: {total_sales_today}, M-Pesa: {total_mpesa}, Cash: {total_cash}, Dual Payments: {total_dual_payments}")
+    print(f"Retail Paid: {total_retail_paid}, Wholesale Paid: {total_wholesale_paid}, Net: {net}")
     
     report_data = {
         'date': now.strftime('%d/%m/%Y'),
@@ -2795,16 +2793,17 @@ def daily_sales_report():
         'total_retail_paid': total_retail_paid,
         'total_debt': total_debt,
         'total_expenses': total_expenses,
-        'total_sales': total_sales,
+        'total_sales': total_sales_today,
         'net': net,
         'orders_count': len(today_orders),
         'today_expenses': today_expenses,
         'total_mpesa': total_mpesa,
         'total_cash': total_cash,
-        'total_dual_payments': total_dual_payments,  # New field
-        'cash_percentage': cash_percentage,  # New field
-        'mpesa_percentage': mpesa_percentage,  # New field
-        'today_orders': today_orders  # Include orders with payment breakdown info
+        'total_dual_payments': total_dual_payments,
+        'cash_percentage': cash_percentage,
+        'mpesa_percentage': mpesa_percentage,
+        'today_orders': today_orders,
+        'retail_collection_total': retail_collection_total
     }
     
     return render_template('daily_sales_report.html', **report_data)
