@@ -2639,8 +2639,11 @@ def daily_sales_report():
     
     print(f"Querying orders from {start_of_day_utc} to {end_of_day_utc} (UTC)")
     
-    # Fetch all orders to check payment_history for payments made today
-    orders_ref = db.collection('orders').stream()
+    # Get ALL orders (not just today's) to check payment_history
+    all_orders_ref = db.collection('orders').stream()
+    
+    # Get today's orders for revenue calculation
+    today_orders_ref = db.collection('orders').where('date', '>=', start_of_day_utc).where('date', '<=', end_of_day_utc).stream()
     
     total_wholesale_revenue = 0
     total_retail_revenue = 0
@@ -2649,49 +2652,102 @@ def daily_sales_report():
     total_debt = 0
     total_mpesa = 0
     total_cash = 0
+    total_dual_payments = 0
     today_orders = []
     
-    for doc in orders_ref:
+    # First, process today's orders for revenue calculation
+    for doc in today_orders_ref:
         order_dict = doc.to_dict()
         order_type = order_dict.get('order_type', 'wholesale').lower()
+        payment = float(order_dict.get('payment', 0))
         balance = float(order_dict.get('balance', 0))
+        payment_type = order_dict.get('payment_type', '').lower().strip()
         receipt_id = order_dict.get('receipt_id', doc.id)
-        payment_history = order_dict.get('payment_history', [])
-        order_date = order_dict.get('date')
+        payment_breakdown = order_dict.get('payment_breakdown')
         
-        # Calculate revenue and payment totals from payment_history for payments made today
-        payment_total = 0
+        # Calculate revenue totals (orders created today)
+        if order_type == 'wholesale':
+            total_wholesale_revenue += payment + balance
+            total_wholesale_paid += payment
+        else:
+            total_retail_revenue += payment + balance
+            total_retail_paid += payment
+        
+        total_debt += balance
+        
+        today_orders.append({
+            'receipt_id': receipt_id,
+            'order_type': order_type,
+            'payment': payment,
+            'balance': balance,
+            'payment_type': payment_type,
+            'payment_breakdown': payment_breakdown
+        })
+    
+    # Process ALL orders to check for payments made today (including previous orders)
+    for doc in all_orders_ref:
+        order_dict = doc.to_dict()
+        order_type = order_dict.get('order_type', 'wholesale').lower()
+        payment_type = order_dict.get('payment_type', '').lower().strip()
+        receipt_id = order_dict.get('receipt_id', doc.id)
+        payment_breakdown = order_dict.get('payment_breakdown')
+        payment_history = order_dict.get('payment_history', [])
+        
+        # Check if this order was created today (already processed above)
+        order_date = order_dict.get('date')
+        is_todays_order = False
+        if order_date:
+            order_date_local = order_date.replace(tzinfo=pytz.UTC).astimezone(NAIROBI_TZ)
+            is_todays_order = start_of_day <= order_date_local < end_of_day
+        
+        if is_todays_order:
+            # For today's orders, process initial payment
+            if payment_breakdown:
+                # Dual payment made today
+                cash_amount = float(payment_breakdown.get('cash', 0))
+                mpesa_amount = float(payment_breakdown.get('mpesa', 0))
+                
+                total_cash += cash_amount
+                total_mpesa += mpesa_amount
+                total_dual_payments += 1
+                
+                print(f"Order {receipt_id} (created today): DUAL payment - cash={cash_amount}, mpesa={mpesa_amount}")
+            else:
+                # Single payment made today
+                initial_payment = float(order_dict.get('payment', 0))
+                if payment_type == 'mpesa':
+                    total_mpesa += initial_payment
+                elif payment_type == 'cash':
+                    total_cash += initial_payment
+                
+                print(f"Order {receipt_id} (created today): {payment_type.upper()} payment - amount={initial_payment}")
+        
+        # Process payment_history for payments made today (from any order)
         for payment_entry in payment_history:
             payment_date = payment_entry.get('date')
             payment_amount = float(payment_entry.get('amount', 0))
-            payment_type = payment_entry.get('payment_type', order_dict.get('payment_type', '')).lower().strip()
-            if payment_date and payment_date >= start_of_day_utc and payment_date <= end_of_day_utc and payment_amount > 0:
-                payment_total += payment_amount
-                if payment_type == 'mpesa':
-                    total_mpesa += payment_amount
-                elif payment_type == 'cash':
-                    total_cash += payment_amount
-        
-        # Update revenue and paid amounts for payments made today
-        if payment_total > 0:
-            if order_type == 'wholesale':
-                total_wholesale_revenue += payment_total
-                total_wholesale_paid += payment_total
-            else:
-                total_retail_revenue += payment_total
-                total_retail_paid += payment_total
-        
-        # Include today's orders in today_orders list
-        if order_date >= start_of_day_utc and order_date <= end_of_day_utc:
-            total_debt += balance
-            today_orders.append({
-                'receipt_id': receipt_id,
-                'order_type': order_type,
-                'payment': payment_total,
-                'balance': balance
-            })
+            
+            if payment_date and payment_amount > 0:
+                # Convert payment date to local time
+                payment_date_local = payment_date.replace(tzinfo=pytz.UTC).astimezone(NAIROBI_TZ)
+                
+                # Check if this payment was made today
+                if start_of_day <= payment_date_local < end_of_day:
+                    # For payment_history, we don't have breakdown info, so use payment_type
+                    if payment_type == 'mpesa':
+                        total_mpesa += payment_amount
+                    elif payment_type == 'cash':
+                        total_cash += payment_amount
+                    
+                    print(f"Order {receipt_id} (payment history): {payment_type.upper()} payment made today - amount={payment_amount}")
+                    
+                    # Add to sales totals for payments made today
+                    if order_type == 'wholesale':
+                        total_wholesale_paid += payment_amount
+                    else:
+                        total_retail_paid += payment_amount
     
-    print(f"Final totals - M-Pesa: {total_mpesa}, Cash: {total_cash}")
+    print(f"Final totals - M-Pesa: {total_mpesa}, Cash: {total_cash}, Dual Payments: {total_dual_payments}")
     
     # Process retail collection (standalone retail sales)
     retail_ref = db.collection('retail').where('date', '>=', start_of_day_utc).where('date', '<=', end_of_day_utc).stream()
@@ -2725,6 +2781,11 @@ def daily_sales_report():
     total_sales = total_wholesale_paid + total_retail_paid
     net = total_sales - total_expenses
     
+    # Calculate payment method percentages
+    total_payment_methods = total_cash + total_mpesa
+    cash_percentage = (total_cash / total_payment_methods * 100) if total_payment_methods > 0 else 0
+    mpesa_percentage = (total_mpesa / total_payment_methods * 100) if total_payment_methods > 0 else 0
+    
     report_data = {
         'date': now.strftime('%d/%m/%Y'),
         'time_generated': now.strftime('%H:%M:%S'),
@@ -2739,7 +2800,11 @@ def daily_sales_report():
         'orders_count': len(today_orders),
         'today_expenses': today_expenses,
         'total_mpesa': total_mpesa,
-        'total_cash': total_cash
+        'total_cash': total_cash,
+        'total_dual_payments': total_dual_payments,  # New field
+        'cash_percentage': cash_percentage,  # New field
+        'mpesa_percentage': mpesa_percentage,  # New field
+        'today_orders': today_orders  # Include orders with payment breakdown info
     }
     
     return render_template('daily_sales_report.html', **report_data)
