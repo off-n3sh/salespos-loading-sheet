@@ -2639,7 +2639,8 @@ def daily_sales_report():
     
     print(f"Querying orders from {start_of_day_utc} to {end_of_day_utc} (UTC)")
     
-    orders_ref = db.collection('orders').where('date', '>=', start_of_day_utc).where('date', '<=', end_of_day_utc).stream()
+    # Fetch all orders to check payment_history for payments made today
+    orders_ref = db.collection('orders').stream()
     
     total_wholesale_revenue = 0
     total_retail_revenue = 0
@@ -2653,35 +2654,42 @@ def daily_sales_report():
     for doc in orders_ref:
         order_dict = doc.to_dict()
         order_type = order_dict.get('order_type', 'wholesale').lower()
-        payment = float(order_dict.get('payment', 0))
         balance = float(order_dict.get('balance', 0))
-        payment_type = order_dict.get('payment_type', '').lower().strip()
         receipt_id = order_dict.get('receipt_id', doc.id)
+        payment_history = order_dict.get('payment_history', [])
+        order_date = order_dict.get('date')
         
-        # Calculate revenue totals (same logic as before)
-        if order_type == 'wholesale':
-            total_wholesale_revenue += payment + balance
-            total_wholesale_paid += payment
-        else:
-            total_retail_revenue += payment + balance
-            total_retail_paid += payment
+        # Calculate revenue and payment totals from payment_history for payments made today
+        payment_total = 0
+        for payment_entry in payment_history:
+            payment_date = payment_entry.get('date')
+            payment_amount = float(payment_entry.get('amount', 0))
+            payment_type = payment_entry.get('payment_type', order_dict.get('payment_type', '')).lower().strip()
+            if payment_date and payment_date >= start_of_day_utc and payment_date <= end_of_day_utc and payment_amount > 0:
+                payment_total += payment_amount
+                if payment_type == 'mpesa':
+                    total_mpesa += payment_amount
+                elif payment_type == 'cash':
+                    total_cash += payment_amount
         
-        total_debt += balance
+        # Update revenue and paid amounts for payments made today
+        if payment_total > 0:
+            if order_type == 'wholesale':
+                total_wholesale_revenue += payment_total
+                total_wholesale_paid += payment_total
+            else:
+                total_retail_revenue += payment_total
+                total_retail_paid += payment_total
         
-        # Calculate payment method totals (same simple logic)
-        if payment_type == 'mpesa':
-            total_mpesa += payment
-        elif payment_type == 'cash':
-            total_cash += payment
-        
-        print(f"Order {receipt_id}: type={order_type}, payment={payment}, payment_type={payment_type}")
-        
-        today_orders.append({
-            'receipt_id': receipt_id,
-            'order_type': order_type,
-            'payment': payment,
-            'balance': balance
-        })
+        # Include today's orders in today_orders list
+        if order_date >= start_of_day_utc and order_date <= end_of_day_utc:
+            total_debt += balance
+            today_orders.append({
+                'receipt_id': receipt_id,
+                'order_type': order_type,
+                'payment': payment_total,
+                'balance': balance
+            })
     
     print(f"Final totals - M-Pesa: {total_mpesa}, Cash: {total_cash}")
     
@@ -2735,6 +2743,7 @@ def daily_sales_report():
     }
     
     return render_template('daily_sales_report.html', **report_data)
+
 @app.route('/reports')
 @no_cache
 @login_required
