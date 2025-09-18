@@ -108,11 +108,13 @@
             <input type="hidden" name="order_type" value="retail">
             <input type="hidden" name="salesperson_name" value="{{ session['user']['firstName'] }} {{ session['user']['lastName'] }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            
             <div class="relative">
                 <label for="retail-client-input" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Client Name</label>
                 <select id="retail-client-input" name="shop_name" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" required></select>
                 <div id="retail-client-debt" class="mt-1 text-sm text-gray-600 dark:text-gray-400 hidden"></div>
             </div>
+            
             <div id="retail-items-container" class="space-y-4">
                 <div class="grid grid-cols-6 gap-2 items-center text-sm font-semibold item-row-header">
                     <span>Item</span>
@@ -124,112 +126,81 @@
                 </div>
                 <button type="button" class="add-item-btn w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600">Add Item</button>
             </div>
+            
             <div class="flex justify-between items-center mt-4">
                 <button type="button" id="add-retail-manual" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">Add Manual Item</button>
                 <div class="text-right"><span class="font-semibold">Subtotal:</span> <span id="retail-order-total" class="ml-2">0.00</span></div>
             </div>
             
-            <!-- Payment Type Selection -->
-            <div class="grid grid-cols-2 gap-4">
-                <!-- Payment Type 1 (Original) -->
-                <div>
-                    <label for="retail-payment-type" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Payment Type</label>
-                    <select id="retail-payment-type" name="payment_type" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                        <option value="cash">Cash</option>
-                        <option value="mpesa">Mpesa</option>
-                        <option value="bank_transfer">Bank Transfer</option>
-                        <option value="credit">Credit</option>
-                    </select>
+            <!-- Payment Section -->
+            <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 space-y-4">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">Payment Method</h3>
+                    
+                    <!-- Toggle Switch -->
+                    <div class="flex items-center space-x-3">
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Single Payment</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="payment-toggle" class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                        </label>
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Dual Payment</span>
+                    </div>
                 </div>
-                
-                <!-- Payment Type 2 (New) -->
-                <div>
-                    <label for="retail-payment-type-2" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Payment Type 2</label>
-                    <select id="retail-payment-type-2" name="payment_type_2" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="">Select Payment Type 2</option>
-                        <option value="dual">Cash + Mpesa</option>
-                    </select>
+
+                <!-- Single Payment Mode (Default) -->
+                <div id="single-payment-mode" class="space-y-4">
+                    <div>
+                        <label for="retail-payment-type" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Payment Type</label>
+                        <select id="retail-payment-type" name="payment_type" class="w-full p-3 border rounded-lg dark:bg-gray-600 dark:border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base" required>
+                            <option value="cash">💵 Cash</option>
+                            <option value="mpesa">📱 M-Pesa</option>
+                            <option value="bank_transfer">🏦 Bank Transfer</option>
+                            <option value="credit">💳 Credit</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label for="retail-amount-paid" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Amount Paid</label>
+                        <input type="number" name="amount_paid" id="retail-amount-paid" placeholder="Enter amount paid (optional)" class="w-full p-3 border rounded-lg dark:bg-gray-600 dark:border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" step="0.01">
+                        <div class="text-right mt-2 text-sm">
+                            <span class="font-semibold text-gray-700 dark:text-gray-300">Change:</span> 
+                            <span id="retail-order-change" class="ml-2 font-bold text-green-600 dark:text-green-400">0.00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dual Payment Mode (Hidden by default) -->
+                <div id="dual-payment-mode" class="hidden space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-white dark:bg-gray-600 rounded-lg p-3 border-2 border-green-200 dark:border-green-700">
+                            <label for="retail-cash-amount" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">💵 Cash Amount</label>
+                            <input type="number" name="cash_amount" id="retail-cash-amount" placeholder="0.00" class="w-full p-2 border rounded-lg dark:bg-gray-500 dark:border-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500" min="0" step="0.01">
+                        </div>
+                        <div class="bg-white dark:bg-gray-600 rounded-lg p-3 border-2 border-blue-200 dark:border-blue-700">
+                            <label for="retail-mpesa-amount" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">📱 M-Pesa Amount</label>
+                            <input type="number" name="mpesa_amount" id="retail-mpesa-amount" placeholder="0.00" class="w-full p-2 border rounded-lg dark:bg-gray-500 dark:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" step="0.01">
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-100 dark:bg-gray-600 rounded-lg p-3 text-center">
+                        <div class="text-sm space-y-1">
+                            <div>
+                                <span class="font-semibold text-gray-700 dark:text-gray-300">Total Paid:</span> 
+                                <span id="retail-dual-total" class="ml-2 font-bold text-blue-600 dark:text-blue-400">0.00</span>
+                            </div>
+                            <div>
+                                <span class="font-semibold text-gray-700 dark:text-gray-300">Change:</span> 
+                                <span id="retail-dual-change" class="ml-2 font-bold text-green-600 dark:text-green-400">0.00</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <!-- Payment Amount Containers -->
-            <div id="retail-amount-paid-container">
-                <input type="number" name="amount_paid" id="retail-amount-paid" placeholder="Amount Paid (optional)" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" min="0" step="0.01">
-                <div class="text-right mt-2"><span class="font-semibold">Change:</span> <span id="retail-order-change" class="ml-2">0.00</span></div>
-            </div>
-
-            <!-- Dual Payment Inputs (Hidden by default) -->
-            <div id="retail-dual-payment-container" class="hidden grid grid-cols-2 gap-4">
-                <div>
-                    <label for="retail-cash-amount" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Cash Amount</label>
-                    <input type="number" name="cash_amount" id="retail-cash-amount" placeholder="Cash amount" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" step="0.01">
-                </div>
-                <div>
-                    <label for="retail-mpesa-amount" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Mpesa Amount</label>
-                    <input type="number" name="mpesa_amount" id="retail-mpesa-amount" placeholder="Mpesa amount" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" step="0.01">
-                </div>
-                <div class="col-span-2 text-right">
-                    <span class="font-semibold">Total Paid:</span> 
-                    <span id="retail-dual-total" class="ml-2">0.00</span>
-                    <br>
-                    <span class="font-semibold">Change:</span> 
-                    <span id="retail-dual-change" class="ml-2">0.00</span>
-                </div>
-            </div>
-
-            <div class="flex space-x-2 mt-4">
-                <button type="submit" class="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600 submit-btn">Submit Order</button>
-                <button type="button" id="close-retail-modal" class="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600">Cancel</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- Wholesale Order Modal -->
-<div id="wholesale-modal" class="modal fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="wholesale-modal-title">
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
-        <h2 id="wholesale-modal-title" class="text-xl font-bold mb-4 text-gray-900 dark:text-white">New Wholesale Order</h2>
-        <div id="wholesale-error" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded mb-4"></div>
-        <form id="wholesale-form" method="POST" action="{{ url_for('orders') }}" class="space-y-4">
-            <input type="hidden" name="order_type" value="wholesale">
-            <input type="hidden" name="salesperson_name" value="{{ session['user']['firstName'] }} {{ session['user']['lastName'] }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div class="relative">
-                <label for="wholesale-client-input" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Shop Name</label>
-                <select id="wholesale-client-input" name="shop_name" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" required></select>
-                <div id="wholesale-client-debt" class="mt-1 text-sm text-gray-600 dark:text-gray-400 hidden"></div>
-            </div>
-            <div id="wholesale-items-container" class="space-y-4">
-                <div class="grid grid-cols-6 gap-2 items-center text-sm font-semibold item-row-header">
-                    <span>Item</span>
-                    <span class="text-center">Qty</span>
-                    <span class="text-center">Price</span>
-                    <span class="text-center">Stock</span>
-                    <span class="text-center">Total</span>
-                    <span class="text-center">Action</span>
-                </div>
-                <button type="button" class="add-item-btn w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600">Add Item</button>
-            </div>
-            <div class="flex justify-between items-center mt-4">
-                <button type="button" id="add-wholesale-manual" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">Add Manual Item</button>
-                <div class="text-right"><span class="font-semibold">Subtotal:</span> <span id="wholesale-order-total" class="ml-2">0.00</span></div>
-            </div>
-            <div>
-                <label for="wholesale-payment-type" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Payment Type</label>
-                <select id="wholesale-payment-type" name="payment_type" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                    <option value="cash">Cash</option>
-                    <option value="mpesa">Mpesa</option>
-                    <option value="bank_transfer">Bank Transfer</option>
-                    <option value="credit">Credit</option>
-                </select>
-            </div>
-            <div id="wholesale-amount-paid-container">
-                <input type="number" name="amount_paid" id="wholesale-amount-paid" placeholder="Amount Paid (optional)" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" min="0" step="0.01">
-                <div class="text-right mt-2"><span class="font-semibold">Change:</span> <span id="wholesale-order-change" class="ml-2">0.00</span></div>
-            </div>
-            <div class="flex space-x-2 mt-4">
-                <button type="submit" class="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600 submit-btn">Submit Order</button>
-                <button type="button" id="close-wholesale-modal" class="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600">Cancel</button>
+            <div class="flex space-x-2 mt-6">
+                <button type="submit" class="flex-1 bg-green-500 text-white py-3 rounded-lg hover:bg-green-600 submit-btn font-medium transition-colors">Submit Order</button>
+                <button type="button" id="close-retail-modal" class="flex-1 bg-red-500 text-white py-3 rounded-lg hover:bg-red-600 font-medium transition-colors">Cancel</button>
             </div>
         </form>
     </div>

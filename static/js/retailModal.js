@@ -5,9 +5,11 @@ const closeRetail = document.getElementById('close-retail-modal');
 const retailContainer = document.getElementById('retail-items-container');
 const retailAmountPaid = document.getElementById('retail-amount-paid');
 const retailPaymentType = document.getElementById('retail-payment-type');
-const retailPaymentType2 = document.getElementById('retail-payment-type-2');
+const paymentToggle = document.getElementById('payment-toggle');
 const retailCashAmount = document.getElementById('retail-cash-amount');
 const retailMpesaAmount = document.getElementById('retail-mpesa-amount');
+const singlePaymentMode = document.getElementById('single-payment-mode');
+const dualPaymentMode = document.getElementById('dual-payment-mode');
 let currentContainer = retailContainer;
 let eventListeners = [];
 
@@ -75,12 +77,17 @@ function resetModal(container) {
         debtElement.classList.add('hidden');
         console.log(`Reset debt element for ${modalId}`);
     }
-    // Reset payment types and show single payment input
+    
+    // Reset payment toggle and modes
+    if (paymentToggle) {
+        paymentToggle.checked = false;
+        singlePaymentMode.classList.remove('hidden');
+        dualPaymentMode.classList.add('hidden');
+    }
+    
+    // Reset payment types and inputs
     if (retailPaymentType) {
         retailPaymentType.value = 'cash';
-        retailPaymentType2.value = '';
-        document.getElementById('retail-amount-paid-container').style.display = 'block';
-        document.getElementById('retail-dual-payment-container').classList.add('hidden');
         retailAmountPaid.value = '';
         retailAmountPaid.removeAttribute('readonly');
         if (retailCashAmount) retailCashAmount.value = '';
@@ -102,6 +109,26 @@ function updateDualPaymentTotals() {
     
     if (dualTotalSpan) dualTotalSpan.textContent = totalPaid.toFixed(2);
     if (dualChangeSpan) dualChangeSpan.textContent = change.toFixed(2);
+}
+
+// Function to validate dual payment inputs
+function validateDualPayment() {
+    if (!paymentToggle.checked) return true; // Single payment mode, no validation needed
+    
+    const cashAmount = parseFloat(retailCashAmount.value) || 0;
+    const mpesaAmount = parseFloat(retailMpesaAmount.value) || 0;
+    
+    if (cashAmount <= 0 && mpesaAmount <= 0) {
+        showModalError('retail', 'Both payment amounts cannot be zero in dual payment mode.');
+        return false;
+    }
+    
+    if (cashAmount < 0 || mpesaAmount < 0) {
+        showModalError('retail', 'Payment amounts cannot be negative.');
+        return false;
+    }
+    
+    return true;
 }
 
 function attachAddItemListeners(container) {
@@ -224,47 +251,42 @@ if (retailAmountPaid) {
     eventListeners.push({ element: retailAmountPaid, type: 'input', handler: amountPaidHandler });
 }
 
-// Payment type toggle for amount paid visibility
-if (retailPaymentType) {
-    const paymentTypeHandler = () => {
-        const amountPaidContainer = document.getElementById('retail-amount-paid-container');
-        if (retailPaymentType.value === 'credit') {
-            amountPaidContainer.style.display = 'none';
-            retailAmountPaid.value = '0.00';
-            updateChange(retailContainer);
-        } else {
-            amountPaidContainer.style.display = 'block';
-            retailAmountPaid.value = '';
-            retailAmountPaid.removeAttribute('readonly');
-        }
-    };
-    retailPaymentType.addEventListener('change', paymentTypeHandler);
-    eventListeners.push({ element: retailPaymentType, type: 'change', handler: paymentTypeHandler });
-    paymentTypeHandler();
-}
-
-// Payment Type 2 handler for dual payment
-if (retailPaymentType2) {
-    const paymentType2Handler = () => {
-        const singlePaymentContainer = document.getElementById('retail-amount-paid-container');
-        const dualPaymentContainer = document.getElementById('retail-dual-payment-container');
-        
-        if (retailPaymentType2.value === 'dual') {
+// Payment toggle handler
+if (paymentToggle) {
+    const toggleHandler = () => {
+        if (paymentToggle.checked) {
             console.log('Switching to dual payment mode');
-            singlePaymentContainer.classList.add('hidden');
-            dualPaymentContainer.classList.remove('hidden');
+            singlePaymentMode.classList.add('hidden');
+            dualPaymentMode.classList.remove('hidden');
             updateDualPaymentTotals();
         } else {
             console.log('Switching to single payment mode');
-            singlePaymentContainer.classList.remove('hidden');
-            dualPaymentContainer.classList.add('hidden');
+            singlePaymentMode.classList.remove('hidden');
+            dualPaymentMode.classList.add('hidden');
             // Clear dual payment inputs
             if (retailCashAmount) retailCashAmount.value = '';
             if (retailMpesaAmount) retailMpesaAmount.value = '';
         }
     };
-    retailPaymentType2.addEventListener('change', paymentType2Handler);
-    eventListeners.push({ element: retailPaymentType2, type: 'change', handler: paymentType2Handler });
+    paymentToggle.addEventListener('change', toggleHandler);
+    eventListeners.push({ element: paymentToggle, type: 'change', handler: toggleHandler });
+}
+
+// Payment type toggle for amount paid visibility (single mode)
+if (retailPaymentType) {
+    const paymentTypeHandler = () => {
+        const amountPaidInput = document.getElementById('retail-amount-paid');
+        if (retailPaymentType.value === 'credit') {
+            amountPaidInput.value = '0.00';
+            amountPaidInput.setAttribute('readonly', true);
+            updateChange(retailContainer);
+        } else {
+            amountPaidInput.value = '';
+            amountPaidInput.removeAttribute('readonly');
+        }
+    };
+    retailPaymentType.addEventListener('change', paymentTypeHandler);
+    eventListeners.push({ element: retailPaymentType, type: 'change', handler: paymentTypeHandler });
 }
 
 // Dual payment input listeners
@@ -300,6 +322,12 @@ if (retailForm) {
             console.warn('Skipping form submission: modal is hidden');
             return;
         }
+        
+        // Validate dual payment if in dual mode
+        if (!validateDualPayment()) {
+            return;
+        }
+        
         console.log('Submitting retail form');
         const submitBtn = this.querySelector('.submit-btn');
         submitBtn.classList.add('processing');
@@ -314,7 +342,6 @@ if (retailForm) {
 
         // Handle payment type and amount paid for credit
         const paymentType = formData.get('payment_type');
-        const paymentType2 = formData.get('payment_type_2');
         const shopName = formData.get('shop_name')?.toLowerCase();
         const restrictedClients = ['client', 'clients', 'walk in', 'walkin'];
 
@@ -327,7 +354,7 @@ if (retailForm) {
         }
 
         // Handle dual payment submission
-        if (paymentType2 === 'dual') {
+        if (paymentToggle.checked) {
             const cashAmount = parseFloat(retailCashAmount.value) || 0;
             const mpesaAmount = parseFloat(retailMpesaAmount.value) || 0;
             
