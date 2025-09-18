@@ -2723,38 +2723,38 @@ def daily_sales_report():
                 # Check if this payment was made today
                 if start_of_day <= payment_date_local < end_of_day:
                     
-                    # SKIP if this is the same as today's initial payment (to avoid double counting)
-                    if is_todays_order and payment_amount == payment:
-                        print(f"⚠️  SKIPPING duplicate payment for today's order {receipt_id}")
-                        continue
-                    
-                    # Add to sales totals
+                    # Add to sales totals (ALWAYS - don't skip for total_retail_paid)
                     if order_type in ['retail', 'app']:
                         total_retail_paid += payment_amount
-                        print(f"📊 RETAIL TRADE TODAY (OLD): Order {receipt_id}, Amount: {payment_amount}")
                         
-                        # 💰 CHECK PAYMENT TYPE - Extract cash/mpesa from previous retail order paid today
-                        if payment_type == 'mpesa':
-                            total_mpesa += payment_amount
-                            print(f"   └── 📱 MPESA: +{payment_amount}")
-                        elif payment_type == 'cash':
-                            total_cash += payment_amount
-                            print(f"   └── 💵 CASH: +{payment_amount}")
-                        elif payment_breakdown:
-                            # Handle dual payment proportionally
-                            cash_ratio = payment_breakdown.get('cash', 0) / payment if payment > 0 else 0
-                            mpesa_ratio = payment_breakdown.get('mpesa', 0) / payment if payment > 0 else 0
-                            
-                            cash_portion = payment_amount * cash_ratio
-                            mpesa_portion = payment_amount * mpesa_ratio
-                            
-                            total_cash += cash_portion
-                            total_mpesa += mpesa_portion
-                            print(f"   └── 📱 MPESA: +{mpesa_portion}, 💵 CASH: +{cash_portion}")
+                        # ONLY skip duplicate for cash/mpesa counting (not for total_retail_paid)
+                        if is_todays_order and payment_amount == payment:
+                            print(f"📊 RETAIL TRADE TODAY (DUPLICATE): Order {receipt_id}, Amount: {payment_amount} - counted in total but skipping cash/mpesa")
                         else:
-                            # No payment_type found - assume cash for old orders
-                            total_cash += payment_amount
-                            print(f"   └── 💵 CASH: +{payment_amount} (no payment_type found)")
+                            print(f"📊 RETAIL TRADE TODAY (OLD): Order {receipt_id}, Amount: {payment_amount}")
+                            
+                            # 💰 CHECK PAYMENT TYPE - Extract cash/mpesa from previous retail order paid today
+                            if payment_type == 'mpesa':
+                                total_mpesa += payment_amount
+                                print(f"   └── 📱 MPESA: +{payment_amount}")
+                            elif payment_type == 'cash':
+                                total_cash += payment_amount
+                                print(f"   └── 💵 CASH: +{payment_amount}")
+                            elif payment_breakdown:
+                                # Handle dual payment proportionally
+                                cash_ratio = payment_breakdown.get('cash', 0) / payment if payment > 0 else 0
+                                mpesa_ratio = payment_breakdown.get('mpesa', 0) / payment if payment > 0 else 0
+                                
+                                cash_portion = payment_amount * cash_ratio
+                                mpesa_portion = payment_amount * mpesa_ratio
+                                
+                                total_cash += cash_portion
+                                total_mpesa += mpesa_portion
+                                print(f"   └── 📱 MPESA: +{mpesa_portion}, 💵 CASH: +{cash_portion}")
+                            else:
+                                # No payment_type found - assume cash for old orders
+                                total_cash += payment_amount
+                                print(f"   └── 💵 CASH: +{payment_amount} (no payment_type found)")
                         
                     else:
                         total_wholesale_paid += payment_amount
