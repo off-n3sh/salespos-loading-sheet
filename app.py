@@ -2723,6 +2723,11 @@ def daily_sales_report():
                 # Check if this payment was made today
                 if start_of_day <= payment_date_local < end_of_day:
                     
+                    # SKIP if this is the same as today's initial payment (to avoid double counting)
+                    if is_todays_order and payment_amount == payment:
+                        print(f"⚠️  SKIPPING duplicate payment for today's order {receipt_id}")
+                        continue
+                    
                     # Add to sales totals
                     if order_type in ['retail', 'app']:
                         total_retail_paid += payment_amount
@@ -2746,6 +2751,10 @@ def daily_sales_report():
                             total_cash += cash_portion
                             total_mpesa += mpesa_portion
                             print(f"   └── 📱 MPESA: +{mpesa_portion}, 💵 CASH: +{cash_portion}")
+                        else:
+                            # No payment_type found - assume cash for old orders
+                            total_cash += payment_amount
+                            print(f"   └── 💵 CASH: +{payment_amount} (no payment_type found)")
                         
                     else:
                         total_wholesale_paid += payment_amount
