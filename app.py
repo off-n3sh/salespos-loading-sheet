@@ -2707,8 +2707,8 @@ def daily_sales_report():
                     total_cash += payment
                     print(f"   └── 💵 CASH: +{payment}")
         
-        # Always add current balance to total debt
-        if balance > 0:
+        # Add current balance to total debt (ONLY for orders created today)
+        if balance > 0 and is_todays_order:
             total_debt += balance
         
         # Process payment_history for payments made TODAY (from any order date)
